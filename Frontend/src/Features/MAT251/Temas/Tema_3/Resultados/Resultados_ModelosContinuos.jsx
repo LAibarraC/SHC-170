@@ -22,19 +22,37 @@ export default function Resultados_ModelosContinuos({ resultados, modelo, onOpen
                 Resultados {modelo}
             </h3>
 
-            {resultados.probabilidadFinal !== null && (
+            {(resultados.probabilidadFinal !== null || resultados.c !== undefined || resultados.c1 !== undefined) && (
                 <div style={{ backgroundColor: '#eff6ff', padding: '10px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #bfdbfe', position: 'relative' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                        <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>Probabilidad Calculada {renderLatex('P(X)')}</div>
+                        <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                            {resultados.c !== undefined || resultados.c1 !== undefined ? `Valor Calculado ${renderLatex('c')}` : `Probabilidad Calculada ${renderLatex('P(X)')}`}
+                        </div>
                         {onOpenProcedimiento && (
                             <button onClick={() => onOpenProcedimiento('probabilidad')} title="Ver procedimiento matemático" style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
                                 <IconoProcedimiento />
                             </button>
                         )}
                     </div>
-                    <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
-                        {formatNum(resultados.probabilidadFinal)} <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>({(resultados.probabilidadFinal * 100).toFixed(2)}%)</span>
-                    </div>
+                    
+                    {resultados.c1 !== undefined && resultados.c2 !== undefined ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+                            <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
+                                <span style={{ fontSize: '1rem', marginRight: '5px' }}>c₁ =</span>{formatNum(resultados.c1)}
+                            </div>
+                            <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
+                                <span style={{ fontSize: '1rem', marginRight: '5px' }}>c₂ =</span>{formatNum(resultados.c2)}
+                            </div>
+                        </div>
+                    ) : resultados.c !== undefined ? (
+                        <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
+                            <span style={{ fontSize: '1rem', marginRight: '5px' }}>c =</span>{formatNum(resultados.c)}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
+                            {formatNum(resultados.probabilidadFinal)} <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>({(resultados.probabilidadFinal * 100).toFixed(2)}%)</span>
+                        </div>
+                    )}
                 </div>
             )}
 

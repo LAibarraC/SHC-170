@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { puntualBinomial, puntualPoisson, puntualHipergeometrica } from '../../../Matematicas/logica_Tema3';
+import { jStat } from 'jstat';
 
 export default function ModalProcedimientoModelos({ modelo, params, condicion, momento, onClose }) {
     const latexRef = useRef(null);
@@ -15,7 +16,7 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
         if (!latexRef.current) return;
 
         let htmlContent = "";
-        const { tipo, valorX, valorB } = condicion;
+        const { tipo, valorX, valorB, valX, valX2, valP, intervals } = condicion || {};
         const renderMath = (math) => {
             const rendered = katex.renderToString(math, { throwOnError: false, displayMode: true });
             return `<div style="border: 1px dashed #cbd5e1; padding: 8px 15px; border-radius: 6px; background-color: #ffffff; margin-top: 8px; overflow-x: auto;">${rendered}</div>`;
@@ -48,6 +49,10 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
                 formBase = "E(X) = \\frac{a + b}{2}";
                 sust = `E(X) = \\frac{${params.a} + ${params.b}}{2}`;
                 res = (params.a + params.b) / 2;
+            } else if (modelo === 'Normal') {
+                formBase = "E(X) = \\mu";
+                sust = `E(X) = ${params.mu}`;
+                res = params.mu;
             }
             htmlContent = `
                 <div style="${styleContainer}">
@@ -87,6 +92,10 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
                 formBase = "V(X) = \\frac{(b - a)^2}{12}";
                 sust = `V(X) = \\frac{(${params.b} - ${params.a})^2}{12}`;
                 res = Math.pow(params.b - params.a, 2) / 12;
+            } else if (modelo === 'Normal') {
+                formBase = "V(X) = \\sigma^2";
+                sust = `V(X) = ${params.sigma}^2`;
+                res = Math.pow(params.sigma, 2);
             }
             htmlContent = `
                 <div style="${styleContainer}">
@@ -109,6 +118,7 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
             if (modelo === 'Poisson') varVal = params.lambda;
             if (modelo === 'Hipergeometrica') varVal = params.n * (params.K / params.N) * ((params.N - params.K) / params.N) * ((params.N - params.n) / (params.N - 1));
             if (modelo === 'uniforme' || modelo === 'Uniforme') varVal = Math.pow(params.b - params.a, 2) / 12;
+            if (modelo === 'Normal') varVal = Math.pow(params.sigma, 2);
             
             htmlContent = `
                 <div style="${styleContainer}">
@@ -131,12 +141,13 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
             const formPoisson = `P(X=x) = \\frac{e^{-\\lambda} \\lambda^x}{x!}`;
             const formHiper = `P(X=x) = \\frac{\\binom{K}{x} \\binom{N-K}{n-x}}{\\binom{N}{n}}`;
             const formUniforme = `f(x) = \\frac{1}{b - a} \\quad P(c \\leq X \\leq d) = \\int_{c}^{d} \\frac{1}{b - a} dx = \\frac{d - c}{b - a}`;
+            const formNormal = `Z = \\frac{x - \\mu}{\\sigma} \\quad \\rightarrow \\quad P(X \\leq x) = P\\left(Z \\leq \\frac{x - \\mu}{\\sigma}\\right) = \\Phi(Z)`;
 
             let formulaBase = "";
             let sustitucionEjemplo = "";
             let resultadoEjemplo = 0;
 
-            const xShow = tipo === 'intervalo' ? valorX : valorX;
+            const xShow = tipo === 'intervalo' ? (valX ?? valorX) : (valX ?? valorX);
 
             if (modelo === 'Bernoulli') {
                 formulaBase = formBernoulli;
@@ -156,45 +167,136 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
                 resultadoEjemplo = puntualHipergeometrica(params.N, params.K, params.n, xShow);
             } else if (modelo === 'uniforme' || modelo === 'Uniforme') {
                 formulaBase = formUniforme;
-                
-                let valC = 0, valD = 0;
-                
-                if (tipo.includes('menor')) {
-                    valC = params.a;
-                    valD = Math.min(valorX, params.b);
-                } else if (tipo.includes('mayor')) {
-                    valC = Math.max(valorX, params.a);
-                    valD = params.b;
-                } else if (tipo.includes('intervalo')) {
-                    valC = Math.max(valorX, params.a);
-                    valD = Math.min(valorB, params.b);
-                }
+                let cX = Number(valX ?? valorX);
+                let cX2 = Number(valX2 ?? valorB);
 
-                if (valC >= valD) {
-                    sustitucionEjemplo = `P(${valC} \\leq X \\leq ${valD}) = 0 \\quad (\\text{Fuera de rango})`;
+                if (tipo.includes('inversa')) {
+                    formulaBase = `P = \\int_{a}^{c} f(x) dx \\Rightarrow c = a + p \\cdot (b - a)`;
+                    if (tipo === 'inversa_menor') {
+                        sustitucionEjemplo = `P(X < c) = ${valP} \\Rightarrow c = ${params.a} + ${valP} \\cdot (${params.b} - ${params.a})`;
+                        resultadoEjemplo = params.a + valP * (params.b - params.a);
+                    } else if (tipo === 'inversa_mayor') {
+                        sustitucionEjemplo = `P(X > c) = ${valP} \\Rightarrow c = ${params.b} - ${valP} \\cdot (${params.b} - ${params.a})`;
+                        resultadoEjemplo = params.b - valP * (params.b - params.a);
+                    } else if (tipo === 'inversa_exterior') {
+                        sustitucionEjemplo = `P(X < c_1) = \\frac{${valP}}{2}, P(X > c_2) = \\frac{${valP}}{2}`;
+                        resultadoEjemplo = valP; // Not a single result here, just for show
+                    }
+                } else if (tipo === 'exterior') {
+                    let p1 = Math.max(0, Math.min(cX, params.b) - params.a) / (params.b - params.a);
+                    let p2 = Math.max(0, params.b - Math.max(cX2, params.a)) / (params.b - params.a);
+                    sustitucionEjemplo = `P(X < ${cX}) + P(X > ${cX2}) = \\frac{${Math.min(cX, params.b)} - ${params.a}}{${params.b} - ${params.a}} + \\frac{${params.b} - ${Math.max(cX2, params.a)}}{${params.b} - ${params.a}}`;
+                    resultadoEjemplo = p1 + p2;
+                } else if (tipo === 'suma_intervalos') {
+                    sustitucionEjemplo = `\\text{Suma de } ${intervals?.length || 0} \\text{ intervalos integrados sobre f(x)}`;
+                    resultadoEjemplo = 0; // Simplified for modal
+                } else {
+                    let valC = 0, valD = 0;
+                    if (tipo.includes('menor')) {
+                        valC = params.a;
+                        valD = Math.min(cX, params.b);
+                    } else if (tipo.includes('mayor')) {
+                        valC = Math.max(cX, params.a);
+                        valD = params.b;
+                    } else if (tipo.includes('intervalo') || tipo.includes('entre')) {
+                        valC = Math.max(cX, params.a);
+                        valD = Math.min(cX2, params.b);
+                    }
+
+                    if (valC >= valD) {
+                        sustitucionEjemplo = `P(${valC} \\leq X \\leq ${valD}) = 0 \\quad (\\text{Fuera de rango})`;
+                        resultadoEjemplo = 0;
+                    } else {
+                        sustitucionEjemplo = `P(${valC} \\leq X \\leq ${valD}) = \\int_{${valC}}^{${valD}} \\frac{1}{${params.b} - ${params.a}} dx = \\frac{${valD} - ${valC}}{${params.b} - ${params.a}}`;
+                        resultadoEjemplo = (valD - valC) / (params.b - params.a);
+                    }
+                }
+            } else if (modelo === 'Normal') {
+                formulaBase = formNormal;
+                let cX = Number(valX ?? valorX);
+                let cX2 = Number(valX2 ?? valorB);
+                
+                if (tipo.includes('inversa')) {
+                    formulaBase = `Z = \\Phi^{-1}(p) \\Rightarrow c = \\mu + Z \\cdot \\sigma`;
+                    if (tipo === 'inversa_menor') {
+                        const z = jStat.normal.inv(valP, 0, 1);
+                        const c = params.mu + z * params.sigma;
+                        sustitucionEjemplo = `\\Phi^{-1}(${valP}) \\approx ${z.toFixed(4)} \\Rightarrow c = ${params.mu} + (${z.toFixed(4)})(${params.sigma})`;
+                        resultadoEjemplo = c;
+                    } else if (tipo === 'inversa_mayor') {
+                        const z = jStat.normal.inv(1 - valP, 0, 1);
+                        const c = params.mu + z * params.sigma;
+                        sustitucionEjemplo = `\\Phi^{-1}(1 - ${valP}) \\approx ${z.toFixed(4)} \\Rightarrow c = ${params.mu} + (${z.toFixed(4)})(${params.sigma})`;
+                        resultadoEjemplo = c;
+                    } else if (tipo === 'inversa_exterior') {
+                        const z1 = jStat.normal.inv(valP / 2, 0, 1);
+                        const z2 = jStat.normal.inv(1 - valP / 2, 0, 1);
+                        sustitucionEjemplo = `Z_1 \\approx ${z1.toFixed(4)}, Z_2 \\approx ${z2.toFixed(4)} \\Rightarrow c_1 = ${params.mu} + Z_1\\sigma, c_2 = ${params.mu} + Z_2\\sigma`;
+                        resultadoEjemplo = valP;
+                    }
+                } else if (tipo === 'exterior') {
+                    const zX1 = (cX - params.mu) / params.sigma;
+                    const zX2 = (cX2 - params.mu) / params.sigma;
+                    const p1 = jStat.normal.cdf(cX, params.mu, params.sigma);
+                    const p2 = 1 - jStat.normal.cdf(cX2, params.mu, params.sigma);
+                    sustitucionEjemplo = `P(X < ${cX}) + P(X > ${cX2}) = \\Phi(${zX1.toFixed(4)}) + (1 - \\Phi(${zX2.toFixed(4)}))`;
+                    resultadoEjemplo = p1 + p2;
+                } else if (tipo === 'suma_intervalos') {
+                    sustitucionEjemplo = `\\text{Suma de las áreas bajo la curva Normal tipificada para } ${intervals?.length || 0} \\text{ intervalos}`;
                     resultadoEjemplo = 0;
                 } else {
-                    sustitucionEjemplo = `P(${valC} \\leq X \\leq ${valD}) = \\int_{${valC}}^{${valD}} \\frac{1}{${params.b} - ${params.a}} dx = \\frac{${valD} - ${valC}}{${params.b} - ${params.a}}`;
-                    resultadoEjemplo = (valD - valC) / (params.b - params.a);
+                    const zX = (cX - params.mu) / params.sigma;
+                    const pX = jStat.normal.cdf(cX, params.mu, params.sigma);
+
+                    if (tipo.includes('menor')) {
+                        sustitucionEjemplo = `P(X \\leq ${cX}) = P\\left(Z \\leq \\frac{${cX} - ${params.mu}}{${params.sigma}}\\right) = P(Z \\leq ${zX.toFixed(4)})`;
+                        resultadoEjemplo = pX;
+                    } else if (tipo.includes('mayor')) {
+                        sustitucionEjemplo = `P(X \\geq ${cX}) = 1 - P\\left(Z \\leq \\frac{${cX} - ${params.mu}}{${params.sigma}}\\right) = 1 - P(Z \\leq ${zX.toFixed(4)})`;
+                        resultadoEjemplo = 1 - pX;
+                    } else if (tipo.includes('intervalo') || tipo.includes('entre')) {
+                        const zB = (cX2 - params.mu) / params.sigma;
+                        const pB = jStat.normal.cdf(cX2, params.mu, params.sigma);
+                        sustitucionEjemplo = `P(${cX} \\leq X \\leq ${cX2}) = P\\left(\\frac{${cX} - ${params.mu}}{${params.sigma}} \\leq Z \\leq \\frac{${cX2} - ${params.mu}}{${params.sigma}}\\right) = \\Phi(${zB.toFixed(4)}) - \\Phi(${zX.toFixed(4)})`;
+                        resultadoEjemplo = pB - pX;
+                    }
                 }
             }
 
             if (modelo === 'uniforme' || modelo === 'Uniforme') {
                 htmlContent = `
                     <div style="${styleContainer}">
-                        <strong style="${styleTitle}">1. Función de Densidad e Integral:</strong>
+                        <strong style="${styleTitle}">1. Función de Densidad e Integral (o Inversa):</strong>
                         ${renderMath(formulaBase)}
                     </div>
                     <div style="${styleContainer}">
-                        <strong style="${styleTitle}">2. Sustituyendo los límites solicitados ajustados al soporte $[a, b]$:</strong>
+                        <strong style="${styleTitle}">2. Sustituyendo los parámetros ($a=${params.a}, b=${params.b}$):</strong>
                         ${renderMath(sustitucionEjemplo)}
                     </div>
                     <div style="${styleContainer}">
-                        <strong style="${styleTitle}">3. Probabilidad Resultante:</strong>
-                        ${renderMath(`P = ${resultadoEjemplo.toFixed(4)}`)}
+                        <strong style="${styleTitle}">3. ${tipo.includes('inversa') ? 'Valor Límite Calculado (c)' : 'Probabilidad Resultante'}:</strong>
+                        ${renderMath(tipo.includes('inversa') && !tipo.includes('exterior') ? `c = ${resultadoEjemplo.toFixed(4)}` : `P = ${resultadoEjemplo.toFixed(4)}`)}
                     </div>
                     <div style="font-size: 0.9em; color: #64748b; font-style: italic; text-align: center;">
                         * Recuerde que para variables continuas $P(X = x) = 0$ y que los límites se restringen al soporte matemático definido.
+                    </div>
+                `;
+            } else if (modelo === 'Normal') {
+                htmlContent = `
+                    <div style="${styleContainer}">
+                        <strong style="${styleTitle}">1. Tipificación a Normal Estándar Z (o Inversa Z):</strong>
+                        ${renderMath(formulaBase)}
+                    </div>
+                    <div style="${styleContainer}">
+                        <strong style="${styleTitle}">2. Sustituyendo los valores para Z:</strong>
+                        ${renderMath(sustitucionEjemplo)}
+                    </div>
+                    <div style="${styleContainer}">
+                        <strong style="${styleTitle}">3. ${tipo.includes('inversa') ? 'Valor Límite Calculado (c)' : 'Probabilidad Resultante'}:</strong>
+                        ${renderMath(tipo.includes('inversa') && !tipo.includes('exterior') ? `c = ${resultadoEjemplo.toFixed(4)}` : `P = ${resultadoEjemplo.toFixed(4)}`)}
+                    </div>
+                    <div style="font-size: 0.9em; color: #64748b; font-style: italic; text-align: center;">
+                        * Recuerde que para variables continuas $P(X = x) = 0$.
                     </div>
                 `;
             } else if (tipo === 'exacta') {

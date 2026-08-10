@@ -23,10 +23,12 @@ const CustomKatexLabel = (props) => {
 
 const getOperador = (tipo) => {
     switch (tipo) {
-        case 'mayor_igual': return '\\boldsymbol{\\ge}';
-        case 'menor_igual': return '\\boldsymbol{\\le}';
-        case 'mayor_estricto': return '\\boldsymbol{>}';
-        case 'menor_estricto': return '\\boldsymbol{<}';
+        case 'mayor':
+        case 'mayor_igual': 
+        case 'mayor_estricto': return '\\boldsymbol{\\ge}';
+        case 'menor':
+        case 'menor_igual': 
+        case 'menor_estricto': return '\\boldsymbol{\\le}';
         default: return '\\boldsymbol{=}';
     }
 };
@@ -88,26 +90,62 @@ export default function GraficoModelosContinuos({ datos, condicion, resultados }
                                 />
                             )}
 
-                            {condicion && condicion.valorX !== undefined && (
-                                <>
-                                    <ReferenceLine
-                                        x={condicion.valorX}
-                                        stroke="#f97316"
-                                        strokeDasharray="4 4"
-                                        strokeWidth={3}
-                                        label={<CustomKatexLabel value={condicion.tipo.includes('intervalo') ? `\\mathbf{X} \\boldsymbol{=} ${condicion.valorX}` : `\\mathbf{X} ${getOperador(condicion.tipo)} ${condicion.valorX}`} />}
-                                    />
-                                    {condicion.tipo.includes('intervalo') && condicion.valorB !== undefined && (
-                                        <ReferenceLine
-                                            x={condicion.valorB}
-                                            stroke="#f97316"
-                                            strokeDasharray="4 4"
-                                            strokeWidth={3}
-                                            label={<CustomKatexLabel value={`X = ${condicion.valorB}`} />}
-                                        />
-                                    )}
-                                </>
-                            )}
+                            {(() => {
+                                if (!condicion || !condicion.tipo) return null;
+                                const tipo = condicion.tipo;
+                                const refs = [];
+                                
+                                const valX = condicion.valX !== undefined ? condicion.valX : condicion.valorX;
+                                const valX2 = condicion.valX2 !== undefined ? condicion.valX2 : condicion.valorB;
+
+                                if (tipo === 'menor' || tipo === 'menor_igual' || tipo === 'mayor' || tipo === 'mayor_igual') {
+                                    if (valX !== undefined) {
+                                        refs.push(
+                                            <ReferenceLine key="line1" x={valX} stroke="#f97316" strokeDasharray="4 4" strokeWidth={3}
+                                                label={<CustomKatexLabel value={`\\mathbf{X} ${getOperador(tipo)} ${valX}`} />} />
+                                        );
+                                    }
+                                } else if (tipo === 'entre' || tipo === 'intervalo' || tipo === 'exterior') {
+                                    if (valX !== undefined && valX2 !== undefined) {
+                                        refs.push(
+                                            <ReferenceLine key="line1" x={valX} stroke="#f97316" strokeDasharray="4 4" strokeWidth={3}
+                                                label={<CustomKatexLabel value={`X_1 = ${valX}`} />} />
+                                        );
+                                        refs.push(
+                                            <ReferenceLine key="line2" x={valX2} stroke="#f97316" strokeDasharray="4 4" strokeWidth={3}
+                                                label={<CustomKatexLabel value={`X_2 = ${valX2}`} />} />
+                                        );
+                                    }
+                                } else if (tipo === 'suma_intervalos' && condicion.intervals) {
+                                    condicion.intervals.forEach((intv, idx) => {
+                                        const min = parseFloat(intv.min);
+                                        const max = parseFloat(intv.max);
+                                        if (!isNaN(min) && !isNaN(max)) {
+                                            refs.push(<ReferenceLine key={`min-${idx}`} x={min} stroke="#f97316" strokeDasharray="4 4" strokeWidth={2} label={<CustomKatexLabel value={`x_{${idx*2+1}}`} />} />);
+                                            refs.push(<ReferenceLine key={`max-${idx}`} x={max} stroke="#f97316" strokeDasharray="4 4" strokeWidth={2} label={<CustomKatexLabel value={`x_{${idx*2+2}}`} />} />);
+                                        }
+                                    });
+                                } else if (tipo === 'inversa_menor' || tipo === 'inversa_mayor') {
+                                    if (resultados?.c !== undefined) {
+                                        refs.push(
+                                            <ReferenceLine key="lineC" x={resultados.c} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={3}
+                                                label={<CustomKatexLabel value={`c = ${resultados.c.toFixed(4)}`} />} />
+                                        );
+                                    }
+                                } else if (tipo === 'inversa_exterior') {
+                                    if (resultados?.c1 !== undefined && resultados?.c2 !== undefined) {
+                                        refs.push(
+                                            <ReferenceLine key="lineC1" x={resultados.c1} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={3}
+                                                label={<CustomKatexLabel value={`c_1 = ${resultados.c1.toFixed(4)}`} />} />
+                                        );
+                                        refs.push(
+                                            <ReferenceLine key="lineC2" x={resultados.c2} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={3}
+                                                label={<CustomKatexLabel value={`c_2 = ${resultados.c2.toFixed(4)}`} />} />
+                                        );
+                                    }
+                                }
+                                return refs;
+                            })()}
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
