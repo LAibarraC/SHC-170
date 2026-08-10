@@ -23,10 +23,16 @@ const getIcon = (val) => {
         case 'muestreo': return (
             <svg {...props}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
         );
+        case 'distribuciones_muestrales': return (
+            <svg {...props}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
+        );
         case 'dist_uniforme': return (
             <svg {...props}><line x1="3" y1="20" x2="21" y2="20" /><line x1="3" y1="4" x2="3" y2="20" /><rect x="6" y="10" width="12" height="10" /></svg>
         );
         case 'dist_continua': return (
+            <svg {...props}><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 9h8" /><path d="M8 13h.01" /><path d="M12 13h.01" /><path d="M16 13h.01" /><path d="M8 17h.01" /><path d="M12 17h.01" /><path d="M16 17h.01" /></svg>
+        );
+        case 'dist_continua_v2': return (
             <svg {...props}><path d="M4 19h16" /><path d="M4 15h16" /><path d="M4 15v4" /><path d="M20 15v4" /><path d="M4 11v-4" /><path d="M20 11v-4" /><path d="M4 11h16" /><path d="M4 7h16" /></svg>
         );
         case 'dist_discreta': return (
@@ -34,6 +40,9 @@ const getIcon = (val) => {
         );
         case 'modelos_discretos': return (
             <svg {...props}><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="M3 15h6"/><path d="M3 18h6"/></svg>
+        );
+        case 'modelos_continuos': return (
+            <svg {...props}><path d="M3 20h18"/><path d="M4 20c1.5-7 3-14 8-14s6.5 7 8 14"/></svg>
         );
         default: return null;
     }

@@ -1,4 +1,6 @@
 import React from 'react';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import {
     ComposedChart,
     Bar,
@@ -11,12 +13,42 @@ import {
     ReferenceLine,
     ReferenceArea,
     LabelList,
-    Label
+    Label,
+    Line,
+    Area
 } from 'recharts';
 import MarcoWidgetMAT251 from '../../ui/MarcoWidgetMAT251';
 
+const CustomKatexLabel = (props) => {
+    const { viewBox, value } = props;
+    if (!viewBox) return null;
+    const { x, y } = viewBox;
+    
+    return (
+        <foreignObject x={x - 50} y={y - 30} width={100} height={30} style={{ overflow: 'visible' }}>
+            <div 
+                dangerouslySetInnerHTML={{ __html: katex.renderToString(value, { throwOnError: false }) }} 
+                style={{ color: '#1e293b', fontSize: '12px', fontWeight: 'bold', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%' }} 
+            />
+        </foreignObject>
+    );
+};
+
+const getOperador = (tipo) => {
+    switch (tipo) {
+        case 'mayor_igual': return '\\boldsymbol{\\ge}';
+        case 'menor_igual': return '\\boldsymbol{\\le}';
+        case 'mayor_estricto': return '\\boldsymbol{>}';
+        case 'menor_estricto': return '\\boldsymbol{<}';
+        default: return '\\boldsymbol{=}';
+    }
+};
+
 export default function GraficoBastonesModelos({ datos, condicion, resultados }) {
     if (!datos || datos.length === 0) return null;
+
+    // Detectar si es el modelo de Bernoulli por la forma de sus datos
+    const esBernoulli = datos.length === 2 && datos[0].x === 0 && datos[1].x === 1;
 
     // --- Lógica de Recorte Dinámico del Eje X ---
     const esperanza = resultados && resultados.esperanza !== undefined ? resultados.esperanza : null;
@@ -45,12 +77,6 @@ export default function GraficoBastonesModelos({ datos, condicion, resultados })
         maxX_idx = datos.length - 1;
     }
 
-    const minRecorte = Math.max(0, minX_idx - 2);
-    const maxRecorte = Math.min(datos.length - 1, maxX_idx + 10);
-
-    const datosRecortados = datos.slice(minRecorte, maxRecorte + 1);
-    // --------------------------------------------
-
     // Función para determinar si una barra debe estar resaltada (cae en la condición)
     const isResaltado = (x) => {
         if (!condicion) return false;
@@ -59,8 +85,33 @@ export default function GraficoBastonesModelos({ datos, condicion, resultados })
         if (tipo === 'menor_igual') return x <= valorX;
         if (tipo === 'mayor_igual') return x >= valorX;
         if (tipo === 'intervalo') return x >= valorX && x <= valorB;
+        if (tipo === 'menor_estricto') return x < valorX;
+        if (tipo === 'mayor_estricto') return x > valorX;
+        if (tipo === 'intervalo_estricto') return x > valorX && x < valorB;
         return false;
     };
+
+    // Función para extender el área naranja hasta las líneas de referencia
+    const isEnRangoArea = (x) => {
+        if (!condicion) return false;
+        const { tipo, valorX, valorB } = condicion;
+        if (tipo === 'exacta') return x === valorX;
+        
+        // El área siempre se dibuja hasta los límites dados por el usuario
+        if (tipo === 'menor_igual' || tipo === 'menor_estricto') return x <= valorX;
+        if (tipo === 'mayor_igual' || tipo === 'mayor_estricto') return x >= valorX;
+        if (tipo === 'intervalo' || tipo === 'intervalo_estricto') return x >= valorX && x <= valorB;
+        
+        return false;
+    };
+
+    const minRecorte = Math.max(0, minX_idx - 2);
+    const maxRecorte = Math.min(datos.length - 1, maxX_idx + 10);
+
+    const datosRecortados = datos.slice(minRecorte, maxRecorte + 1).map(d => ({
+        ...d,
+        p_linea: condicion && condicion.tipo !== 'exacta' && condicion.valorX !== undefined ? (isEnRangoArea(d.x) ? d.p : null) : null
+    }));
 
     // Custom Tooltip
     const CustomTooltip = ({ active, payload, label }) => {
@@ -83,91 +134,98 @@ export default function GraficoBastonesModelos({ datos, condicion, resultados })
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                             data={datosRecortados}
-                            margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
+                            margin={{ top: 20, right: 30, left: 0, bottom: 30 }}
+                            barCategoryGap={esBernoulli ? '15%' : '10%'}
                         >
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
 
+
+
                             <XAxis
                                 dataKey="x"
-                                type="number"
-                                domain={['dataMin', 'dataMax']}
-                                padding={{ left: 20, right: 20 }}
+                                type={esBernoulli ? "category" : "number"}
+                                domain={esBernoulli ? undefined : ['dataMin', 'dataMax']}
+                                padding={esBernoulli ? { left: 40, right: 40 } : { left: 20, right: 20 }}
                                 ticks={datosRecortados.map(d => d.x)}
                                 tick={{ fill: '#333333', fontSize: 12, fontWeight: 600 }}
                                 axisLine={{ stroke: '#333333', strokeWidth: 2 }}
                                 tickLine={{ stroke: '#333333', strokeWidth: 2 }}
-                                label={{ value: 'Valor (x)', position: 'insideBottom', offset: -10, fill: '#333333', fontSize: 13, fontWeight: 600 }}
+                                label={{ value: 'Valor (x)', position: 'insideBottom', offset: -10, fill: '#333333', fontSize: 14, fontWeight: 'bold', textAnchor: 'middle' }}
                             />
 
                             <YAxis
-                                domain={[0, 'auto']}
+                                domain={esBernoulli ? [0, 1] : [0, 'auto']}
                                 padding={{ top: 30 }}
                                 tick={{ fill: '#333333', fontSize: 12, fontWeight: 600 }}
                                 axisLine={{ stroke: '#333333', strokeWidth: 2 }}
                                 tickLine={{ stroke: '#333333', strokeWidth: 2 }}
-                                label={{ value: 'Probabilidad P(x)', angle: -90, position: 'insideLeft', offset: 10, fill: '#333333', fontSize: 13, fontWeight: 600 }}
+                                label={{ value: 'Probabilidad P(x)', angle: -90, position: 'insideLeft', offset: 15, fill: '#333333', fontSize: 14, fontWeight: 'bold', textAnchor: 'middle' }}
                             />
 
                             <Tooltip content={<CustomTooltip />} />
 
-                            {esperanza !== null && desviacion !== null && (
+                            {/* Reference lines moved to the bottom so they draw on top */}
+
+                            {/* El gráfico de bastones se simula con barras muy delgadas, pero para Bernoulli es un histograma */}
+                            <Bar 
+                                dataKey="p" 
+                                fill="#3b82f6" 
+                                stroke={esBernoulli ? "#1e293b" : "none"}
+                                {...(esBernoulli ? {} : { barSize: 15, radius: [0, 0, 0, 0] })}
+                            >
+                                {datosRecortados.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill="#3b82f6"
+                                        fillOpacity={isResaltado(entry.x) ? 0.4 : 1}
+                                    />
+                                ))}
+                            </Bar>
+
+                            {/* Línea envolvente (envelope) para mostrar la forma de la distribución (excepto en Bernoulli) */}
+                            {!esBernoulli && (
                                 <>
-                                    <ReferenceArea
-                                        x1={Math.max(0, esperanza - desviacion)}
-                                        x2={esperanza + desviacion}
-                                        fill="#94a3b8"
-                                        fillOpacity={0.15}
-                                        ifOverflow="hidden"
+                                    <Area
+                                        type="linear"
+                                        dataKey="p_linea"
+                                        fill="#f97316"
+                                        fillOpacity={0.25}
+                                        stroke="none"
+                                        isAnimationActive={false}
+                                        connectNulls={false}
                                     />
-                                    <ReferenceLine
-                                        x={esperanza - desviacion}
-                                        stroke="#059669"
-                                        strokeDasharray="3 3"
-                                        label={{ position: 'insideTopRight', value: `E(X) - σ = ${(esperanza - desviacion).toFixed(2)}`, fill: '#059669', fontSize: 9, fontWeight: 600 }}
-                                    />
-                                    <ReferenceLine
-                                        x={esperanza + desviacion}
-                                        stroke="#059669"
-                                        strokeDasharray="3 3"
-                                        label={{ position: 'insideTopLeft', value: `E(X) + σ = ${(esperanza + desviacion).toFixed(2)}`, fill: '#059669', fontSize: 9, fontWeight: 600 }}
+                                    <Line
+                                        type="linear"
+                                        dataKey="p_linea"
+                                        stroke="#334155"
+                                        strokeWidth={1}
+                                        dot={false}
+                                        isAnimationActive={false}
+                                        connectNulls={false}
                                     />
                                 </>
                             )}
 
-                            {esperanza !== null && (
-                                <ReferenceLine
-                                    x={esperanza}
-                                    stroke="#dc2626"
-                                    strokeDasharray="3 3"
-                                    strokeWidth={1.5}
-                                    label={{ position: 'top', value: `E(X) = ${esperanza.toFixed(2)}`, fill: '#dc2626', fontSize: 10, fontWeight: 700 }}
-                                />
-                            )}
-
-                            {/* El gráfico de bastones se simula con barras muy delgadas */}
-                            <Bar dataKey="p" barSize={8} radius={[4, 4, 0, 0]}>
-                                {datosRecortados.map((entry, index) => (
-                                    <Cell
-                                        key={`cell-${index}`}
-                                        fill={isResaltado(entry.x) ? '#3b82f6' : '#cbd5e1'}
+                            {condicion && condicion.valorX !== undefined && (
+                                <>
+                                    <ReferenceLine
+                                        x={condicion.valorX}
+                                        stroke="#f97316"
+                                        strokeDasharray="4 4"
+                                        strokeWidth={3}
+                                        label={<CustomKatexLabel value={condicion.tipo.includes('intervalo') ? `\\mathbf{X} \\boldsymbol{=} ${condicion.valorX}` : `\\mathbf{X} ${getOperador(condicion.tipo)} ${condicion.valorX}`} />}
                                     />
-                                ))}
-                                <LabelList
-                                    dataKey="p"
-                                    content={(props) => {
-                                        const { x, y, width, value, index } = props;
-                                        const entry = datosRecortados[index];
-                                        if (entry && isResaltado(entry.x)) {
-                                            return (
-                                                <text x={x + width / 2} y={y - 5} fill="#3b82f6" textAnchor="middle" fontSize="9" fontWeight="bold">
-                                                    {value.toFixed(2)}
-                                                </text>
-                                            );
-                                        }
-                                        return null;
-                                    }}
-                                />
-                            </Bar>
+                                    {condicion.tipo.includes('intervalo') && condicion.valorB !== undefined && (
+                                        <ReferenceLine
+                                            x={condicion.valorB}
+                                            stroke="#f97316"
+                                            strokeDasharray="4 4"
+                                            strokeWidth={3}
+                                            label={<CustomKatexLabel value={`X = ${condicion.valorB}`} />}
+                                        />
+                                    )}
+                                </>
+                            )}
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>

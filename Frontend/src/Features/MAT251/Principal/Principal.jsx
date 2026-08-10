@@ -25,15 +25,23 @@ import ResultadosReglaMultiplicacion from '../Temas/Tema_1/Resultados/Resultados
 import ResultadosMuestreo from '../Temas/Tema_1/Resultados/Resultados_Muestreo';
 import ResultadosEspacioContinuo from '../Temas/Tema_1/Resultados/Resultados_EspacioContinuo';
 
+import Resultados_DistribucionesMuestrales from '../Temas/Tema_1/Resultados/Resultados_DistribucionesMuestrales';
+
 import Operacion from '../Temas/Tema_1/Controles/Operacion';
 import Controles_DistribucionDiscreta from '../Temas/Tema_2/Controles/Controles_DistribucionDiscreta';
 import ControlDistribucionContinua from '../Temas/Tema_2/Controles/ControlDistribucionContinua';
+import ControlDistribucionContinua_v2 from '../Temas/Tema_2/Controles/ControlDistribucionContinua_v2';
 import Resultados_DistribucionDiscreta from '../Temas/Tema_2/Resultados/Resultados_DistribucionDiscreta';
 import ResultadoDistribucionContinua from '../Temas/Tema_2/Resultados/ResultadoDistribucionContinua';
+import ResultadoDistribucionContinua_v2 from '../Temas/Tema_2/Resultados/ResultadoDistribucionContinua_v2';
+import { calcularMomentosTeoricos } from '../Matematicas/logica_Tema2_v2';
 import '../styles/Temas/Tema2.css';
 
 import Controles_ModelosDiscretos from '../Temas/Tema_3/Controles/Controles_ModelosDiscretos';
 import Resultados_ModelosDiscretos from '../Temas/Tema_3/Resultados/Resultados_ModelosDiscretos';
+import Controles_ModelosContinuos from '../Temas/Tema_3/Controles/Controles_ModelosContinuos';
+import GraficoModelosContinuos from '../Graficas/Tema_3/GraficoModelosContinuos';
+import Resultados_ModelosContinuos from '../Temas/Tema_3/Resultados/Resultados_ModelosContinuos';
 import GraficoBastonesModelos from '../Graficas/Tema_3/GraficoBastonesModelos';
 import ModalProcedimientoModelos from '../Temas/Tema_3/Modales/ModalProcedimientoModelos';
 import '../styles/Temas/Tema3.css';
@@ -144,12 +152,27 @@ export default function Principal() {
     // Estados para Tema 2: Discreta y Continua
     const [datosDiscretos, setDatosDiscretos] = useState(null);
     const [datosContinuos, setDatosContinuos] = useState(null);
+    const [datosContinuosV2, setDatosContinuosV2] = useState(null);
 
-    // Estados para Tema 3: Modelos
+    // Resultados Tema 3
     const [datosTema3, setDatosTema3] = useState(null);
+    const [datosTema3Continuos, setDatosTema3Continuos] = useState(null);
     const [modalProcTema3, setModalProcTema3] = useState(false);
 
     // ==========================================FUNCIONES //
+
+    const handleCalcularContinuaV2 = (tipo, parametros) => {
+        if (!tipo) {
+            setDatosContinuosV2(null);
+            return;
+        }
+        if (parametros.modoB) {
+            setDatosContinuosV2({ tipo, parametros, resultados: null });
+        } else {
+            const resultados = calcularMomentosTeoricos(tipo, parametros);
+            setDatosContinuosV2({ tipo, parametros, resultados });
+        }
+    };
 
     // Valores unicos de un Espacio mustral
     const valoresUnicos = useMemo(() => {
@@ -552,7 +575,7 @@ export default function Principal() {
                                 setTipoElementos={setTipoElementos}
                             />
                         )}
-                        {(operacion === 'probabilidad' || operacion === 'simulador_total' || operacion === 'regla_adicion' || operacion === 'regla_multiplicacion' || operacion === 'muestreo' || operacion === 'dist_uniforme' || operacion === 'dist_discreta' || operacion === 'dist_continua' || operacion === 'esperanza_varianza' || operacion === 'momentos_asimetria' || operacion === 'modelos_discretos') && (
+                        {(operacion === 'probabilidad' || operacion === 'simulador_total' || operacion === 'regla_adicion' || operacion === 'regla_multiplicacion' || operacion === 'muestreo' || operacion === 'distribuciones_muestrales' || operacion === 'dist_uniforme' || operacion === 'dist_discreta' || operacion === 'dist_continua' || operacion === 'esperanza_varianza' || operacion === 'momentos_asimetria' || operacion === 'modelos_discretos' || operacion === 'modelos_continuos') && (
                             <ControlesProbabilidad setModalVars={setModalVars} varSeleccionada={varSeleccionada} />
                         )}
                     </div>
@@ -565,7 +588,7 @@ export default function Principal() {
                 <div className="frecuencias" style={{ borderRadius: RADIUS }}>
                     {operacion && (
                         <h3 style={{ fontSize: FS.lg, fontFamily: FONT, fontWeight: 600 }}>
-                            Resultados: {operacion === 'conteo' ? 'TÉCNICAS DE CONTEO' : operacion === 'simulador_total' ? 'PROBABILIDAD TOTAL' : operacion === 'regla_adicion' ? 'AXIOMAS Y REGLA DE LA ADICIÓN' : operacion === 'regla_multiplicacion' ? 'REGLA DE LA MULTIPLICACIÓN' : operacion === 'muestreo' ? 'INTRODUCCIÓN AL MUESTREO' : operacion === 'dist_uniforme' ? 'PROBABILIDAD EN ESPACIO CONTINUO' : operacion === 'dist_discreta' ? 'VARIABLE ALEATORIA DISCRETA' : operacion === 'dist_continua' ? 'VARIABLE ALEATORIA CONTINUA' : operacion === 'modelos_discretos' ? 'MODELOS DISCRETOS ESPECIALES' : (subTipoProbabilidad === 'clasica' ? 'PROBABILIDAD CLÁSICA' : subTipoProbabilidad === 'frecuentista' ? 'PROBABILIDAD FRECUENTISTA' : 'PROBABILIDAD CONDICIONAL')}
+                            Resultados: {operacion === 'conteo' ? 'TÉCNICAS DE CONTEO' : operacion === 'simulador_total' ? 'PROBABILIDAD TOTAL' : operacion === 'regla_adicion' ? 'AXIOMAS Y REGLA DE LA ADICIÓN' : operacion === 'regla_multiplicacion' ? 'REGLA DE LA MULTIPLICACIÓN' : operacion === 'muestreo' ? 'INTRODUCCIÓN AL MUESTREO' : operacion === 'dist_uniforme' ? 'PROBABILIDAD EN ESPACIO CONTINUO' : operacion === 'dist_discreta' ? 'VARIABLE ALEATORIA DISCRETA' : operacion === 'dist_continua' ? 'CALCULADORA (BETA)' : operacion === 'dist_continua_v2' ? 'VARIABLE ALEATORIA CONTINUA' : operacion === 'modelos_discretos' ? 'DISTRIBUCIONES DISCRETAS' : operacion === 'modelos_continuos' ? 'DISTRIBUCIONES CONTINUAS' : (subTipoProbabilidad === 'clasica' ? 'PROBABILIDAD CLÁSICA' : subTipoProbabilidad === 'frecuentista' ? 'PROBABILIDAD FRECUENTISTA' : 'PROBABILIDAD CONDICIONAL')}
                         </h3>
                     )}
 
@@ -641,6 +664,19 @@ export default function Principal() {
                             <ControlDistribucionContinua onCalcular={setDatosContinuos} />
                             <ResultadoDistribucionContinua resultados={datosContinuos} />
                         </div>
+                    ) : operacion === 'dist_continua_v2' ? (
+                        <div className="tema2-container">
+                            <ControlDistribucionContinua_v2 onCalcular={handleCalcularContinuaV2} />
+                            {datosContinuosV2 && (
+                                <>
+                                    <ResultadoDistribucionContinua_v2 
+                                        resultados={datosContinuosV2.resultados} 
+                                        tipo={datosContinuosV2.tipo} 
+                                        parametros={datosContinuosV2.parametros}
+                                    />
+                                </>
+                            )}
+                        </div>
                     ) : operacion === 'modelos_discretos' ? (
                         <div className="tema3-container">
                             <Controles_ModelosDiscretos 
@@ -651,21 +687,49 @@ export default function Principal() {
                                 onCalcular={(datos) => {
                                     setDatosTema3(datos);
                                 }}
-                            />
-                            {datosTema3 && (
-                                <>
-                                    <Resultados_ModelosDiscretos 
-                                        resultados={datosTema3.resultados} 
-                                        modelo={datosTema3.modelo} 
-                                        onOpenProcedimiento={(tipo) => setModalProcTema3(tipo)}
-                                    />
-                                    <GraficoBastonesModelos 
-                                        datos={datosTema3.datosGrafico} 
-                                        condicion={datosTema3.condicion} 
-                                        resultados={datosTema3.resultados}
-                                    />
-                                </>
-                            )}
+                            >
+                                {datosTema3 && (
+                                    <>
+                                        <GraficoBastonesModelos 
+                                            datos={datosTema3.datosGrafico} 
+                                            condicion={datosTema3.condicion} 
+                                            resultados={datosTema3.resultados}
+                                        />
+                                        <Resultados_ModelosDiscretos 
+                                            resultados={datosTema3.resultados} 
+                                            modelo={datosTema3.modelo} 
+                                            onOpenProcedimiento={(tipo) => setModalProcTema3(tipo)}
+                                        />
+                                    </>
+                                )}
+                            </Controles_ModelosDiscretos>
+                        </div>
+                    ) : operacion === 'modelos_continuos' ? (
+                        <div className="tema3-container">
+                            <Controles_ModelosContinuos 
+                                varSeleccionada={varSeleccionada}
+                                filas={filas}
+                                statsDatos={statsDatos}
+                                abrirEditor={abrirEditor}
+                                onCalcular={(datos) => {
+                                    setDatosTema3Continuos(datos);
+                                }}
+                            >
+                                {datosTema3Continuos && (
+                                    <>
+                                        <GraficoModelosContinuos 
+                                            datos={datosTema3Continuos.datosGrafico} 
+                                            condicion={datosTema3Continuos.condicion} 
+                                            resultados={datosTema3Continuos.resultados}
+                                        />
+                                        <Resultados_ModelosContinuos 
+                                            resultados={datosTema3Continuos.resultados} 
+                                            modelo={datosTema3Continuos.modelo} 
+                                            onOpenProcedimiento={(tipo) => setModalProcTema3(tipo)}
+                                        />
+                                    </>
+                                )}
+                            </Controles_ModelosContinuos>
                         </div>
                     ) : operacion === 'dist_uniforme' ? (
                         <ResultadosEspacioContinuo
@@ -687,6 +751,8 @@ export default function Principal() {
                             error={errorMuestreo} setError={setErrorMuestreo}
                             statsDatos={statsDatos} abrirEditor={abrirEditor}
                         />
+                    ) : operacion === 'distribuciones_muestrales' ? (
+                        <Resultados_DistribucionesMuestrales varSeleccionada={varSeleccionada} filas={filas} abrirEditor={abrirEditor} />
                     ) : operacion === 'regla_multiplicacion' ? (
                         <ResultadosReglaMultiplicacion
                             varSeleccionada={varSeleccionada} filas={filas}

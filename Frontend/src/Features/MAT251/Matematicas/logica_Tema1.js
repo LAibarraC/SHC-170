@@ -599,3 +599,158 @@ export const calcularDistribucionUniforme = (minVal, maxVal, inputMin, inputMax)
         resultado: { A, B, a, b, H, prob }
     };
 };
+
+export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo) => {
+    if (!poblacionStr || poblacionStr.trim() === '') return { error: 'Ingresa la población.' };
+    
+    const rawItems = poblacionStr.split(',').map(v => v.trim()).filter(v => v !== '');
+    const poblacion = [];
+    
+    for (const item of rawItems) {
+        let label = '';
+        let numStr = item;
+        
+        if (item.includes('=')) {
+            const parts = item.split('=');
+            label = parts[0].trim();
+            numStr = parts[1].trim();
+        } else if (item.includes(':')) {
+            const parts = item.split(':');
+            label = parts[0].trim();
+            numStr = parts[1].trim();
+        } else if (item.includes('|')) {
+            const parts = item.split('|').map(p => p.trim());
+            if (parts.length >= 3) {
+                // Para 3 o más columnas (ej: "1 | A | 3000"), buscamos el valor numérico desde el final
+                let foundNum = false;
+                for (let i = parts.length - 1; i >= 0; i--) {
+                    if (!isNaN(parseFloat(parts[i]))) {
+                        numStr = parts[i];
+                        label = i > 0 ? parts[i - 1] : parts[0]; // La etiqueta es el valor anterior
+                        foundNum = true;
+                        break;
+                    }
+                }
+                if (!foundNum) {
+                    numStr = parts[parts.length - 1];
+                    label = parts[parts.length - 2];
+                }
+            } else if (parts.length === 2) {
+                // Para 2 columnas
+                const p0 = parts[0];
+                const p1 = parts[1];
+                if (!isNaN(parseFloat(p1)) && isNaN(parseFloat(p0))) {
+                    label = p0;
+                    numStr = p1;
+                } else if (!isNaN(parseFloat(p0)) && isNaN(parseFloat(p1))) {
+                    label = p1;
+                    numStr = p0;
+                } else {
+                    label = p0;
+                    numStr = p1;
+                }
+            } else {
+                numStr = parts[0];
+            }
+        }
+        
+        const valor = parseFloat(numStr);
+        if (!isNaN(valor)) {
+            poblacion.push({ id: label || valor.toString(), valor: valor });
+        }
+    }
+    
+    if (poblacion.length === 0) return { error: 'La población ingresada no tiene números válidos.' };
+    
+    const n = parseInt(nStr);
+    if (isNaN(n) || n <= 0) return { error: 'El tamaño de muestra (n) debe ser un número entero positivo.' };
+    if (!conReemplazo && n > poblacion.length) return { error: 'El tamaño de muestra (n) no puede ser mayor a la población sin reemplazo.' };
+
+    const limiteSeguridad = 5000;
+    let muestras = [];
+
+    const generarCombinaciones = (arr, r) => {
+        if (r === 0) return [[]];
+        if (arr.length === 0) return [];
+        const [primero, ...resto] = arr;
+        const conPrimero = generarCombinaciones(resto, r - 1).map(c => [primero, ...c]);
+        const sinPrimero = generarCombinaciones(resto, r);
+        return [...conPrimero, ...sinPrimero];
+    };
+
+    const generarConReemplazo = (arr, r) => {
+        if (r === 0) return [[]];
+        const subMuestras = generarConReemplazo(arr, r - 1);
+        let res = [];
+        for (let i = 0; i < arr.length; i++) {
+            for (let j = 0; j < subMuestras.length; j++) {
+                if (res.length >= limiteSeguridad) return res;
+                res.push([arr[i], ...subMuestras[j]]);
+            }
+        }
+        return res;
+    };
+
+    if (conReemplazo) {
+        muestras = generarConReemplazo(poblacion, n);
+    } else {
+        muestras = generarCombinaciones(poblacion, n);
+    }
+
+    if (muestras.length >= limiteSeguridad) {
+        return { error: `Límite de seguridad excedido. Se intentaron generar demasiadas muestras (límite: ${limiteSeguridad}). Por favor, reduce la población o el tamaño de la muestra.` };
+    }
+
+    const calcularMedia = (arr) => arr.reduce((a, b) => a + b.valor, 0) / arr.length;
+    const calcularVarianza = (arr, media) => arr.reduce((acc, val) => acc + Math.pow(val.valor - media, 2), 0) / arr.length;
+
+    const datosTabla = muestras.map((muestra, index) => {
+        const media = calcularMedia(muestra);
+        const varianza = calcularVarianza(muestra, media);
+        return {
+            id: index + 1,
+            elementos: muestra.map(x => x.id).join(', '),
+            valores: muestra.map(x => x.valor).join(' '),
+            media: parseFloat(media.toFixed(2)),
+            varianza: parseFloat(varianza.toFixed(2))
+        };
+    });
+
+    const frecuenciasMedias = {};
+    datosTabla.forEach(fila => {
+        const m = fila.media;
+        if (frecuenciasMedias[m]) {
+            frecuenciasMedias[m]++;
+        } else {
+            frecuenciasMedias[m] = 1;
+        }
+    });
+
+    const distribucionMedias = Object.keys(frecuenciasMedias)
+        .map(m => parseFloat(m))
+        .sort((a, b) => a - b)
+        .map(m => ({
+            media: m,
+            frecuencia: frecuenciasMedias[m],
+            total: datosTabla.length
+        }));
+
+    // Cálculos Finales
+    const esperanzaMedia = distribucionMedias.reduce((acc, curr) => acc + (curr.media * (curr.frecuencia / curr.total)), 0);
+    const varianzaMedia = distribucionMedias.reduce((acc, curr) => acc + (Math.pow(curr.media - esperanzaMedia, 2) * (curr.frecuencia / curr.total)), 0);
+
+    const mediaPoblacional = calcularMedia(poblacion);
+    const varianzaPoblacional = calcularVarianza(poblacion, mediaPoblacional);
+
+    const calculosFinales = {
+        esperanzaMedia: parseFloat(esperanzaMedia.toFixed(4)),
+        varianzaMedia: parseFloat(varianzaMedia.toFixed(4)),
+        mediaPoblacional: parseFloat(mediaPoblacional.toFixed(4)),
+        varianzaPoblacional: parseFloat(varianzaPoblacional.toFixed(4)),
+        n: n,
+        N: poblacion.length,
+        poblacionOriginal: poblacion.map(p => p.valor)
+    };
+
+    return { resultado: datosTabla, distribucionMedias, calculosFinales, conReemplazo };
+};

@@ -1,0 +1,43 @@
+;=========================================================
+RESUMEN DE IMPLEMENTACIONES NUEVAS (TEMA 1 Y TEMA 2)
+=========================================================
+Fecha de generación: Julio 2026
+
+1. TEMA 1: DISTRIBUCIONES MUESTRALES (Nueva Operación)
+=========================================================
+Esta operación se añadió como una nueva funcionalidad dentro del Tema 1. Se centra en el Teorema del Límite Central y las distribuciones de medias muestrales y proporciones muestrales.
+
+Archivos Creados y Modificados:
+- Controles_DistribucionesMuestrales.jsx: Interfaz para ingresar los datos (Población finita/infinita, Media, Desviación Estándar, Tamaño de muestra n, etc.). Incluye validaciones lógicas en tiempo real para evitar que la muestra sea mayor a la población (n > N).
+- Resultados_DistribucionesMuestrales.jsx: Panel lateral derecho que muestra los resultados en tiempo real (Media poblacional vs Muestral, Error Estándar, Factor de Corrección para poblaciones finitas).
+- ModalProcedimiento_DistribucionesMuestrales.jsx: Ventana emergente que renderiza el paso a paso matemático usando LaTeX. Muestra las fórmulas formales de Z, Error Estándar, y genera conclusiones automáticas interpretando el resultado.
+- mat251Functions.js (Archivo central de lógica): Se añadieron las funciones `calcularDistribucionesMuestrales` que procesan toda la matemática de forma aislada, separando la lógica de negocio de la interfaz visual.
+
+Características Técnicas Destacadas:
+- Arquitectura desacoplada: la UI y la matemática están 100% separadas.
+- Renderizado condicional inteligente: oculta inputs innecesarios según si el usuario elige una población infinita o un cálculo de proporción.
+- Uso de `react-katex` para mostrar las fórmulas matemáticas con formato académico estricto.
+
+
+2. TEMA 2: DISTRIBUCIONES CLÁSICAS V2 (Variable Aleatoria Continua)
+=========================================================
+Se añadió como la tercera opción desplegable del Tema 2 bajo el nombre "Distribuciones Clásicas (V2)". El objetivo principal fue abandonar las costosas integrales iterativas y la dependencia de math.js, adoptando propiedades teóricas exactas y optimizadas.
+
+Archivos Creados y Modificados:
+- ControlDistribucionContinua_v2.jsx: Panel izquierdo con un selector personalizado (UI premium mejorada) y fórmulas de la Función de Densidad en LaTeX incrustadas dinámicamente al lado del selector. Administra los parámetros de: Normal, Normal Estándar, Chi-Cuadrado y F de Fisher.
+- ResultadoDistribucionContinua_v2.jsx: Panel derecho que utiliza la librería `recharts` para dibujar las curvas de densidad (Campanas de Gauss, curvas asimétricas de Chi-Cuadrado/Fisher) de manera completamente fluida, generando arreglos de puntos precisos al instante.
+- ModalProcedimientoContinua_v2.jsx: Muestra toda la base teórica matemática (PDF, Esperanza Matemática E(X) y Varianza V(X)) con fórmulas generadas con LaTeX según la distribución seleccionada.
+- ModalProbabilidades_v2.jsx: Poderoso módulo interactivo que permite calcular áreas bajo la curva (P(X < a), P(X > a), P(a < X < b)) de forma instantánea usando funciones de Distribución Acumulada (CDF) de `jstat`. Pinta dinámicamente el área calculada (sombreada) en un gráfico responsivo.
+
+Características Técnicas Destacadas:
+- Integración de la librería `jstat` para cálculos estadísticos directos, precisos e instantáneos sin recargar el navegador.
+- Optimización de memoria en React: Se implementaron funciones de limpieza (`cleanup functions`) en los `useEffect` para vaciar los arrays de datos pesados de los gráficos y liberar memoria RAM cuando el usuario cierra las vistas.
+- Gráficos interactivos y áreas sombreadas dinámicas que reaccionan inmediatamente al mover un slider o ingresar una probabilidad.
+
+
+3. INTEGRACIÓN EN EL ORQUESTADOR (Principal.jsx)
+=========================================================
+- Se importaron todos los nuevos componentes _v2 y de Muestreo.
+- Se añadieron nuevos estados globales (`datosContinuosV2`) y banderas para los modales (`modalProcedimientoContV2`, `modalProbabilidadesV2`).
+- Se amplió el Switch de renderizado condicional en la interfaz principal para soportar `operacion === 'distribuciones_muestrales'` y `operacion === 'dist_continua_v2'`.
+- IMPORTANTE: Se respetó íntegramente la arquitectura modular de 5 archivos y se mantuvo intacta la operación antigua "Variable Aleatoria Continua" (retrocompatibilidad garantizada).

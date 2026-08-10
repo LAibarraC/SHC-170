@@ -9,9 +9,10 @@ export default function Controles_ModelosDiscretos({
     filas,
     statsDatos,
     abrirEditor,
-    onCalcular
+    onCalcular,
+    children
 }) {
-    const [modelo, setModelo] = useState('Binomial');
+    const [modelo, setModelo] = useState('Bernoulli');
     const [modo, setModo] = useState('matriz'); // 'manual' | 'matriz'
 
     const renderLatex = (str) => {
@@ -25,6 +26,7 @@ export default function Controles_ModelosDiscretos({
     const [paramN_hip, setParamN_hip] = useState('');
     const [paramK_hip, setParamK_hip] = useState('');
     const [paramn_hip, setParamn_hip] = useState('');
+    const [paramP_ber, setParamP_ber] = useState('');
 
     // Condición
     const [tipoCondicion, setTipoCondicion] = useState('exacta'); // 'exacta', 'menor_igual', 'mayor_igual', 'intervalo'
@@ -37,6 +39,60 @@ export default function Controles_ModelosDiscretos({
     const [statsEstimados, setStatsEstimados] = useState(null);
 
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        // Limpiar todo cuando se cambia entre 'manual' y 'matriz'
+        setParamN_bin('');
+        setParamP_bin('');
+        setParamLambda('');
+        setParamN_hip('');
+        setParamK_hip('');
+        setParamn_hip('');
+        setParamP_ber('');
+        
+        setTipoCondicion('exacta');
+        setValorX('');
+        setValorB('');
+        
+        setColumnaSeleccionada(0);
+        setValorExito('');
+        setStatsEstimados(null);
+        setError('');
+        
+        if (onCalcular) {
+            onCalcular(null);
+        }
+    }, [modo]);
+
+    const handleCambiarModelo = (nuevoModelo) => {
+        if (modelo === nuevoModelo) return;
+        setModelo(nuevoModelo);
+        
+        // Reset manual parameters
+        setParamN_bin('');
+        setParamP_bin('');
+        setParamLambda('');
+        setParamN_hip('');
+        setParamK_hip('');
+        setParamn_hip('');
+        setParamP_ber('');
+        
+        // Reset search conditions
+        setTipoCondicion('exacta');
+        setValorX('');
+        setValorB('');
+        
+        // Reset matrix settings
+        setColumnaSeleccionada(0);
+        setValorExito('');
+        setStatsEstimados(null);
+        setError('');
+
+        // Clear graph and results
+        if (onCalcular) {
+            onCalcular(null);
+        }
+    };
 
     // Extraer datos de la matriz
     const columnasDisponibles = useMemo(() => {
@@ -75,7 +131,7 @@ export default function Controles_ModelosDiscretos({
         let K = 0;
         let media = 0;
 
-        if (modelo === 'Binomial' || modelo === 'Hipergeometrica') {
+        if (modelo === 'Binomial' || modelo === 'Hipergeometrica' || modelo === 'Bernoulli') {
             if (!valorExito) {
                 setError('Debe seleccionar qué valor representa el "Éxito".');
                 return;
@@ -92,8 +148,10 @@ export default function Controles_ModelosDiscretos({
             });
 
             if (modelo === 'Binomial') {
-                setParamP_bin(p.toFixed(4));
+                setParamP_bin(p.toFixed(2));
                 setParamN_bin(totalDatos.toString());
+            } else if (modelo === 'Bernoulli') {
+                setParamP_ber(p.toFixed(2));
             } else {
                 setParamN_hip(totalDatos.toString());
                 setParamK_hip(K.toString());
@@ -112,7 +170,7 @@ export default function Controles_ModelosDiscretos({
                 suma: sum,
                 media: media
             });
-            setParamLambda(media.toFixed(4));
+            setParamLambda(media.toFixed(2));
         }
         setError('');
     };
@@ -137,35 +195,68 @@ export default function Controles_ModelosDiscretos({
             const N = parseInt(paramN_hip);
             const K = parseInt(paramK_hip);
             const n = parseInt(paramn_hip);
+            if (isNaN(n) || n <= 0) return setError('Por favor, ingresa un tamaño de muestra (n) mayor a 0 para generar la gráfica.');
             if (isNaN(N) || N <= 0) return setError('N (población) debe ser entero positivo.');
             if (isNaN(K) || K < 0 || K > N) return setError('K (éxitos) debe estar entre 0 y N.');
-            if (isNaN(n) || n <= 0 || n > N) return setError('n (muestra) debe estar entre 1 y N.');
+            if (n <= 0 || K < 0 || N <= 0 || n > N || K > N) return setError('Parámetros Hipergeométrica inválidos. n, K <= N, etc.');
             params = { N, K, n };
+        } else if (modelo === 'Bernoulli') {
+            const p = parseFloat(paramP_ber);
+            if (isNaN(p) || p < 0 || p > 1) return setError('La probabilidad p debe estar entre 0 y 1.');
+            params = { p };
         }
 
         // Parsear condición
-        const x = parseInt(valorX);
-        if (isNaN(x) || x < 0) return setError('El valor objetivo "x" debe ser un entero no negativo.');
+        let condicionCalculo = null;
+        let condicionVisual = null;
+        if (valorX !== '') {
+            let x = parseInt(valorX);
+            if (isNaN(x) || x < 0) return setError('El valor objetivo "x" debe ser un entero no negativo.');
 
-        let b = 0;
-        if (tipoCondicion === 'intervalo') {
-            b = parseInt(valorB);
-            if (isNaN(b) || b <= x) return setError('El límite superior del intervalo debe ser mayor que el límite inferior.');
+            let b = 0;
+            if (tipoCondicion.includes('intervalo')) {
+                b = parseInt(valorB);
+                if (isNaN(b) || b <= x) return setError('El límite superior del intervalo debe ser mayor que el límite inferior.');
+            }
+
+            condicionVisual = { tipo: tipoCondicion, valorX: x, valorB: b };
+
+            // Lógica de traducción estricta a inclusiva
+            let tipoAjustado = tipoCondicion;
+            switch (tipoCondicion) {
+                case 'menor_estricto':
+                    x = x - 1;
+                    if (x < 0) return setError('Al evaluar P(X < x), el límite inclusivo (x-1) es negativo. La probabilidad es 0.');
+                    tipoAjustado = 'menor_igual';
+                    break;
+                case 'mayor_estricto':
+                    x = x + 1;
+                    tipoAjustado = 'mayor_igual';
+                    break;
+                case 'intervalo_estricto':
+                    x = x + 1;
+                    b = b - 1;
+                    if (b < x) return setError('El intervalo estricto ingresado no contiene ningún número entero válido.');
+                    tipoAjustado = 'intervalo';
+                    break;
+                default:
+                    break;
+            }
+
+            // Validar límites de x según modelo
+            if (modelo === 'Binomial' && x > params.n) return setError(`"x" ajustado no puede ser mayor que n (${params.n}).`);
+            if (modelo === 'Hipergeometrica' && x > Math.min(params.K, params.n)) {
+                return setError(`"x" ajustado no puede ser mayor que el mínimo entre K y n (${Math.min(params.K, params.n)}).`);
+            }
+
+            condicionCalculo = { tipo: tipoAjustado, valorX: x, valorB: b };
         }
-
-        // Validar límites de x según modelo
-        if (modelo === 'Binomial' && x > params.n) return setError(`"x" no puede ser mayor que n (${params.n}).`);
-        if (modelo === 'Hipergeometrica' && x > Math.min(params.K, params.n)) {
-            return setError(`"x" no puede ser mayor que el mínimo entre K y n (${Math.min(params.K, params.n)}).`);
-        }
-
-        const condicion = { tipo: tipoCondicion, valorX: x, valorB: b };
 
         // Calcular
-        const resultados = calcularDistribucionModelo(modelo, params, condicion);
+        const resultados = calcularDistribucionModelo(modelo, params, condicionCalculo);
         const datosGrafico = generarDatosGrafico(modelo, params);
 
-        onCalcular({ modelo, params, condicion, resultados, datosGrafico });
+        onCalcular({ modelo, params, condicion: condicionVisual, resultados, datosGrafico });
     };
 
     const renderParametrosManuales = () => {
@@ -182,71 +273,111 @@ export default function Controles_ModelosDiscretos({
 
         return (
             <div className="tema3-grid" style={{ marginBottom: '5px', gap: '10px' }}>
+                {modelo === 'Bernoulli' && (
+                    <>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', gridColumn: '1 / -1', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>Probabilidad <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('p')}</span></label>
+                            <input
+                                type="number" className="tema3-input" step="0.01" min="0" max="1"
+                                value={paramP_ber} onChange={e => setParamP_ber(e.target.value)}
+                                placeholder="0.00"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', width: '200px', textAlign: 'center' }}
+                            />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                            {renderLatex(`P(X=x) = ${paramP_ber || 'p'}^x (1 - ${paramP_ber || 'p'})^{1-x}`)}
+                        </div>
+                    </>
+                )}
                 {modelo === 'Binomial' && (
                     <>
-                        <div className="tema3-form-group" style={{ marginBottom: '0' }}>
-                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Muestra total {renderLatex('n')}</label>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>Muestra total <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('n')}</span></label>
                             <input
                                 type="number" className="tema3-input" min="1"
                                 value={paramN_bin} onChange={e => setParamN_bin(e.target.value)}
-                                placeholder="Ej. 10"
-                                style={{ padding: '6px 10px', fontSize: '0.85rem' }}
+                                placeholder="0"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
                         </div>
-                        <div className="tema3-form-group" style={{ marginBottom: '0' }}>
-                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Probabilidad base {renderLatex('p')}</label>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>Probabilidad <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('p')}</span></label>
                             <input
                                 type="number" className="tema3-input" step="0.01" min="0" max="1"
                                 value={paramP_bin} onChange={e => setParamP_bin(e.target.value)}
-                                placeholder="Ej. 0.5"
+                                placeholder="0.00"
                                 disabled={readOnlyParams}
-                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem' }}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                            {renderLatex(`P(X=x) = \\binom{${paramN_bin || 'n'}}{x} ${paramP_bin || 'p'}^x (1 - ${paramP_bin || 'p'})^{${paramN_bin || 'n'}-x}`)}
                         </div>
                     </>
                 )}
                 {modelo === 'Poisson' && (
-                    <div className="tema3-form-group" style={{ marginBottom: '0' }}>
-                        <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Tasa Promedio {renderLatex('\\lambda')}</label>
-                        <input
-                            type="number" className="tema3-input" step="0.1" min="0.1"
-                            value={paramLambda} onChange={e => setParamLambda(e.target.value)}
-                            placeholder="Ej. 2.5"
-                            disabled={readOnlyParams}
-                            style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem' }}
-                        />
-                    </div>
+                    <>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', gridColumn: '1 / -1', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap' }}>Tasa media de Ocurrencia {renderLatex('\\lambda')}</label>
+                            <input
+                                type="number" className="tema3-input" step="0.1" min="0"
+                                value={paramLambda} onChange={e => setParamLambda(e.target.value)}
+                                placeholder="0.00"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', width: '200px', textAlign: 'center' }}
+                            />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                            {renderLatex(`P(X=x) = \\frac{${paramLambda || '\\lambda'}^x e^{-${paramLambda || '\\lambda'}}}{x!}`)}
+                        </div>
+                    </>
                 )}
                 {modelo === 'Hipergeometrica' && (
                     <>
-                        <div className="tema3-form-group" style={{ marginBottom: '0' }}>
-                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Población Total {renderLatex('N')}</label>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '1rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '35px' }}>{renderLatex('N')}</label>
                             <input
                                 type="number" className="tema3-input" min="1"
                                 value={paramN_hip} onChange={e => setParamN_hip(e.target.value)}
-                                placeholder="Ej. 50"
+                                placeholder="0"
                                 disabled={readOnlyParams}
-                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem' }}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
                         </div>
-                        <div className="tema3-form-group" style={{ marginBottom: '0' }}>
-                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Éxitos en Población {renderLatex('K')}</label>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '1rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '35px' }}>{renderLatex('N_1')}</label>
                             <input
                                 type="number" className="tema3-input" min="0"
                                 value={paramK_hip} onChange={e => setParamK_hip(e.target.value)}
-                                placeholder="Ej. 10"
+                                placeholder="0"
                                 disabled={readOnlyParams}
-                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem' }}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
                         </div>
-                        <div className="tema3-form-group" style={{ marginBottom: '0' }}>
-                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Muestra {renderLatex('n')}</label>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '1rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '35px' }}>{renderLatex('N_2')}</label>
+                            <input
+                                type="number" className="tema3-input"
+                                value={(paramN_hip !== '' && paramK_hip !== '') ? Math.max(0, parseInt(paramN_hip) - parseInt(paramK_hip)) : ''}
+                                readOnly
+                                disabled
+                                placeholder="N - N₁"
+                                style={{ ...disabledStyle, padding: '6px 10px', fontSize: '0.85rem', flex: 1, backgroundColor: '#e2e8f0', color: '#64748b' }}
+                            />
+                        </div>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '1rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '35px' }}>{renderLatex('n')}</label>
                             <input
                                 type="number" className="tema3-input" min="1"
                                 value={paramn_hip} onChange={e => setParamn_hip(e.target.value)}
-                                placeholder="Ej. 5"
-                                style={{ padding: '6px 10px', fontSize: '0.85rem' }}
+                                placeholder="0"
+                                style={{ padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                            {renderLatex(`P(X=x) = \\frac{\\binom{${paramK_hip || 'N_1'}}{x} \\binom{${(paramN_hip !== '' && paramK_hip !== '') ? Math.max(0, parseInt(paramN_hip) - parseInt(paramK_hip)) : 'N_2'}}{${paramn_hip || 'n'}-x}}{\\binom{${paramN_hip || 'N'}}{${paramn_hip || 'n'}}}`)}
                         </div>
                     </>
                 )}
@@ -263,6 +394,7 @@ export default function Controles_ModelosDiscretos({
                 {/* SELECTOR DE MODELO */}
                 <div style={{ display: 'flex', width: '100%', maxWidth: '600px', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                     {[
+                        { id: 'Bernoulli', label: 'Bernoulli' },
                         { id: 'Binomial', label: 'Binomial' },
                         { id: 'Poisson', label: 'Poisson' },
                         { id: 'Hipergeometrica', label: 'Hipergeométrica' }
@@ -270,7 +402,7 @@ export default function Controles_ModelosDiscretos({
                         <button
                             key={tipo.id}
                             type="button"
-                            onClick={() => { setModelo(tipo.id); setError(''); setStatsEstimados(null); }}
+                            onClick={() => handleCambiarModelo(tipo.id)}
                             style={{
                                 flex: 1,
                                 padding: '8px 16px',
@@ -289,7 +421,6 @@ export default function Controles_ModelosDiscretos({
                     ))}
                 </div>
 
-                {/* SELECTOR DE MODO DE ENTRADA */}
                 <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                     <button
                         type="button"
@@ -337,14 +468,14 @@ export default function Controles_ModelosDiscretos({
                 )}
 
                 {modo === 'matriz' && (
-                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '12px 15px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card, #fff)', padding: '12px 15px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', marginBottom: '20px' }}>
                             <div>
                                 <div style={{ color: 'var(--primary-color, #0d6efd)', fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Conjunto de Datos:</div>
-                                <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
                                     Cargados: <strong style={{ color: 'var(--primary-color, #0d6efd)' }}>{statsDatos ? statsDatos.cargados : 0}</strong> &nbsp;
                                     Agregados: <strong style={{ color: 'var(--primary-color, #0d6efd)' }}>{statsDatos ? statsDatos.agregados : 0}</strong> &nbsp;
-                                    Total: <strong style={{ color: '#334155' }}>{statsDatos ? statsDatos.total : 0}</strong>
+                                    Total: <strong style={{ color: 'var(--text-color, #334155)' }}>{statsDatos ? statsDatos.total : 0}</strong>
                                 </div>
                             </div>
                             <button
@@ -371,63 +502,65 @@ export default function Controles_ModelosDiscretos({
                         </div>
                         {columnasDisponibles.length > 0 ? (
                             <>
-                                <div className="tema3-form-group">
-                                    <label className="tema3-label">Columna de Análisis:</label>
-                                    <select
-                                        className="tema3-select"
-                                        value={columnaSeleccionada}
-                                        onChange={e => { setColumnaSeleccionada(Number(e.target.value)); setStatsEstimados(null); }}
-                                    >
-                                        {columnasDisponibles.map((col, idx) => (
-                                            <option key={idx} value={idx}>{col}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {(modelo === 'Binomial' || modelo === 'Hipergeometrica') && (
-                                    <div className="tema3-form-group">
-                                        <label className="tema3-label">Valor que representa el "Éxito":</label>
+                                <div style={{ display: 'flex', gap: '15px' }}>
+                                    <div className="tema3-form-group" style={{ flex: 1 }}>
+                                        <label className="tema3-label">Columna:</label>
                                         <select
                                             className="tema3-select"
-                                            value={valorExito}
-                                            onChange={e => setValorExito(e.target.value)}
+                                            value={columnaSeleccionada}
+                                            onChange={e => { setColumnaSeleccionada(Number(e.target.value)); setStatsEstimados(null); }}
                                         >
-                                            <option value="">Seleccione un valor...</option>
-                                            {valoresUnicos.map((val, idx) => (
-                                                <option key={idx} value={val}>{val}</option>
+                                            {columnasDisponibles.map((col, idx) => (
+                                                <option key={idx} value={idx}>{col}</option>
                                             ))}
                                         </select>
                                     </div>
-                                )}
 
-                                <button className="tema3-btn" onClick={estimarDesdeDatos} style={{ background: '#10b981', marginBottom: '10px' }}>
+                                    {(modelo === 'Binomial' || modelo === 'Hipergeometrica' || modelo === 'Bernoulli') && (
+                                        <div className="tema3-form-group" style={{ flex: 1 }}>
+                                            <label className="tema3-label">Valor a evaluar (x):</label>
+                                            <select
+                                                className="tema3-select"
+                                                value={valorExito}
+                                                onChange={e => setValorExito(e.target.value)}
+                                            >
+                                                <option value="">Seleccione un valor...</option>
+                                                {valoresUnicos.map((val, idx) => (
+                                                    <option key={idx} value={val}>{val}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button className="tema3-btn" onClick={estimarDesdeDatos} style={{ background: '#10b981', marginBottom: '10px', width: 'auto', margin: '0 auto', display: 'block', padding: '8px 16px' }}>
                                     Estimar Parámetros
                                 </button>
 
                                 {statsEstimados && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '5px', color: '#475569', marginTop: '10px', backgroundColor: '#ffffff', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '5px', color: 'var(--text-muted, #475569)', marginTop: '10px', backgroundColor: 'var(--bg-card, #ffffff)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color, #cbd5e1)', textAlign: 'center' }}>
                                         <div style={{ flex: 1 }}>
                                             <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Total Registros</span>
-                                            <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{statsEstimados.total}</strong>
+                                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.total}</strong>
                                         </div>
                                         {modelo !== 'Poisson' ? (
                                             <>
-                                                <div style={{ flex: 1, borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0' }}>
+                                                <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Ocurrencias (Éxito)</span>
-                                                    <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{statsEstimados.exitos}</strong>
+                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.exitos}</strong>
                                                 </div>
                                                 <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Probabilidad {renderLatex('p')}</span>
-                                                    <div style={{ fontSize: '0.9rem', color: '#0f172a', marginTop: '2px' }}>
-                                                        {renderLatex(`\\frac{${statsEstimados.exitos}}{${statsEstimados.total}} = ${statsEstimados.p?.toFixed(4)}`)}
+                                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)', marginTop: '2px' }}>
+                                                        {renderLatex(`\\frac{${statsEstimados.exitos}}{${statsEstimados.total}} = ${statsEstimados.p?.toFixed(2)}`)}
                                                     </div>
                                                 </div>
                                             </>
                                         ) : (
-                                            <div style={{ flex: 1, borderLeft: '1px solid #e2e8f0' }}>
+                                            <div style={{ flex: 1 }}>
                                                 <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Media {renderLatex('\\lambda')}</span>
-                                                <div style={{ fontSize: '0.9rem', color: '#0f172a', marginTop: '2px' }}>
-                                                    {renderLatex(`\\frac{${statsEstimados.suma}}{${statsEstimados.total}} = ${statsEstimados.media?.toFixed(4)}`)}
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)', marginTop: '2px' }}>
+                                                    {renderLatex(`\\frac{${statsEstimados.suma}}{${statsEstimados.total}} = ${statsEstimados.media?.toFixed(2)}`)}
                                                 </div>
                                             </div>
                                         )}
@@ -435,59 +568,84 @@ export default function Controles_ModelosDiscretos({
                                 )}
                             </>
                         ) : (
-                            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>No hay datos cargados en el estado global. Ve a Gestión de Datos para importar.</p>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>No hay datos cargados en el estado global. Ve a Gestión de Datos para importar.</p>
                         )}
                     </div>
                 )}
 
                 {renderParametrosManuales()}
 
-                <div style={{ borderTop: '1px solid #e2e8f0', margin: '15px 0' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                    <button className="tema3-btn" onClick={manejarCalculo} style={{ padding: '8px 16px', fontSize: '0.9rem', width: 'auto' }}>
+                        Graficar
+                    </button>
+                </div>
 
-                <h4 style={{ color: '#334155', fontSize: '0.85rem', margin: '0 0 10px 0' }}>Condición de Búsqueda</h4>
+                {children && (
+                    <>
+                        <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)', margin: '15px 0' }}></div>
 
-                <div className="tema3-grid" style={{ marginBottom: '15px', gap: '10px' }}>
-                    <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                <h4 style={{ color: 'var(--text-color, #334155)', fontSize: '0.85rem', margin: '0 0 10px 0' }}>Condición de Búsqueda</h4>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', marginBottom: '25px' }}>
+                    <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column' }}>
                         <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Operador lógico</label>
                         <CustomSelect
                             value={tipoCondicion}
                             onChange={val => setTipoCondicion(val)}
                             options={[
-                                { value: 'exacta', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>Exacta {renderLatex('P(X = x)')}</div> },
-                                { value: 'menor_igual', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>Acumulada Menor o Igual {renderLatex('P(X \\leq x)')}</div> },
-                                { value: 'mayor_igual', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>Acumulada Mayor o Igual {renderLatex('P(X \\geq x)')}</div> },
-                                { value: 'intervalo', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>Intervalo {renderLatex('P(a \\leq X \\leq b)')}</div> },
+                                { value: 'exacta', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(X = x)')}</div> },
+                                { value: 'menor_igual', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(X \\leq x)')}</div> },
+                                { value: 'mayor_igual', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(X \\geq x)')}</div> },
+                                { value: 'intervalo', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(a \\leq X \\leq b)')}</div> },
+                                { value: 'menor_estricto', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(X < x)')}</div> },
+                                { value: 'mayor_estricto', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(X > x)')}</div> },
+                                { value: 'intervalo_estricto', label: <div style={{display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', whiteSpace: 'nowrap'}}>{renderLatex('P(a < X < b)')}</div> },
                             ]}
                         />
                     </div>
 
-                    <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                        <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>{tipoCondicion === 'intervalo' ? <>Límite Inferior {renderLatex('a')}</> : <>Número de éxitos esperados {renderLatex('x')}</>}</label>
+                    <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                        <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>{tipoCondicion.includes('intervalo') ? <>Límite Inferior {renderLatex('a')}</> : <>Número de éxitos {renderLatex('x')}</>}</label>
                         <input
                             type="number" className="tema3-input" min="0"
                             value={valorX} onChange={e => setValorX(e.target.value)}
-                            placeholder="Ej. 2"
-                            style={{ padding: '0 10px', fontSize: '0.85rem', height: '36px', boxSizing: 'border-box' }}
+                            placeholder="0"
+                            title={modelo === 'Bernoulli' && valorX !== '' && valorX !== '0' && valorX !== '1' ? "En el modelo de Bernoulli, el número de éxitos (x) solo puede ser 0 o 1." : ""}
+                            style={{ 
+                                padding: '0 10px', 
+                                fontSize: '0.85rem', 
+                                height: '36px', 
+                                boxSizing: 'border-box',
+                                ...(modelo === 'Bernoulli' && valorX !== '' && valorX !== '0' && valorX !== '1' ? { borderColor: '#ef4444', backgroundColor: 'var(--bg-error, #fee2e2)', color: '#b91c1c' } : {})
+                            }}
                         />
                     </div>
 
-                    {tipoCondicion === 'intervalo' && (
-                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+                    {tipoCondicion.includes('intervalo') && (
+                        <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                             <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '4px' }}>Límite Superior {renderLatex('b')}</label>
                             <input
                                 type="number" className="tema3-input" min="0"
                                 value={valorB} onChange={e => setValorB(e.target.value)}
-                                placeholder="Ej. 5"
+                                placeholder="0"
                                 style={{ padding: '0 10px', fontSize: '0.85rem', height: '36px', boxSizing: 'border-box' }}
                             />
                         </div>
                     )}
+                    
+                    <button className="tema3-btn" onClick={manejarCalculo} style={{ flex: '0 0 auto', padding: '0 16px', fontSize: '0.9rem', height: '36px', width: 'auto' }}>
+                        Calcular
+                    </button>
                 </div>
+                </>
+                )}
 
-                <button className="tema3-btn" onClick={manejarCalculo} style={{ padding: '8px 16px', fontSize: '0.9rem', width: 'auto', alignSelf: 'center', margin: '0 auto', display: 'block' }}>
-                    Calcular Distribución
-                </button>
-            </div>
+                    {/* SECCIÓN DE GRAFICADO Y RESULTADOS */}
+                    <div style={{ margin: '20px 0' }}>
+                        {children}
+                    </div>
+                </div>
         </div>
     );
 }
@@ -517,12 +675,12 @@ function CustomSelect({ value, onChange, options }) {
                     padding: '0 10px',
                     height: '36px',
                     boxSizing: 'border-box',
-                    background: 'white',
-                    border: `1px solid ${isOpen ? '#3b82f6' : '#cbd5e1'}`,
+                    background: 'var(--bg-input, white)',
+                    border: `1px solid ${isOpen ? 'var(--primary-color, #3b82f6)' : 'var(--border-color, #cbd5e1)'}`,
                     borderRadius: '8px', cursor: 'pointer',
                     boxShadow: isOpen ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
                     transition: 'all 0.2s ease',
-                    color: '#1e293b',
+                    color: 'var(--text-color, #1e293b)',
                     userSelect: 'none',
                 }}
             >
@@ -530,15 +688,15 @@ function CustomSelect({ value, onChange, options }) {
                     <div style={{ fontWeight: 400, fontSize: '0.8rem' }}>{selectedOption.label}</div>
                 </div>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s ease', color: '#64748b', flexShrink: 0 }}>
+                    style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s ease', color: 'var(--text-muted, #64748b)', flexShrink: 0 }}>
                     <polyline points="6 9 12 15 18 9" />
                 </svg>
             </div>
             {isOpen && (
                 <div style={{
                     position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-                    background: 'white',
-                    border: '1px solid #cbd5e1',
+                    background: 'var(--bg-panel, white)',
+                    border: '1px solid var(--border-color, #cbd5e1)',
                     borderRadius: '8px',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                     zIndex: 1000,
@@ -562,17 +720,17 @@ function CustomSelect({ value, onChange, options }) {
                                 onMouseLeave={e => {
                                     if (!active) {
                                         e.currentTarget.style.background = 'transparent';
-                                        e.currentTarget.style.color = '#1e293b';
+                                        e.currentTarget.style.color = 'var(--text-color, #1e293b)';
                                     }
                                 }}
                                 style={{
                                     padding: '8px 12px',
                                     fontSize: '0.85rem',
-                                    color: active ? '#fff' : '#1e293b',
-                                    background: active ? '#3b82f6' : 'transparent',
+                                    color: active ? '#fff' : 'var(--text-color, #1e293b)',
+                                    background: active ? 'var(--primary-color, #3b82f6)' : 'transparent',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
-                                    borderBottom: idx < options.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                    borderBottom: idx < options.length - 1 ? '1px solid var(--border-color)' : 'none',
                                     display: 'flex', alignItems: 'center', gap: '8px',
                                 }}
                             >

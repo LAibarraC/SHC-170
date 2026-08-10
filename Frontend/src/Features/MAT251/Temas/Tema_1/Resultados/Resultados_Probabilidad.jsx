@@ -45,14 +45,16 @@ export default function ResultadosProbabilidad({
     const labels = getLabels();
 
     const [inputMode, setInputMode] = useState('matriz'); // 'matriz' | 'manual'
-    const [manualN, setManualN] = useState('10');
-    const [manualF, setManualF] = useState('2');
+    const [manualN, setManualN] = useState('');
+    const [manualF, setManualF] = useState('');
 
     const nVal = parseFloat(manualN) || 0;
     const fVal = parseFloat(manualF) || 0;
 
     let errorManual = '';
-    if (nVal <= 0) {
+    if (manualN === '' && manualF === '') {
+        // Sin error inicial si están vacíos
+    } else if (nVal <= 0) {
         errorManual = `${labels.denominador} debe ser mayor a 0.`;
     } else if (fVal < 0) {
         errorManual = `${labels.numerador} no puede ser menor a 0.`;

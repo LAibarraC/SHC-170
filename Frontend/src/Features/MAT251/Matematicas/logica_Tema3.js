@@ -57,12 +57,40 @@ export const calcularDistribucionModelo = (modelo, params, condicion) => {
     let inicio = 0;
     let fin = 0;
 
+    // Calcular Esperanza y Varianza teóricas
+    let E = 0;
+    let V = 0;
+    if (modelo === 'Bernoulli') {
+        E = params.p;
+        V = params.p * (1 - params.p);
+    } else if (modelo === 'Binomial') {
+        E = params.n * params.p;
+        V = params.n * params.p * (1 - params.p);
+    } else if (modelo === 'Poisson') {
+        E = params.lambda;
+        V = params.lambda;
+    } else if (modelo === 'Hipergeometrica') {
+        const { N, K, n } = params;
+        const p = K / N;
+        E = n * p;
+        V = n * p * (1 - p) * ((N - n) / (N - 1));
+    }
+
+    if (!condicion) {
+        return {
+            probabilidadFinal: null,
+            esperanza: E,
+            varianza: V,
+        };
+    }
+
     // Determinar límites del bucle según condición y modelo
     const { tipo, valorX, valorB } = condicion;
     
     // Límites teóricos máximos
     let maxTeorico = 0;
-    if (modelo === 'Binomial') maxTeorico = params.n;
+    if (modelo === 'Bernoulli') maxTeorico = 1;
+    else if (modelo === 'Binomial') maxTeorico = params.n;
     else if (modelo === 'Hipergeometrica') maxTeorico = Math.min(params.K, params.n);
     else if (modelo === 'Poisson') {
         // Poisson va al infinito, si es 'mayor' cortaremos el bucle o usaremos complemento 1 - P(X < x)
@@ -86,6 +114,7 @@ export const calcularDistribucionModelo = (modelo, params, condicion) => {
 
     // Funciones de cálculo según modelo
     const calcularPuntual = (x) => {
+        if (modelo === 'Bernoulli') return x === 0 ? 1 - params.p : (x === 1 ? params.p : 0);
         if (modelo === 'Binomial') return puntualBinomial(params.n, params.p, x);
         if (modelo === 'Poisson') return puntualPoisson(params.lambda, x);
         if (modelo === 'Hipergeometrica') return puntualHipergeometrica(params.N, params.K, params.n, x);
@@ -113,21 +142,7 @@ export const calcularDistribucionModelo = (modelo, params, condicion) => {
         }
     }
 
-    // Calcular Esperanza y Varianza teóricas
-    let E = 0;
-    let V = 0;
-    if (modelo === 'Binomial') {
-        E = params.n * params.p;
-        V = params.n * params.p * (1 - params.p);
-    } else if (modelo === 'Poisson') {
-        E = params.lambda;
-        V = params.lambda;
-    } else if (modelo === 'Hipergeometrica') {
-        const { N, K, n } = params;
-        const p = K / N;
-        E = n * p;
-        V = n * p * (1 - p) * ((N - n) / (N - 1));
-    }
+    // Esperanza y Varianza teóricas ya calculadas arriba
 
     return {
         probabilidadFinal: prob,
@@ -139,6 +154,13 @@ export const calcularDistribucionModelo = (modelo, params, condicion) => {
 
 // Generador de datos para el gráfico de bastones
 export const generarDatosGrafico = (modelo, params) => {
+    if (modelo === 'Bernoulli') {
+        return [
+            { x: 0, p: 1 - params.p },
+            { x: 1, p: params.p }
+        ];
+    }
+
     const datos = [];
     let limite = 0;
 

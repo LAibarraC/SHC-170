@@ -33,12 +33,12 @@ export const api = {
   },
 
   // --- OBTENER ESTUDIANTES DE UNA CLASE ---
-  obtenerEstudiantesClase: async (claseId, userEmail) => {
+  obtenerEstudiantesClase: async (claseId, userEmail) => { 
     const res = await fetch(`${BASE_URL}/clases/${claseId}/estudiantes?user_email=${encodeURIComponent(userEmail)}`);
     if (!res.ok) throw new Error("Error al obtener los estudiantes de la clase");
     return await res.json();
   },
-
+  
   // --- DESMATRICULAR/ELIMINAR ESTUDIANTE DE UNA CLASE ---
   desmatricularEstudiante: async (claseId, estudianteId, userEmail) => {
     const res = await fetch(`${BASE_URL}/clases/${claseId}/desmatricular/${estudianteId}?user_email=${encodeURIComponent(userEmail)}`, {

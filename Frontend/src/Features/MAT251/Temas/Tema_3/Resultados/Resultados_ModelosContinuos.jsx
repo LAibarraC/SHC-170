@@ -4,7 +4,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { IconoProcedimiento } from '../../../ui/Iconos';
 
-export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpenProcedimiento }) {
+export default function Resultados_ModelosContinuos({ resultados, modelo, onOpenProcedimiento }) {
     if (!resultados) return null;
 
     const renderLatex = (str) => {
@@ -22,19 +22,21 @@ export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpen
                 Resultados {modelo}
             </h3>
 
-            <div style={{ backgroundColor: '#eff6ff', padding: '10px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #bfdbfe', position: 'relative' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
-                    <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>Probabilidad Calculada {renderLatex('P(X)')}</div>
-                    {onOpenProcedimiento && (
-                        <button onClick={() => onOpenProcedimiento('probabilidad')} title="Ver procedimiento matemático" style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
-                            <IconoProcedimiento />
-                        </button>
-                    )}
+            {resultados.probabilidadFinal !== null && (
+                <div style={{ backgroundColor: '#eff6ff', padding: '10px', borderRadius: '8px', marginBottom: '15px', textAlign: 'center', border: '1px solid #bfdbfe', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                        <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>Probabilidad Calculada {renderLatex('P(X)')}</div>
+                        {onOpenProcedimiento && (
+                            <button onClick={() => onOpenProcedimiento('probabilidad')} title="Ver procedimiento matemático" style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
+                                <IconoProcedimiento />
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
+                        {formatNum(resultados.probabilidadFinal)} <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>({(resultados.probabilidadFinal * 100).toFixed(2)}%)</span>
+                    </div>
                 </div>
-                <div style={{ fontSize: '1.5rem', color: '#0f172a', fontWeight: 800 }}>
-                    {formatNum(resultados.probabilidadFinal)} <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 600 }}>({(resultados.probabilidadFinal * 100).toFixed(2)}%)</span>
-                </div>
-            </div>
+            )}
 
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
                 <div style={{ flex: 1, padding: '8px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center', position: 'relative' }}>
@@ -67,7 +69,7 @@ export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpen
 
                 <div style={{ flex: 1, padding: '8px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center', position: 'relative' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Desv. Est. {renderLatex('\\sigma')}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Desviación {renderLatex('\\sigma')}</div>
                         {onOpenProcedimiento && (
                             <button onClick={() => onOpenProcedimiento('desviacion')} title="Ver procedimiento matemático" style={{ position: 'absolute', top: '4px', right: '4px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: '#64748b' }}>
                                 <IconoProcedimiento />
@@ -75,7 +77,7 @@ export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpen
                         )}
                     </div>
                     <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 700 }}>
-                        {formatNum(resultados.desviacion)}
+                        {formatNum(resultados.desviacion !== undefined ? resultados.desviacion : Math.sqrt(resultados.varianza))}
                     </div>
                 </div>
             </div>

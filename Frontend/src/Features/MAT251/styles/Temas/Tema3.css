@@ -2,27 +2,26 @@
 .tema3-container {
     padding: 20px;
     font-family: system-ui, -apple-system, sans-serif;
-    color: #334155;
-    background: #f8fafc;
+    color: var(--text-color, #334155);
+    background: transparent;
     border-radius: 8px;
 }
 
 .tema3-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
+    background: transparent;
     border-radius: 8px;
-    padding: 20px;
+    padding: 0;
     margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: none;
 }
 
 .tema3-title {
-    color: #1e3a8a;
+    color: var(--primary-color, #1e3a8a);
     font-size: 1.25rem;
     font-weight: 700;
     margin-top: 0;
     margin-bottom: 15px;
-    border-bottom: 2px solid #bfdbfe;
+    border-bottom: 2px solid var(--border-color, #bfdbfe);
     padding-bottom: 10px;
 }
 
@@ -36,16 +35,18 @@
     font-size: 0.85rem;
     font-weight: 600;
     margin-bottom: 5px;
-    color: #475569;
+    color: var(--text-muted, #475569);
 }
 
 .tema3-input, .tema3-select {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--border-color, #cbd5e1);
     border-radius: 6px;
     font-size: 0.95rem;
     box-sizing: border-box;
+    background: var(--bg-input, #ffffff);
+    color: var(--text-color, #000000);
 }
 
 .tema3-input:focus, .tema3-select:focus {
@@ -78,10 +79,10 @@
 
 .tema3-switch-container {
     display: flex;
-    background: #f1f5f9;
+    background: var(--bg-input, #f1f5f9);
     padding: 4px;
     border-radius: 8px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-color, #e2e8f0);
     margin-bottom: 20px;
 }
 
@@ -95,11 +96,11 @@
     cursor: pointer;
     transition: all 0.2s ease;
     background: transparent;
-    color: #64748b;
+    color: var(--text-muted, #64748b);
 }
 
 .tema3-switch-btn.active {
-    background: #3b82f6;
+    background: var(--primary-color, #3b82f6);
     color: white;
 }
 

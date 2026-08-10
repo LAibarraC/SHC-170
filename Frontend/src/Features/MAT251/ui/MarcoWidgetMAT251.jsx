@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconoGrafico, IconoMostrar, IconoOcultar, IconoMaximizar, IconoRestaurar } from '../../../ui/iconos';
@@ -22,6 +22,33 @@ const IconoArbol = () => (
 export default function MarcoWidgetMAT251({ id, titulo, children, anchoCompleto = false, ancho, alto }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [zoom, setZoom] = useState(1);
+
+  const containerRefNormal = useRef(null);
+  const containerRefMax = useRef(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [startScroll, setStartScroll] = useState({ left: 0, top: 0 });
+
+  const handlePointerDown = (e, ref) => {
+    if (zoom <= 1) return;
+    setIsPanning(true);
+    setStartPos({ x: e.clientX, y: e.clientY });
+    if (ref.current) {
+      setStartScroll({ left: ref.current.scrollLeft, top: ref.current.scrollTop });
+    }
+  };
+
+  const handlePointerMove = (e, ref) => {
+    if (!isPanning || zoom <= 1) return;
+    e.preventDefault();
+    if (ref.current) {
+      ref.current.scrollLeft = startScroll.left - (e.clientX - startPos.x);
+      ref.current.scrollTop = startScroll.top - (e.clientY - startPos.y);
+    }
+  };
+
+  const handlePointerUp = () => setIsPanning(false);
 
   const {
     attributes,
@@ -71,16 +98,30 @@ export default function MarcoWidgetMAT251({ id, titulo, children, anchoCompleto 
             >
               <IconoMover />
             </div>
-            <h4 className="widget-titulo" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h4 className="widget-titulo" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
               <IconoArbol /> {titulo}
             </h4>
           </div>
 
           <div className="widget-controles">
+            <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input, transparent)', borderRadius: '6px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <button className="widget-btn" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} title="Alejar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', padding: 0, border: 'none', borderRadius: 0 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', minWidth: '38px', color: 'var(--text-main)', userSelect: 'none', height: '24px', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)' }}>
+                    {Math.round(zoom * 100)}%
+                </div>
+                <button className="widget-btn" onClick={() => setZoom(z => Math.min(3, z + 0.25))} title="Acercar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', padding: 0, border: 'none', borderRadius: 0 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            
+            <div style={{ width: '1px', height: '16px', background: 'var(--border-color)', margin: '0 4px' }}></div>
+
             <button className="widget-btn" onClick={() => setIsMinimized(!isMinimized)} title={isMinimized ? "Mostrar" : "Ocultar"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {isMinimized ? <IconoMostrar /> : <IconoOcultar />}
             </button>
-            <button className="widget-btn" onClick={() => { setIsMaximized(true); setIsMinimized(false); }} title="Maximizar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="widget-btn" onClick={() => { setIsMaximized(true); setIsMinimized(false); setZoom(1); }} title="Maximizar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <IconoMaximizar />
             </button>
           </div>
@@ -89,8 +130,18 @@ export default function MarcoWidgetMAT251({ id, titulo, children, anchoCompleto 
         <div className={`widget-body ${isMinimized ? 'oculto' : ''}`} style={{ flex: 1, position: 'relative', minHeight: '300px', padding: 0 }}>
           {/* Si está maximizado, dejamos la caja vacía para que no se renderice dos veces el gráfico pesado */}
           {!isMaximized && (
-            <div className="contenedor-grafico-interno" style={{ position: 'absolute', top: 15, left: 15, right: 15, bottom: 15, height: 'auto', width: 'auto' }}>
-              {childrenConProps}
+            <div 
+              ref={containerRefNormal}
+              className="contenedor-grafico-interno thin-scrollbar" 
+              style={{ position: 'absolute', top: 15, left: 15, right: 15, bottom: 15, overflow: zoom > 1 ? 'auto' : 'hidden', cursor: zoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+              onPointerDown={(e) => handlePointerDown(e, containerRefNormal)}
+              onPointerMove={(e) => handlePointerMove(e, containerRefNormal)}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+            >
+              <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%`, minWidth: '100%', minHeight: '100%', transition: 'width 0.3s, height 0.3s' }}>
+                {childrenConProps}
+              </div>
             </div>
           )}
           {isMaximized && (
@@ -141,20 +192,41 @@ export default function MarcoWidgetMAT251({ id, titulo, children, anchoCompleto 
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <IconoArbol /> {titulo}
               </h3>
-              <button
-                onClick={() => setIsMaximized(false)}
-                style={{
-                  background: '#dc2626', color: 'white', border: 'none', borderRadius: '5px',
-                  padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold'
-                }}
-              >
-                <IconoRestaurar /> Cerrar
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input, transparent)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                  <button className="widget-btn" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} title="Alejar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', padding: 0, border: 'none', borderRadius: 0, cursor: 'pointer' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 'bold', minWidth: '45px', color: 'var(--text-main)', userSelect: 'none', height: '30px', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)' }}>
+                      {Math.round(zoom * 100)}%
+                  </div>
+                  <button className="widget-btn" onClick={() => setZoom(z => Math.min(4, z + 0.25))} title="Acercar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', height: '30px', padding: 0, border: 'none', borderRadius: 0, cursor: 'pointer' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setIsMaximized(false); setZoom(1); }}
+                  style={{
+                    background: '#dc2626', color: 'white', border: 'none', borderRadius: '5px',
+                    padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold'
+                  }}
+                >
+                  <IconoRestaurar /> Cerrar
+                </button>
+              </div>
             </div>
 
             {/* Cuerpo Gigante del Gráfico */}
-            <div style={{ flex: 1, position: 'relative', padding: '20px' }}>
-              <div style={{ position: 'absolute', top: 20, left: 20, right: 20, bottom: 20 }}>
+            <div 
+              ref={containerRefMax}
+              className="thin-scrollbar"
+              style={{ flex: 1, position: 'relative', padding: '20px', overflow: zoom > 1 ? 'auto' : 'hidden', cursor: zoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+              onPointerDown={(e) => handlePointerDown(e, containerRefMax)}
+              onPointerMove={(e) => handlePointerMove(e, containerRefMax)}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+            >
+              <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%`, minWidth: '100%', minHeight: '100%', transition: 'width 0.3s, height 0.3s' }}>
                 {childrenConProps}
               </div>
             </div>

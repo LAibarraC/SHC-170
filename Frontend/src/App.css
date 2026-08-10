@@ -148,6 +148,7 @@ button:hover {
 /* SCROLLBAR PERSONALIZADO */
 ::-webkit-scrollbar {
   width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -162,6 +163,26 @@ button:hover {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #787878;
+}
+
+/* Scrollbar delgado para contenedores específicos horizontales */
+.thin-scrollbar {
+  scrollbar-width: thin;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 6px;
+  border: none;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
 }
 
 /* ========================================= */

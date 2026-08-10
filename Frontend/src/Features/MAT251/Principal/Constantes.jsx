@@ -14,6 +14,7 @@ export const OPERACIONES = [
       { value: 'regla_adicion', label: 'Axiomas y Regla de la Adición' },
       { value: 'regla_multiplicacion', label: 'Regla de la Multiplicación' },
       { value: 'muestreo', label: 'Introducción al Muestreo' },
+      { value: 'distribuciones_muestrales', label: 'Distribuciones Muestrales' },
       { value: 'dist_uniforme', label: 'Probabilidad en Espacio Continuo' },
     ],
   },
@@ -22,14 +23,16 @@ export const OPERACIONES = [
     titulo: 'Variables aleatorias',
     operaciones: [
       { value: 'dist_discreta', label: 'Variable Aleatoria Discreta' },
-      { value: 'dist_continua', label: 'Variable Aleatoria Continua' },
+      { value: 'dist_continua_v2', label: 'Variable Aleatoria Continua' },
+      { value: 'dist_continua', label: 'Calculadora (Beta)' },
     ],
   },
   {
     tema: 'Tema 3',
     titulo: 'Distribuciones discretas y continuas importantes',
     operaciones: [
-      { value: 'modelos_discretos', label: 'Modelos Discretos Especiales' }
+      { value: 'modelos_discretos', label: 'Distribuciones Discretas' },
+      { value: 'modelos_continuos', label: 'Distribuciones Continuas' }
     ],
   },
   {
