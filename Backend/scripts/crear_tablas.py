@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Añadir el directorio 'Backend' al sys.path para poder importar módulos como 'config' y 'models'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config.database import engine
 import models
 

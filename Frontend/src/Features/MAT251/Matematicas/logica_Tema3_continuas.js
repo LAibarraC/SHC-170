@@ -107,10 +107,16 @@ export const calcularDistribucionContinua = (modelo, params, condicion) => {
                     resultExtra.c = bisectionInverse(pInput, true, cdf, a, b);
                     prob = pInput;
                     break;
+                case 'inversa_entre':
+                    const tailProbUni = (1 - pInput) / 2;
+                    resultExtra.c1 = bisectionInverse(tailProbUni, false, cdf, a, b);
+                    resultExtra.c2 = bisectionInverse(tailProbUni, true, cdf, a, b);
+                    prob = pInput;
+                    break;
                 case 'inversa_exterior':
-                    const halfP = pInput / 2;
-                    resultExtra.c1 = bisectionInverse(halfP, false, cdf, a, b);
-                    resultExtra.c2 = bisectionInverse(halfP, true, cdf, a, b);
+                    const halfPUni = pInput / 2;
+                    resultExtra.c1 = bisectionInverse(halfPUni, false, cdf, a, b);
+                    resultExtra.c2 = bisectionInverse(halfPUni, true, cdf, a, b);
                     prob = pInput;
                     break;
                 default:
@@ -166,6 +172,12 @@ export const calcularDistribucionContinua = (modelo, params, condicion) => {
                     resultExtra.c = jStat.normal.inv(1 - pInput, mu, sigma);
                     prob = pInput;
                     break;
+                case 'inversa_entre':
+                    const tailProb = (1 - pInput) / 2;
+                    resultExtra.c1 = jStat.normal.inv(tailProb, mu, sigma);
+                    resultExtra.c2 = jStat.normal.inv(1 - tailProb, mu, sigma);
+                    prob = pInput;
+                    break;
                 case 'inversa_exterior':
                     const halfP = pInput / 2;
                     resultExtra.c1 = jStat.normal.inv(halfP, mu, sigma);
@@ -218,6 +230,8 @@ export const generarDatosGraficoContinua = (modelo, params, condicion, resultado
             return x <= (resultados.c ?? 0);
         } else if (tipo === 'inversa_mayor') {
             return x >= (resultados.c ?? 0);
+        } else if (tipo === 'inversa_entre') {
+            return x >= (resultados.c1 ?? 0) && x <= (resultados.c2 ?? 0);
         } else if (tipo === 'inversa_exterior') {
             return x <= (resultados.c1 ?? 0) || x >= (resultados.c2 ?? 0);
         }
@@ -257,19 +271,50 @@ export const generarDatosGraficoContinua = (modelo, params, condicion, resultado
         const desviaciones = 4; 
         const inicio = mu - desviaciones * sigma;
         const fin = mu + desviaciones * sigma;
-        const step = (fin - inicio) / puntos;
+        const puntosAumentados = 200; // Mayor resolución para la curva suave
+        const step = (fin - inicio) / puntosAumentados;
 
-        for (let i = 0; i <= puntos; i++) {
-            const x = inicio + i * step;
+        const agregarPunto = (x) => {
             const y = densidadNormal(mu, sigma, x);
-            
             let fillY = null;
             if (y > 0 && isInsideCondition(x)) {
                 fillY = y;
             }
-
             datos.push({ x, y, fillY });
+        };
+
+        // 1. Puntos regulares de la curva
+        for (let i = 0; i <= puntosAumentados; i++) {
+            agregarPunto(inicio + i * step);
         }
+
+        // 2. Inyectar puntos frontera exactos para eliminar huecos visuales
+        const inyectarFrontera = (frontera) => {
+            if (frontera === undefined || isNaN(frontera)) return;
+            // Inyectamos el punto exacto y deltas microscópicos para cortes perfectos del área
+            agregarPunto(frontera - 0.00001);
+            agregarPunto(frontera);
+            agregarPunto(frontera + 0.00001);
+        };
+
+        if (condicion) {
+            if (condicion.valX !== undefined) inyectarFrontera(Number(condicion.valX));
+            if (condicion.valorX !== undefined) inyectarFrontera(Number(condicion.valorX));
+            if (condicion.valX2 !== undefined) inyectarFrontera(Number(condicion.valX2));
+            if (condicion.valorB !== undefined) inyectarFrontera(Number(condicion.valorB));
+            if (resultados && resultados.c !== undefined) inyectarFrontera(resultados.c);
+            if (resultados && resultados.c1 !== undefined) inyectarFrontera(resultados.c1);
+            if (resultados && resultados.c2 !== undefined) inyectarFrontera(resultados.c2);
+            if (condicion.intervals) {
+                condicion.intervals.forEach(intv => {
+                    inyectarFrontera(parseFloat(intv.min));
+                    inyectarFrontera(parseFloat(intv.max));
+                });
+            }
+        }
+
+        // Ordenar datos por x para que Recharts dibuje el path de izquierda a derecha correctamente
+        datos.sort((p1, p2) => p1.x - p2.x);
     }
 
     return datos;

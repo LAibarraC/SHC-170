@@ -1,6 +1,6 @@
 // v2 — Tema 2 habilitado
 export const FONT = 'system-ui, -apple-system, sans-serif';
-export const FS = { xs: '0.75rem', sm: '0.85rem', base: '0.95rem', md: '1rem', lg: '1.1rem' };
+export const FS = { xs: '0.75rem', sm: '0.85rem', sx: '0.75rem', base: '0.95rem', md: '1rem', lg: '1.1rem' };
 export const RADIUS = '5px';
 
 export const OPERACIONES = [

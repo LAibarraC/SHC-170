@@ -587,9 +587,9 @@ export default function Principal() {
             <div className="calculadora-resultados" style={{ fontFamily: FONT }}>
                 <div className="frecuencias" style={{ borderRadius: RADIUS }}>
                     {operacion && (
-                        <h3 style={{ fontSize: FS.lg, fontFamily: FONT, fontWeight: 600 }}>
-                            Resultados: {operacion === 'conteo' ? 'TÉCNICAS DE CONTEO' : operacion === 'simulador_total' ? 'PROBABILIDAD TOTAL' : operacion === 'regla_adicion' ? 'AXIOMAS Y REGLA DE LA ADICIÓN' : operacion === 'regla_multiplicacion' ? 'REGLA DE LA MULTIPLICACIÓN' : operacion === 'muestreo' ? 'INTRODUCCIÓN AL MUESTREO' : operacion === 'dist_uniforme' ? 'PROBABILIDAD EN ESPACIO CONTINUO' : operacion === 'dist_discreta' ? 'VARIABLE ALEATORIA DISCRETA' : operacion === 'dist_continua' ? 'CALCULADORA (BETA)' : operacion === 'dist_continua_v2' ? 'VARIABLE ALEATORIA CONTINUA' : operacion === 'modelos_discretos' ? 'DISTRIBUCIONES DISCRETAS' : operacion === 'modelos_continuos' ? 'DISTRIBUCIONES CONTINUAS' : (subTipoProbabilidad === 'clasica' ? 'PROBABILIDAD CLÁSICA' : subTipoProbabilidad === 'frecuentista' ? 'PROBABILIDAD FRECUENTISTA' : 'PROBABILIDAD CONDICIONAL')}
-                        </h3>
+                        <h4 style={{ fontSize: FS.sx, fontFamily: FONT, fontWeight: 500, color: 'var(--primary-color)', margin: '0', display: 'flex', alignItems: 'center' }}>
+                            Resultados: <span style={{ color: 'var(--text-main)', marginLeft: '6px' }}>{operacion === 'conteo' ? 'TÉCNICAS DE CONTEO' : operacion === 'simulador_total' ? 'PROBABILIDAD TOTAL' : operacion === 'regla_adicion' ? 'AXIOMAS Y REGLA DE LA ADICIÓN' : operacion === 'regla_multiplicacion' ? 'REGLA DE LA MULTIPLICACIÓN' : operacion === 'muestreo' ? 'INTRODUCCIÓN AL MUESTREO' : operacion === 'dist_uniforme' ? 'PROBABILIDAD EN ESPACIO CONTINUO' : operacion === 'dist_discreta' ? 'VARIABLE ALEATORIA DISCRETA' : operacion === 'dist_continua' ? 'CALCULADORA (BETA)' : operacion === 'dist_continua_v2' ? 'VARIABLE ALEATORIA CONTINUA' : operacion === 'modelos_discretos' ? 'DISTRIBUCIONES DISCRETAS' : operacion === 'modelos_continuos' ? 'DISTRIBUCIONES CONTINUAS' : (subTipoProbabilidad === 'clasica' ? 'PROBABILIDAD CLÁSICA' : subTipoProbabilidad === 'frecuentista' ? 'PROBABILIDAD FRECUENTISTA' : 'PROBABILIDAD CONDICIONAL')}</span>
+                        </h4>
                     )}
 
                     {/* RESULTADOS */}
@@ -698,6 +698,7 @@ export default function Principal() {
                                         <Resultados_ModelosDiscretos 
                                             resultados={datosTema3.resultados} 
                                             modelo={datosTema3.modelo} 
+                                            params={datosTema3.params}
                                             onOpenProcedimiento={(tipo) => setModalProcTema3(tipo)}
                                         />
                                     </>
@@ -725,6 +726,8 @@ export default function Principal() {
                                         <Resultados_ModelosContinuos 
                                             resultados={datosTema3Continuos.resultados} 
                                             modelo={datosTema3Continuos.modelo} 
+                                            condicion={datosTema3Continuos.condicion}
+                                            params={datosTema3Continuos.params}
                                             onOpenProcedimiento={(tipo) => setModalProcTema3(tipo)}
                                         />
                                     </>
@@ -807,14 +810,24 @@ export default function Principal() {
             <ModalVariables modalVars={modalVars} setModalVars={setModalVars} variables={variables} cargarVariable={cargarVariable} />
             
             {/* Modales Tema 3 */}
-            {modalProcTema3 && datosTema3 && (
-                <ModalProcedimientoModelos 
-                    modelo={datosTema3.modelo}
-                    params={datosTema3.params}
-                    condicion={datosTema3.condicion}
-                    momento={modalProcTema3}
-                    onClose={() => setModalProcTema3(false)}
-                />
+            {modalProcTema3 && (
+                operacion === 'modelos_discretos' && datosTema3 ? (
+                    <ModalProcedimientoModelos 
+                        modelo={datosTema3.modelo}
+                        params={datosTema3.params}
+                        condicion={datosTema3.condicion}
+                        momento={modalProcTema3}
+                        onClose={() => setModalProcTema3(false)}
+                    />
+                ) : operacion === 'modelos_continuos' && datosTema3Continuos ? (
+                    <ModalProcedimientoModelos 
+                        modelo={datosTema3Continuos.modelo}
+                        params={datosTema3Continuos.params}
+                        condicion={datosTema3Continuos.condicion}
+                        momento={modalProcTema3}
+                        onClose={() => setModalProcTema3(false)}
+                    />
+                ) : null
             )}
         </div>
     );
