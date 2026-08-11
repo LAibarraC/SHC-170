@@ -38,6 +38,7 @@ origins = [
     "https://adminusfx.jboris.org",  # Enlace de hosting en producción
     "https://backend-shc170.onrender.com",
     "https://simulador-empresarial-swart.vercel.app", #por las dudas
+    "http://10.250.54.7:5173",
 ]
 
 app.add_middleware(
