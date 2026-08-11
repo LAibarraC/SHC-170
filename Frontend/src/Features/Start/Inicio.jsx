@@ -6,7 +6,7 @@ import imagenInicio2 from "../../assets/images/imagen de inicio 2.jpg";
 
 import "../../styles/ui/Inicio.css";
 
-const INTERVALO_MS = 6000;
+const INTERVALO_MS = 4000;
 
 export default function Inicio() {
   const imagenes = [escudoAdmin, imagenInicio1, imagenInicio2];
