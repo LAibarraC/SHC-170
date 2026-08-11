@@ -4,7 +4,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { IconoProcedimiento } from '../../../ui/Iconos';
 
-export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpenProcedimiento }) {
+export default function Resultados_ModelosDiscretos({ resultados, modelo, params, onOpenProcedimiento }) {
     if (!resultados) return null;
 
     const renderLatex = (str) => {
@@ -13,8 +13,21 @@ export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpen
 
     const formatNum = (num) => {
         if (typeof num !== 'number' || isNaN(num)) return '-';
-        return Number.isInteger(num) ? num.toString() : num.toFixed(4);
+        return Number.isInteger(num) ? num.toString() : num.toFixed(2);
     };
+
+    let formulaEsperanza = "";
+    if (params) {
+        if (modelo === 'Bernoulli') {
+            formulaEsperanza = `E(X) = ${params.p}`;
+        } else if (modelo === 'Binomial') {
+            formulaEsperanza = `E(X) = ${params.n} \\cdot ${params.p}`;
+        } else if (modelo === 'Poisson') {
+            formulaEsperanza = `E(X) = ${params.lambda}`;
+        } else if (modelo === 'Hipergeometrica') {
+            formulaEsperanza = `E(X) = ${params.n} \\cdot \\frac{${params.K}}{${params.N}}`;
+        }
+    }
 
     return (
         <div className="tema3-card" style={{ marginTop: '20px' }}>
@@ -40,15 +53,15 @@ export default function Resultados_ModelosDiscretos({ resultados, modelo, onOpen
                 <div style={{ flex: 1, padding: '8px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center', position: 'relative' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                         <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Esperanza {renderLatex('E(X)')}</div>
-                        {onOpenProcedimiento && (
-                            <button onClick={() => onOpenProcedimiento('esperanza')} title="Ver procedimiento matemático" style={{ position: 'absolute', top: '4px', right: '4px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px', color: '#64748b' }}>
-                                <IconoProcedimiento />
-                            </button>
-                        )}
                     </div>
                     <div style={{ fontSize: '1rem', color: '#334155', fontWeight: 700 }}>
                         {formatNum(resultados.esperanza)}
                     </div>
+                    {formulaEsperanza && (
+                        <div style={{ fontSize: '0.8rem', color: '#0f172a', marginTop: '6px', fontWeight: 500 }}>
+                            {renderLatex(formulaEsperanza)}
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ flex: 1, padding: '8px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center', position: 'relative' }}>

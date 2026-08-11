@@ -282,23 +282,78 @@ export default function ModalProcedimientoModelos({ modelo, params, condicion, m
                     </div>
                 `;
             } else if (modelo === 'Normal') {
-                htmlContent = `
-                    <div style="${styleContainer}">
-                        <strong style="${styleTitle}">1. Tipificación a Normal Estándar Z (o Inversa Z):</strong>
-                        ${renderMath(formulaBase)}
-                    </div>
-                    <div style="${styleContainer}">
-                        <strong style="${styleTitle}">2. Sustituyendo los valores para Z:</strong>
-                        ${renderMath(sustitucionEjemplo)}
-                    </div>
-                    <div style="${styleContainer}">
-                        <strong style="${styleTitle}">3. ${tipo.includes('inversa') ? 'Valor Límite Calculado (c)' : 'Probabilidad Resultante'}:</strong>
-                        ${renderMath(tipo.includes('inversa') && !tipo.includes('exterior') ? `c = ${resultadoEjemplo.toFixed(4)}` : `P = ${resultadoEjemplo.toFixed(4)}`)}
-                    </div>
-                    <div style="font-size: 0.9em; color: #64748b; font-style: italic; text-align: center;">
-                        * Recuerde que para variables continuas $P(X = x) = 0$.
-                    </div>
-                `;
+                const isEstandar = (params.mu === 0 && params.sigma === 1);
+                
+                // Estilos base Tema 2
+                const stepTitleStyle = "font-weight: bold; font-size: 0.9em; margin-bottom: 8px; color: #1e293b;";
+                const boxStyle = "background: #f8fafc; padding: 12px; border-radius: 8px; font-size: 16px; border: 1px dashed #cbd5e1; display: flex; flex-direction: column; gap: 10px; overflow-x: auto;";
+                const renderInline = (math) => katex.renderToString(math, { throwOnError: false });
+
+                if (tipo.includes('inversa')) {
+                    htmlContent = `
+                        <div style="margin-bottom: 15px;">
+                            <div style="${stepTitleStyle}">Paso 1: Tipificación a Normal Estándar Z (Inversa)</div>
+                            <div style="${boxStyle}; align-items: center; flex-direction: row; gap: 20px;">
+                                <div>${renderInline("Z = \\Phi^{-1}(p) \\Rightarrow c = \\mu + Z \\cdot \\sigma")}</div>
+                                <div style="font-size: 0.8em; color: #64748b;">
+                                    Datos: ${renderInline(`\\mu = ${params.mu}`)}, ${renderInline(`\\sigma = ${params.sigma}`)}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="${stepTitleStyle}">Paso 2: Sustituyendo los valores para Z</div>
+                            <div style="${boxStyle}">
+                                ${renderInline(sustitucionEjemplo)}
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="${stepTitleStyle}">Paso 3: Valor Límite Calculado (c)</div>
+                            <div style="${boxStyle}; font-weight: bold;">
+                                ${renderInline(tipo === 'inversa_exterior' ? `c_1 = ${params.mu + jStat.normal.inv(valP / 2, 0, 1) * params.sigma}, c_2 = ${params.mu + jStat.normal.inv(1 - valP / 2, 0, 1) * params.sigma}` : `c = ${resultadoEjemplo.toFixed(4)}`)}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    htmlContent = `
+                        <div style="margin-bottom: 15px;">
+                            <div style="${stepTitleStyle}">Paso 1: Fórmula de Estandarización</div>
+                            <div style="${boxStyle}; align-items: center; flex-direction: row; gap: 20px;">
+                                <div>${renderInline("Z = \\frac{X - \\mu}{\\sigma}")}</div>
+                                <div style="font-size: 0.8em; color: #64748b;">
+                                    Datos: ${renderInline(`\\mu = ${params.mu}`)}, ${renderInline(`\\sigma = ${params.sigma}`)}
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="${stepTitleStyle}">Paso 2: Calcular el valor de Z</div>
+                            <div style="${boxStyle}">
+                                ${tipo === 'suma_intervalos' ? 
+                                    intervals.map((inv, idx) => `
+                                        <div>${renderInline(`Z_{${idx * 2 + 1}} = \\frac{${inv.min} - ${params.mu}}{${params.sigma}} = ${((inv.min - params.mu) / params.sigma).toFixed(4)}`)}</div>
+                                        <div>${renderInline(`Z_{${idx * 2 + 2}} = \\frac{${inv.max} - ${params.mu}}{${params.sigma}} = ${((inv.max - params.mu) / params.sigma).toFixed(4)}`)}</div>
+                                    `).join('')
+                                : tipo === 'exterior' || tipo === 'entre' || tipo === 'intervalo' ? `
+                                    <div>${renderInline(`Z_1 = \\frac{${valX ?? valorX} - ${params.mu}}{${params.sigma}} = ${((Number(valX ?? valorX) - params.mu) / params.sigma).toFixed(4)}`)}</div>
+                                    <div>${renderInline(`Z_2 = \\frac{${valX2 ?? valorB} - ${params.mu}}{${params.sigma}} = ${((Number(valX2 ?? valorB) - params.mu) / params.sigma).toFixed(4)}`)}</div>
+                                ` : `
+                                    ${renderInline(`Z = \\frac{${valX ?? valorX} - ${params.mu}}{${params.sigma}} = ${((Number(valX ?? valorX) - params.mu) / params.sigma).toFixed(4)}`)}
+                                `}
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <div style="${stepTitleStyle}">Paso 3: Planteamiento de la Integral</div>
+                            <div style="${boxStyle}; align-items: center; text-align: center;">
+                                <div>${renderInline("P(Z \\le z_0) = \\frac{1}{\\sqrt{2\\pi}} \\int_{-\\infty}^{z_0} e^{-\\frac{x^2}{2}} dx")}</div>
+                                <div style="font-size: 0.8em; font-style: italic; color: #64748b; text-align: left; width: 100%; margin-top: 8px;">
+                                    Nota: Esta integral no tiene solución algebraica. El valor se obtiene buscando el valor de Z en la Tabla de la Normal Estándar o mediante aproximación computacional.
+                                </div>
+                                <div style="font-weight: bold; margin-top: 10px; font-size: 1.1em; width: 100%; text-align: left;">
+                                    ${renderInline(`P = ${resultadoEjemplo.toFixed(4)}`)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
             } else if (tipo === 'exacta') {
                 htmlContent = `
                     <div style="${styleContainer}">
