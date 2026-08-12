@@ -197,9 +197,6 @@ export default function Archivos({ usuario }) {
       return;
     }
 
-    const confirmar = window.confirm(`¿Eliminar "${filename}" de forma permanente?`);
-    if (!confirmar) return;
-
     try {
       await api.eliminarArchivo(filename, usuario.nombre, tabActiva === "cursos" ? cursoSeleccionado : "");
       setFiles((prev) => prev.filter((f) => f.filename !== filename));
