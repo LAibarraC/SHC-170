@@ -2,7 +2,11 @@
 
 /*uvicorn main:app --reload*/
 
-export const BASE_URL = import.meta.env.VITE_API_URL;
+// Detecta automáticamente si estás en localhost o en la IP del celular
+const hostActual = window.location.hostname;
+
+// Construye la URL apuntando al puerto 8000 (tu backend)
+export const BASE_URL = `http://${hostActual}:8000`;
 
 
 export const api = {
