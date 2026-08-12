@@ -217,24 +217,45 @@ export default function Archivos({ usuario }) {
       const url = `${BASE_URL}/files/${encodeURIComponent(filename)}?autor=${autorParam}${cursoParam}`;
       
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("No se pudo descargar el archivo del servidor.");
+      if (!response.ok) throw new Error("No se pudo descargar el archivo del servidor.");
+      const blob = await response.blob();
+
+      if (window.showSaveFilePicker) {
+        try {
+          // 1. Abre la ventana y ESPERA a que elijas el lugar y presiones "Guardar"
+          const fileHandle = await window.showSaveFilePicker({ suggestedName: filename });
+          
+          // 2. ¡El lugar ya fue seleccionado! Mostramos el mensaje AHORA:
+          alerta.exito("Descarga iniciada", "Guardando el archivo en tu equipo...");
+
+          // 3. Procedemos a escribir el archivo físicamente en el disco
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          
+        } catch (error) {
+          // Si cierras la ventana o presionas "Cancelar", no muestra nada.
+          if (error.name !== 'AbortError') {
+            alerta.error("Error al guardar", "Hubo un problema al escribir el archivo.");
+          }
+        }
+      } else {
+        // Método clásico (para Firefox/Safari) donde no se puede detectar la ventana
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alerta.exito("Descarga iniciada", "Elige el lugar donde se va a guardar el archivo.");
+        setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 5000);
       }
       
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-      
-      alerta.success("Archivo descargado", `El archivo "${filename}" se ha descargado correctamente.`);
     } catch (err) {
       console.error(err);
-      alerta.error("Error al descargar", err.message || "Ocurrió un error al descargar el archivo.");
+      alerta.error("Error al descargar", err.message || "No se pudo conectar con el servidor.");
     }
   };
 
