@@ -10,9 +10,19 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import escudoAdmin from "../../assets/images/escudoAdmin.png";
 
+import Modal from "../../utils/Modal";
+
 export default function Historial() {
   const { usuario } = useData();
   const navigate = useNavigate();
+
+  // Estados para el historial
+  const [registros, setRegistros] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  // Estados para el Modal de confirmación
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [registroAEliminar, setRegistroAEliminar] = useState(null);
 
   const iniciarTour = () => {
     const tourSteps = [
@@ -98,9 +108,6 @@ export default function Historial() {
     driverObj.drive();
   };
 
-  const [registros, setRegistros] = useState([]);
-  const [cargando, setCargando] = useState(true);
-
   const cargarHistorial = async () => {
     if (!usuario) return;
     try {
@@ -115,20 +122,35 @@ export default function Historial() {
     }
   };
 
-  const handleEliminar = async (id) => {
-    try {
-      await api.eliminarHistorial(id, usuario.nombre);
-      // Filtramos el registro eliminado de la pantalla al instante
-      setRegistros(registros.filter((reg) => reg.id !== id));
-      alerta.exito("Eliminado", "El registro ha sido borrado de tu historial.");
-    } catch (error) {
-      alerta.error("Error", "No se pudo eliminar el registro.");
-    }
-  };
-
   useEffect(() => {
     cargarHistorial();
   }, [usuario]);
+
+  // Funciones para manejar el Modal
+  const solicitarEliminacion = (id) => {
+    setRegistroAEliminar(id);
+    setIsModalOpen(true);
+  };
+
+  const cancelarEliminacion = () => {
+    setIsModalOpen(false);
+    setRegistroAEliminar(null);
+  };
+
+  const confirmarEliminacion = async () => {
+    if (!registroAEliminar) return;
+    try {
+      await api.eliminarHistorial(registroAEliminar, usuario.nombre);
+      // Filtramos el registro eliminado de la pantalla al instante
+      setRegistros(registros.filter((reg) => reg.id !== registroAEliminar));
+      alerta.exito("Eliminado", "El registro ha sido borrado de tu historial.");
+    } catch (error) {
+      alerta.error("Error", "No se pudo eliminar el registro.");
+    } finally {
+      setIsModalOpen(false);
+      setRegistroAEliminar(null);
+    }
+  };
 
   return (
     <div className="page-container">
@@ -271,7 +293,7 @@ export default function Historial() {
 
                       <button
                         className="btn-eliminar tour-btn-eliminar"
-                        onClick={() => handleEliminar(reg.id)}
+                        onClick={() => solicitarEliminacion(reg.id)}
                         title="Eliminar registro"
                       >
                         Eliminar
@@ -284,6 +306,55 @@ export default function Historial() {
           </table>
         </div>
       )}
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={cancelarEliminacion} 
+        title="Confirmar eliminación"
+      >
+        <p style={{ color: 'var(--text-main)', fontSize: '1rem', marginBottom: '20px' }}>
+          ¿Estás seguro de que deseas eliminar este cálculo de tu historial? Esta acción no se puede deshacer.
+        </p>
+        
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button 
+            onClick={cancelarEliminacion}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-color)',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            Cancelar
+          </button>
+          
+          <button 
+            onClick={confirmarEliminacion}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              background: '#ef4444',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+          >
+            Sí, eliminar
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

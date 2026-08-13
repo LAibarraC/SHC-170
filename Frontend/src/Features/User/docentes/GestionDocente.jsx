@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../services/api';
 import { alerta } from '../../../utils/Notificaciones';
+import Modal from '../../../utils/Modal'; 
 
 export default function GestionDocente({ usuario }) {
   const [clases, setClases] = useState([]);
@@ -8,6 +9,10 @@ export default function GestionDocente({ usuario }) {
   const [estudiantes, setEstudiantes] = useState([]);
   const [cargandoClases, setCargandoClases] = useState(true);
   const [cargandoEstudiantes, setCargandoEstudiantes] = useState(false);
+
+  // Estados para el Modal de confirmación
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [estudianteAEliminar, setEstudianteAEliminar] = useState(null);
 
   useEffect(() => {
     if (usuario?.email) {
@@ -54,18 +59,33 @@ export default function GestionDocente({ usuario }) {
     cargarEstudiantes(id);
   };
 
-  const handleEliminarEstudiante = async (estudianteId, estudianteNombre) => {
-    const confirmar = window.confirm(`¿Estás seguro de que deseas eliminar al estudiante ${estudianteNombre} de este curso?`);
-    if (!confirmar) return;
+  // Prepara el estado y abre el modal
+  const solicitarEliminacionEstudiante = (estudianteId, estudianteNombre) => {
+    setEstudianteAEliminar({ id: estudianteId, nombre: estudianteNombre });
+    setIsModalOpen(true);
+  };
+
+  // Ejecuta la eliminación tras confirmar en el modal
+  const confirmarEliminacion = async () => {
+    if (!estudianteAEliminar) return;
 
     try {
-      await api.desmatricularEstudiante(claseSeleccionada, estudianteId, usuario.email);
+      await api.desmatricularEstudiante(claseSeleccionada, estudianteAEliminar.id, usuario.email);
       alerta.exito("Estudiante eliminado", "El alumno ha sido removido del curso correctamente.");
       // Recargar lista
       cargarEstudiantes(claseSeleccionada);
     } catch (error) {
       alerta.error("Error", error.message || "No se pudo desmatricular al estudiante");
+    } finally {
+      // Cerrar modal y limpiar estado
+      setIsModalOpen(false);
+      setEstudianteAEliminar(null);
     }
+  };
+
+  const cancelarEliminacion = () => {
+    setIsModalOpen(false);
+    setEstudianteAEliminar(null);
   };
 
   return (
@@ -178,7 +198,7 @@ export default function GestionDocente({ usuario }) {
                     </td>
                     <td data-label="Acciones" style={{ padding: '15px', textAlign: 'center' }}>
                       <button
-                        onClick={() => handleEliminarEstudiante(est.id, est.nombre)}
+                        onClick={() => solicitarEliminacionEstudiante(est.id, est.nombre)}
                         style={{
                           padding: '6px 12px',
                           borderRadius: '6px',
@@ -207,6 +227,55 @@ export default function GestionDocente({ usuario }) {
           </div>
         )}
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={cancelarEliminacion} 
+        title="Confirmar eliminación"
+      >
+        <p style={{ color: 'var(--text-main)', fontSize: '1rem', marginBottom: '20px' }}>
+          ¿Estás seguro de que deseas eliminar al estudiante <strong>{estudianteAEliminar?.nombre}</strong> de este curso?
+        </p>
+        
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <button 
+            onClick={cancelarEliminacion}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-color)',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            Cancelar
+          </button>
+          
+          <button 
+            onClick={confirmarEliminacion}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              background: '#ef4444',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+          >
+            Sí, eliminar
+          </button>
+        </div>
+      </Modal>
 
       {/* ESTILOS DE ANIMACIÓN SPIN */}
       <style>{`
