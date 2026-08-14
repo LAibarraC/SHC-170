@@ -14,6 +14,11 @@ export default function GestionDocente({ usuario }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [estudianteAEliminar, setEstudianteAEliminar] = useState(null);
 
+  // --- ESTADOS PARA BÚSQUEDA Y PAGINACIÓN ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Cantidad de estudiantes por página
+
   useEffect(() => {
     if (usuario?.email) {
       cargarClases();
@@ -56,8 +61,36 @@ export default function GestionDocente({ usuario }) {
   const handleSeleccionarClase = (e) => {
     const id = e.target.value;
     setClaseSeleccionada(id);
+    setSearchTerm(""); // Limpiar búsqueda al cambiar de clase
+    setCurrentPage(1); // Reiniciar paginación al cambiar de clase
     cargarEstudiantes(id);
   };
+
+  // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
+  // Filtramos la lista de estudiantes
+  const filteredEstudiantes = estudiantes.filter((est) => {
+    const nombreMatch = est.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+    const emailMatch = est.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    return nombreMatch || emailMatch;
+  });
+
+  // Cálculos para la paginación
+  const totalPages = Math.ceil(filteredEstudiantes.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentEstudiantes = filteredEstudiantes.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Volver a la página 1 al buscar
+  };
+
+  // Efecto para evitar quedarse en una página vacía si se elimina el último elemento
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredEstudiantes.length, currentPage, totalPages]);
+
 
   // Prepara el estado y abre el modal
   const solicitarEliminacionEstudiante = (estudianteId, estudianteNombre) => {
@@ -86,6 +119,54 @@ export default function GestionDocente({ usuario }) {
   const cancelarEliminacion = () => {
     setIsModalOpen(false);
     setEstudianteAEliminar(null);
+  };
+
+  // --- COMPONENTE REUTILIZABLE DE PAGINACIÓN ---
+  const ControlesPaginacion = () => {
+    if (totalPages <= 1) return null;
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px" }}>
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === 1 ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === 1 ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === 1 ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.85rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Anterior
+        </button>
+
+        <span style={{ fontSize: "0.85rem", color: "var(--text-muted, #6b7280)", fontWeight: "bold" }}>
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === totalPages ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === totalPages ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.85rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Siguiente
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -167,64 +248,87 @@ export default function GestionDocente({ usuario }) {
             No hay estudiantes inscritos en este curso todavía.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tabla-responsive" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Nombre del Estudiante</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Correo Electrónico</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Fecha de Inscripción</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold', textAlign: 'center' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {estudiantes.map((est, index) => (
-                  <tr 
-                    key={est.id} 
-                    style={{ 
-                      borderBottom: '1px solid var(--border-color)', 
-                      backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)',
-                      transition: 'background-color 0.2s'
-                    }}
-                  >
-                    <td data-label="Nombre del Estudiante" style={{ padding: '15px', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                      <div style={{ textAlign: 'right', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{est.nombre}</div>
-                    </td>
-                    <td data-label="Correo Electrónico" style={{ padding: '15px', color: 'var(--text-main)' }}>
-                      <div style={{ textAlign: 'right', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{est.email}</div>
-                    </td>
-                    <td data-label="Fecha de Inscripción" style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      {est.fecha_creacion ? est.fecha_creacion.split(' ')[0] : 'N/A'}
-                    </td>
-                    <td data-label="Acciones" style={{ padding: '15px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => solicitarEliminacionEstudiante(est.id, est.nombre)}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid #ef4444',
-                          background: 'transparent',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
+          <>
+            {/* BUSCADOR */}
+            <div style={{ marginBottom: "20px" }}>
+              <input
+                type="text"
+                placeholder="Buscar estudiante por nombre o correo..."
+                value={searchTerm}
+                onChange={handleSearch}
+                style={{ width: "100%", padding: "10px 15px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)", color: "var(--text-main)", outline: "none", fontSize: "0.95rem" }}
+              />
+            </div>
+
+            {/* TABLA DE ESTUDIANTES */}
+            {filteredEstudiantes.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                No se encontraron estudiantes que coincidan con "{searchTerm}".
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tabla-responsive" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Nombre del Estudiante</th>
+                      <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Correo Electrónico</th>
+                      <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Fecha de Inscripción</th>
+                      <th style={{ padding: '12px 15px', fontWeight: 'bold', textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentEstudiantes.map((est, index) => (
+                      <tr 
+                        key={est.id} 
+                        style={{ 
+                          borderBottom: '1px solid var(--border-color)', 
+                          backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)',
+                          transition: 'background-color 0.2s'
                         }}
                       >
-                        Eliminar estudiante
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <td data-label="Nombre del Estudiante" style={{ padding: '15px', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                          <div style={{ textAlign: 'right', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{est.nombre}</div>
+                        </td>
+                        <td data-label="Correo Electrónico" style={{ padding: '15px', color: 'var(--text-main)' }}>
+                          <div style={{ textAlign: 'right', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{est.email}</div>
+                        </td>
+                        <td data-label="Fecha de Inscripción" style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          {est.fecha_creacion ? est.fecha_creacion.split(' ')[0] : 'N/A'}
+                        </td>
+                        <td data-label="Acciones" style={{ padding: '15px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => solicitarEliminacionEstudiante(est.id, est.nombre)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #ef4444',
+                              background: 'transparent',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: 'bold',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            Eliminar estudiante
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            {/* PAGINACIÓN */}
+            <ControlesPaginacion />
+          </>
         )}
       </div>
 
