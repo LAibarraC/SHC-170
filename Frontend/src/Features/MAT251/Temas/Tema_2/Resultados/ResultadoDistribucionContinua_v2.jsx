@@ -6,7 +6,7 @@ import Latex from '../../../../../components/excel/Latex';
 import MarcoWidgetMAT251 from '../../../ui/MarcoWidgetMAT251';
 import { jStat } from 'jstat';
 import { IconoMas, IconoBasura } from '../../../../../ui/iconos';
-import { IconoProcedimiento } from '../../../ui/iconos';
+import { IconoProcedimiento } from '../../../ui/Iconos';
 import ModalTablaZ from '../Modales/ModalTablaZ';
 import ModalTablaChi from '../Modales/ModalTablaChi';
 import ModalTablaF from '../Modales/ModalTablaF';

@@ -4,59 +4,62 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-Color: rgba(15, 23, 42, 0.6);
-    backdrop-Filter: blur(3px);
+    background-color: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(3px);
     display: flex;
-    align-Items: center;
-    justify-Content: center;
-    z-Index: 9999;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
     padding: 20px;
 }
 
 .container_modal {
-    background-Color: #ffffff;
-    border-Radius: 12px;
+    background-color: var(--bg-card, #ffffff);
+    color: var(--text-main, #1e293b);
+    border-radius: 12px;
     width: 100%;
-    max-Width: 500px;
-    max-Height: 90vh;
+    max-width: 500px;
+    max-height: 90vh;
     display: flex;
-    flex-Direction: column;
-    box-Shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                0 10px 10px -5px rgba(0, 0, 0, 0.04);
     animation: fadeInUp 0.2s ease-out;
-    text-Align: center;
+    text-align: center;
 }
 
 .modal_header {
     display: flex;
-    justify-Content: space-between;
-    align-Items: center;
+    justify-content: space-between;
+    align-items: center;
     padding: 10px 20px;
-    border-Bottom: 1px solid #e2e8f0;
-    background-Color: #f8fafc;
-    border-Top-Left-Radius: 12px;
-    border-Top-Right-Radius: 12px;
-    text-Align: center;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background-color: var(--bg-card, #f8fafc);
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    text-align: center;
 }
 
-.modal_header h3{
-     margin: auto; 
-     color: #1e293b; 
-     font-Size: 1rem; 
-     text-Align: center;
+.modal_header h3 {
+    margin: auto;
+    color: var(--text-main, #1e293b);
+    font-size: 1rem;
+    text-align: center;
 }
 
 .modal_button {
     background: transparent;
     border: none;
-    font-Size: 1.5rem;
+    font-size: 1.5rem;
     cursor: pointer;
-    color: #94a3b8;
-    line-Height: 1;
+    color: var(--text-muted, #94a3b8);
+    line-height: 1;
     padding: 0 5px;
     transition: color 0.2s;
 }
 
 .modal_body {
     padding: 20px;
-    overflow-Y: auto;
+    overflow-y: auto;
+    color: var(--text-main, #1e293b);
 }
