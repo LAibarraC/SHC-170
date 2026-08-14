@@ -89,7 +89,7 @@ export const generarPDFReporte = async (elementId, nombreArchivo = "Reporte_Esta
 
             // Capturamos solo esta sección
             const canvas = await html2canvas(seccion, {
-                scale: 2,
+                scale: 1.5,
                 useCORS: true,
                 backgroundColor: "#ffffff",
                 logging: false,
@@ -103,7 +103,7 @@ export const generarPDFReporte = async (elementId, nombreArchivo = "Reporte_Esta
                 }
             });
 
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/jpeg', 0.75);
             const imgProps = pdf.getImageProperties(imgData);
             const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
 
@@ -114,7 +114,7 @@ export const generarPDFReporte = async (elementId, nombreArchivo = "Reporte_Esta
             }
 
             // 3. Añadimos la sección
-            pdf.addImage(imgData, 'PNG', margin, currentY, contentWidth, imgHeight);
+            pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
             currentY += imgHeight + 0.2; // Espacio de 0.2in entre secciones
         }
 
