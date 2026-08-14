@@ -3,6 +3,10 @@ import { api } from '../../../services/api';
 import { alerta } from '../../../utils/Notificaciones';
 import Modal from '../../../utils/Modal'; 
 
+// Importaciones para el tour interactivo
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+
 export default function GestionDocente({ usuario }) {
   const [clases, setClases] = useState([]);
   const [claseSeleccionada, setClaseSeleccionada] = useState('');
@@ -18,6 +22,76 @@ export default function GestionDocente({ usuario }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5; // Cantidad de estudiantes por página
+
+  // --- FUNCIÓN DEL TOUR INTERACTIVO ---
+  const iniciarTour = () => {
+    const tourSteps = [
+      {
+        element: '#tour-gestion-titulo',
+        popover: {
+          title: 'Gestión de Alumnos',
+          description: 'Aquí puedes visualizar y administrar la lista de todos los estudiantes inscritos en tus materias.',
+          side: "bottom",
+          align: 'start'
+        }
+      },
+      {
+        element: '#tour-gestion-selector',
+        popover: {
+          title: 'Selector de Curso',
+          description: 'Despliega este menú y elige uno de tus cursos asignados para cargar su respectiva lista de estudiantes.',
+          side: "bottom",
+          align: 'center'
+        }
+      }
+    ];
+
+    if (document.querySelector('#tour-gestion-buscador')) {
+      tourSteps.push({
+        element: '#tour-gestion-buscador',
+        popover: {
+          title: 'Buscador Rápido',
+          description: 'Si tienes muchos alumnos, escribe aquí su nombre o correo electrónico para encontrarlo instantáneamente.',
+          side: "bottom",
+          align: 'start'
+        }
+      });
+    }
+
+    if (document.querySelector('#tour-gestion-tabla')) {
+      tourSteps.push({
+        element: '#tour-gestion-tabla',
+        popover: {
+          title: 'Registro de Estudiantes',
+          description: 'Esta tabla te muestra los datos de los alumnos y la fecha exacta en la que se inscribieron a tu clase.',
+          side: "top",
+          align: 'start'
+        }
+      });
+    }
+
+    if (document.querySelector('.tour-gestion-eliminar')) {
+      tourSteps.push({
+        element: '.tour-gestion-eliminar',
+        popover: {
+          title: 'Desmatricular Alumno',
+          description: 'Haciendo clic aquí podrás remover a un estudiante del curso. Se te pedirá confirmación antes de aplicar los cambios.',
+          side: "left",
+          align: 'center'
+        }
+      });
+    }
+
+    const driverObj = driver({
+      showProgress: true,
+      nextBtnText: 'Siguiente',
+      prevBtnText: 'Anterior',
+      doneBtnText: 'Finalizar',
+      progressText: '{{current}} de {{total}}',
+      steps: tourSteps
+    });
+    driverObj.drive();
+  };
 
   useEffect(() => {
     if (usuario?.email) {
@@ -172,10 +246,10 @@ export default function GestionDocente({ usuario }) {
   return (
     <div style={{ maxWidth: '1100px', margin: 'clamp(15px, 3vw, 25px) auto', padding: '0 20px', position: 'relative' }}>
       
-      {/* CABECERA */}
+      {/* CABECERA CON BOTÓN DE TOUR */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'clamp(15px, 3vw, 25px)', flexWrap: 'wrap', gap: 'clamp(10px, 3vw, 20px)' }}>
         <div>
-          <h2 style={{ fontSize: 'clamp(1.3rem, 4vw, 1.8rem)', margin: '0 0 5px 0', color: 'var(--text-main)' }}>
+          <h2 id="tour-gestion-titulo" style={{ fontSize: 'clamp(1.3rem, 4vw, 1.8rem)', margin: '0 0 5px 0', color: 'var(--text-main)' }}>
             Gestión de Alumnos
           </h2>
           <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 'clamp(0.85rem, 3vw, 0.95rem)' }}>
@@ -183,42 +257,59 @@ export default function GestionDocente({ usuario }) {
           </p>
         </div>
 
-        {/* Selector de Curso */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <label style={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '0.9rem' }}>
-            Curso:
-          </label>
-          {cargandoClases ? (
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Cargando cursos...</span>
-          ) : clases.length === 0 ? (
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No tienes cursos asignados</span>
-          ) : (
-            <select
-              value={claseSeleccionada}
-              onChange={handleSeleccionarClase}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-input)',
-                color: 'var(--text-main)',
-                outline: 'none',
-                fontWeight: 'bold',
-                fontSize: '0.9rem',
-                cursor: 'pointer'
-              }}
-            >
-              {clases.map((c) => (
-                <option 
-                  key={c.id} 
-                  value={c.id} 
-                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}
-                >
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
-          )}
+        {/* Contenedor de Botón Tour y Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+          
+          {/* Botón de Guía Rápida */}
+          <button
+            onClick={iniciarTour}
+            className="guia-rapida-flotante"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span className="guia-rapida-flotante-texto">Guía Rápida</span>
+          </button>
+
+          {/* Selector de Curso */}
+          <div id="tour-gestion-selector" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label style={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '0.9rem' }}>
+              Curso:
+            </label>
+            {cargandoClases ? (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Cargando cursos...</span>
+            ) : clases.length === 0 ? (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No tienes cursos asignados</span>
+            ) : (
+              <select
+                value={claseSeleccionada}
+                onChange={handleSeleccionarClase}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-input)',
+                  color: 'var(--text-main)',
+                  outline: 'none',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {clases.map((c) => (
+                  <option 
+                    key={c.id} 
+                    value={c.id} 
+                    style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}
+                  >
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       </div>
 
@@ -250,7 +341,7 @@ export default function GestionDocente({ usuario }) {
         ) : (
           <>
             {/* BUSCADOR */}
-            <div style={{ marginBottom: "20px" }}>
+            <div id="tour-gestion-buscador" style={{ marginBottom: "20px" }}>
               <input
                 type="text"
                 placeholder="Buscar estudiante por nombre o correo..."
@@ -266,7 +357,7 @@ export default function GestionDocente({ usuario }) {
                 No se encontraron estudiantes que coincidan con "{searchTerm}".
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div id="tour-gestion-tabla" style={{ overflowX: 'auto' }}>
                 <table className="tabla-responsive" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -297,6 +388,7 @@ export default function GestionDocente({ usuario }) {
                         </td>
                         <td data-label="Acciones" style={{ padding: '15px', textAlign: 'center' }}>
                           <button
+                            className="tour-gestion-eliminar"
                             onClick={() => solicitarEliminacionEstudiante(est.id, est.nombre)}
                             style={{
                               padding: '6px 12px',
