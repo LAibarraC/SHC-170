@@ -166,6 +166,11 @@ export default function Grupos() {
   const [cursoAEliminar, setCursoAEliminar] = useState(null);
   const [palabraConfirmar, setPalabraConfirmar] = useState("");
 
+  // --- ESTADOS PARA BÚSQUEDA Y PAGINACIÓN ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; // Cantidad de cursos por página (ideal para diseño en grid)
+
   // Extraemos el correo con seguridad
   const correoUsuario = usuario?.email || usuario?.id;
 
@@ -176,6 +181,7 @@ export default function Grupos() {
 
   const esAdmin = usuario.rol === "Administrador" || usuario.isAdmin === true;
   const esDocente = usuario.rol === "Docente";
+  const esEstudiante = usuario.rol === "Estudiante";
 
   // 1. CARGAR DATOS DESDE MYSQL AL ABRIR LA PÁGINA
   const cargarCursos = async () => {
@@ -195,6 +201,35 @@ export default function Grupos() {
   useEffect(() => {
     cargarCursos();
   }, [usuario]);
+
+  // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
+  // Seleccionamos la lista correcta según el rol
+  const listaBase = (esDocente || esAdmin) ? misCursos : cursosInscritos;
+
+  // Filtramos por término de búsqueda (nombre o código)
+  const filteredCursos = listaBase.filter((curso) => {
+    const nombreMatch = curso.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
+    const codigoMatch = curso.codigo?.toLowerCase().includes(searchTerm.toLowerCase());
+    return nombreMatch || codigoMatch;
+  });
+
+  // Cálculos para la paginación
+  const totalPages = Math.ceil(filteredCursos.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentCursos = filteredCursos.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Volver a la página 1 al buscar
+  };
+
+  // Efecto para evitar quedarse en una página vacía si se elimina el último elemento de la página
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredCursos.length, currentPage, totalPages]);
+
 
   // --- LÓGICA DEL DOCENTE: Crear curso en la BD ---
   const handleCrearCurso = async (e) => {
@@ -329,6 +364,54 @@ export default function Grupos() {
       alerta.error("Error de conexión", "No hay respuesta del servidor.");
     }
   };
+
+  // --- COMPONENTE REUTILIZABLE DE PAGINACIÓN ---
+  const ControlesPaginacion = () => {
+    if (totalPages <= 1) return null;
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "25px", paddingBottom: "20px" }}>
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === 1 ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === 1 ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === 1 ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.9rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Anterior
+        </button>
+
+        <span style={{ fontSize: "0.9rem", color: "var(--text-muted, #6b7280)", fontWeight: "bold" }}>
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === totalPages ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === totalPages ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.9rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Siguiente
+        </button>
+      </div>
+    );
+  };
   
   return (
     <div className="page-container" style={{ position: "relative" }}>
@@ -350,6 +433,7 @@ export default function Grupos() {
           pointerEvents: "none"
         }}
       />
+      
       <div style={{ marginBottom: "clamp(15px, 4vw, 30px)", borderBottom: "2px solid var(--border-color)", paddingBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px" }}>
         <div>
           <h1 style={{ color: "var(--text-main)", margin: 0, fontSize: "clamp(1.3rem, 4vw, 1.8rem)" }}>Gestión Académica y Cursos</h1>
@@ -393,94 +477,93 @@ export default function Grupos() {
             </button>
           </div>
 
-          <div id="tour-lista-cursos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-            {misCursos.map((curso) => {
-              const puedeGestionar = esAdmin || curso.docente_email === correoUsuario;
-              return (
-                <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-                  <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
-                  <p style={{ margin: "0 0 5px 0", color: "var(--text-muted, #666)" }}>
-                    <strong>Código de Matriculación:</strong> <span className="tour-curso-codigo" style={{ color: "var(--accent-color)", fontWeight: "bold" }}>{curso.codigo}</span>
-                  </p>
-                  {curso.fecha_limite_matriculacion && (
-                    <p style={{ margin: "5px 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                      <strong>Límite de Matrícula:</strong> {curso.fecha_limite_matriculacion}
-                    </p>
-                  )}
-                  {curso.docente_nombre && (
-                    <p style={{ margin: "5px 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                      <strong>Docente:</strong> {curso.docente_nombre}
-                    </p>
-                  )}
-                  <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
-                    {puedeGestionar && (
-                      <button
-                        onClick={() => handleOpenEditar(curso)}
-                        className="tour-curso-gestionar"
-                        onMouseEnter={() => setHoveredCursoId(curso.id)}
-                        onMouseLeave={() => setHoveredCursoId(null)}
-                        style={{
-                          flex: 1,
-                          padding: "8px",
-                          background: hoveredCursoId === curso.id ? "#374151" : "#4b5563",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                          fontWeight: "bold",
-                          color: "#ffffff",
-                          transition: "background-color 0.2s"
-                        }}
-                      >
-                        Gestionar
-                      </button>
-                    )}
-                    <button
-                      onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
-                      className="tour-curso-subir"
-                      style={{ flex: 1, padding: "8px", background: "var(--primary-color)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
-                    >
-                      Subir Material
-                    </button>
-                  </div>
-                  {puedeGestionar && (
-                    <button
-                      onClick={() => handleOpenEliminar(curso)}
-                      className="tour-curso-eliminar"
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        marginTop: "10px",
-                        background: "rgba(220, 38, 38, 0.1)",
-                        border: "1px solid rgba(220, 38, 38, 0.3)",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        fontWeight: "bold",
-                        color: "#dc2626",
-                        transition: "all 0.2s"
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#dc2626";
-                        e.currentTarget.style.color = "#ffffff";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "rgba(220, 38, 38, 0.1)";
-                        e.currentTarget.style.color = "#dc2626";
-                      }}
-                    >
-                      Eliminar Curso
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {/* BUSCADOR DOCENTE */}
+          {(listaBase.length > 0 || searchTerm !== "") && (
+            <div style={{ marginBottom: "20px" }}>
+              <input
+                type="text"
+                placeholder="Buscar curso por nombre o código..."
+                value={searchTerm}
+                onChange={handleSearch}
+                style={{ width: "100%", padding: "10px 15px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)", color: "var(--text-main)", outline: "none", fontSize: "0.95rem" }}
+              />
+            </div>
+          )}
+
+          {/* ESTADO VACÍO Y LISTA */}
+          {filteredCursos.length === 0 && searchTerm !== "" ? (
+            <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
+              No se encontraron cursos que coincidan con "{searchTerm}".
+            </div>
+          ) : (
+            <>
+              <div id="tour-lista-cursos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
+                {currentCursos.map((curso) => {
+                  const puedeGestionar = esAdmin || curso.docente_email === correoUsuario;
+                  return (
+                    <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
+                      <p style={{ margin: "0 0 5px 0", color: "var(--text-muted, #666)" }}>
+                        <strong>Código de Matriculación:</strong> <span className="tour-curso-codigo" style={{ color: "var(--accent-color)", fontWeight: "bold" }}>{curso.codigo}</span>
+                      </p>
+                      {curso.fecha_limite_matriculacion && (
+                        <p style={{ margin: "5px 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                          <strong>Límite de Matrícula:</strong> {curso.fecha_limite_matriculacion}
+                        </p>
+                      )}
+                      {curso.docente_nombre && (
+                        <p style={{ margin: "5px 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                          <strong>Docente:</strong> {curso.docente_nombre}
+                        </p>
+                      )}
+                      <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+                        {puedeGestionar && (
+                          <button
+                            onClick={() => handleOpenEditar(curso)}
+                            className="tour-curso-gestionar"
+                            onMouseEnter={() => setHoveredCursoId(curso.id)}
+                            onMouseLeave={() => setHoveredCursoId(null)}
+                            style={{
+                              flex: 1, padding: "8px", background: hoveredCursoId === curso.id ? "#374151" : "#4b5563", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", color: "#ffffff", transition: "background-color 0.2s"
+                            }}
+                          >
+                            Gestionar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
+                          className="tour-curso-subir"
+                          style={{ flex: 1, padding: "8px", background: "var(--primary-color)", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}
+                        >
+                          Subir Material
+                        </button>
+                      </div>
+                      {puedeGestionar && (
+                        <button
+                          onClick={() => handleOpenEliminar(curso)}
+                          className="tour-curso-eliminar"
+                          style={{ width: "100%", padding: "8px", marginTop: "10px", background: "rgba(220, 38, 38, 0.1)", border: "1px solid rgba(220, 38, 38, 0.3)", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", color: "#dc2626", transition: "all 0.2s" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#dc2626"; e.currentTarget.style.color = "#ffffff"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220, 38, 38, 0.1)"; e.currentTarget.style.color = "#dc2626"; }}
+                        >
+                          Eliminar Curso
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <ControlesPaginacion />
+            </>
+          )}
         </div>
       )}
 
       {/* ========================================= */}
       {/* VISTA DEL ESTUDIANTE                      */}
       {/* ========================================= */}
-      {usuario.rol === "Estudiante" && (
+      {esEstudiante && (
         <div>
           <div id="tour-matriculacion-seccion" style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", marginBottom: "30px" }}>
             <h3 style={{ margin: "0 0 15px 0", color: "var(--text-main, #333)" }}>Matricularse a un Curso</h3>
@@ -502,30 +585,48 @@ export default function Grupos() {
           <div id="tour-clases-activas">
             <h2 style={{ color: "#27ae60", marginBottom: "20px" }}>Mis Clases Activas</h2>
 
-            {cursosInscritos.length === 0 ? (
+            {/* BUSCADOR ESTUDIANTE */}
+            {(listaBase.length > 0 || searchTerm !== "") && (
+              <div style={{ marginBottom: "20px" }}>
+                <input
+                  type="text"
+                  placeholder="Buscar materia por nombre..."
+                  value={searchTerm}
+                  onChange={handleSearch}
+                  style={{ width: "100%", padding: "10px 15px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)", color: "var(--text-main)", outline: "none", fontSize: "0.95rem" }}
+                />
+              </div>
+            )}
+
+            {listaBase.length === 0 ? (
               <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
-                Aún no estás inscrito en ninguna materia. Usa el buscador de arriba.
+                Aún no estás inscrito en ninguna materia. Ingresa un código arriba.
+              </div>
+            ) : filteredCursos.length === 0 ? (
+              <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
+                No se encontraron materias que coincidan con "{searchTerm}".
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-                {cursosInscritos.map((curso) => (
-                  <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", borderTop: "4px solid #27ae60" }}>
-                    <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
-                    {usuario.rol === "Docente" && (
-                      <p style={{ margin: "0 0 15px 0", color: "var(--text-muted, #666)" }}>
-                        <strong>Código:</strong> {curso.codigo}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
-                      className="tour-ir-material"
-                      style={{ width: "100%", padding: "10px", background: "transparent", border: "1px solid #27ae60", color: "#27ae60", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", transition: "all 0.3s" }}
-                    >
-                      Ir a Material de Estudio
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
+                  {currentCursos.map((curso) => (
+                    <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", borderTop: "4px solid #27ae60" }}>
+                      <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
+                      <button
+                        onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
+                        className="tour-ir-material"
+                        style={{ width: "100%", padding: "10px", background: "transparent", border: "1px solid #27ae60", color: "#27ae60", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", transition: "all 0.3s" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#27ae60"; e.currentTarget.style.color = "white"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#27ae60"; }}
+                      >
+                        Ir a Material de Estudio
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <ControlesPaginacion />
+              </>
             )}
           </div>
         </div>
