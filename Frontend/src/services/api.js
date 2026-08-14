@@ -8,7 +8,6 @@ const hostActual = window.location.hostname;
 // Construye la URL apuntando al puerto 8000 (tu backend)
 export const BASE_URL = `http://${hostActual}:8000`;
 
-
 export const api = {
   // --- VERIFICAR ESTADO DEL SERVIDOR ---
   verificarEstado: async () => {
@@ -43,13 +42,25 @@ export const api = {
     return await res.json();
   },
   
-  // --- DESMATRICULAR/ELIMINAR ESTUDIANTE DE UNA CLASE ---
+  // --- DESMATRICULAR/ELIMINAR ESTUDIANTE DE UNA CLASE (por el docente) ---
   desmatricularEstudiante: async (claseId, estudianteId, userEmail) => {
     const res = await fetch(`${BASE_URL}/clases/${claseId}/desmatricular/${estudianteId}?user_email=${encodeURIComponent(userEmail)}`, {
       method: "DELETE"
     });
     if (!res.ok) throw new Error("Error al eliminar al estudiante de la clase");
     return await res.json();
+  },
+
+   // --- NUEVA: ABANDONAR CLASE (estudiante se desmatricula a sí mismo) ---
+  abandonarClase: async (claseId, estudianteEmail) => {
+    const res = await fetch(`${BASE_URL}/abandonar_clase`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clase_id: claseId, estudiante_email: estudianteEmail }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.detail || "Error al desmatricularse del curso");
+    return data;
   },
 
   // --- VERIFICAR EMAIL ---
@@ -96,7 +107,6 @@ export const api = {
 
   // --- Función para obtener las hojas de un Excel ---
   obtenerHojas: async (filename, autor = "", curso = "") => {
-    // 🛠️ CORREGIDO: Cambiamos API_URL por BASE_URL
     let url = `${BASE_URL}/sheets/${encodeURIComponent(filename)}?`;
     if (autor) url += `autor=${encodeURIComponent(autor)}&`;
     if (curso) url += `curso=${encodeURIComponent(curso)}`;
@@ -108,7 +118,6 @@ export const api = {
 
   // --- Función unificada para leer los datos de la hoja ---
   obtenerDatosHoja: async (filename, hoja, autor = "", curso = "") => {
-    // 🛠️ CORREGIDO: Cambiamos API_URL por BASE_URL y eliminamos el duplicado viejo
     let url = `${BASE_URL}/view/${encodeURIComponent(filename)}?hoja=${hoja}`;
     if (autor) url += `&autor=${encodeURIComponent(autor)}`;
     if (curso) url += `&curso=${encodeURIComponent(curso)}`;
@@ -120,7 +129,6 @@ export const api = {
 
   // --- OBTENER LISTA DE ARCHIVOS ---
   obtenerArchivos: async (autor, visibilidad = "personal", curso = "") => {
-    // 🛠️ CORREGIDO: Cambiamos API_URL por BASE_URL
     let url = `${BASE_URL}/files?autor=${encodeURIComponent(autor)}&visibilidad=${visibilidad}`;
     if (curso) url += `&curso=${encodeURIComponent(curso)}`;
 
@@ -131,7 +139,6 @@ export const api = {
 
   // --- VER EXCEL (Solo metadatos/estructura) ---
   verExcel: async (filename, hoja = 0, autor = "", curso = "") => {
-    // 🛠️ CORREGIDO: Cambiamos API_URL por BASE_URL
     let url = `${BASE_URL}/view/${encodeURIComponent(filename)}?hoja=${hoja}`;
     if (autor) url += `&autor=${encodeURIComponent(autor)}`;
     if (curso) url += `&curso=${encodeURIComponent(curso)}`;
@@ -327,7 +334,7 @@ export const api = {
     }
   },
 
-guardarEnHistorial: async (autor, calculo, archivo, snapshotCompleto) => {
+  guardarEnHistorial: async (autor, calculo, archivo, snapshotCompleto) => {
     try {
       const res = await fetch(`${BASE_URL}/guardar_historial`, {
         method: "POST",
@@ -336,7 +343,7 @@ guardarEnHistorial: async (autor, calculo, archivo, snapshotCompleto) => {
           autor: autor,
           calculo: calculo,
           archivo_origen: archivo,
-          snapshot: snapshotCompleto, // 👈 La clave coincide exactamente con el backend
+          snapshot: snapshotCompleto,
         }),
       });
       if (!res.ok) {

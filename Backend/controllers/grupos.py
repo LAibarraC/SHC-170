@@ -92,21 +92,23 @@ async def unirse_clase_db(db: AsyncSession, datos: UnirseClase):
     inscrito = result.scalars().first()
     
     if inscrito:
-        return JSONResponse(status_code=400, content={"error": "Ya estás inscrito en esta clase"})
-        
+        return JSONResponse(status_code=409, content={"error": "Ya estás inscrito en esta clase"})
+
+    nombre_clase = clase.nombre
+    nombre_estudiante = estudiante.nombre or estudiante.email
     nueva_inscripcion = Inscripcion(clase_id=clase.id, estudiante_id=estudiante.id)
     db.add(nueva_inscripcion)
-    
+
     nueva_notificacion = Notificacion(
         tipo="matriculacion",
-        mensaje=f"El estudiante {estudiante.nombre} ({estudiante.email}) se ha inscrito a tu clase '{clase.nombre}'.",
+        mensaje=f"El estudiante {nombre_estudiante} ({estudiante.email}) se ha inscrito a tu clase '{nombre_clase}'.",
         usuario_id=clase.docente_id,
         leido=False
     )
     db.add(nueva_notificacion)
-    
+
     await db.commit()
-    return {"message": f"Te has unido a {clase.nombre} exitosamente"}
+    return {"message": f"Te has unido a {nombre_clase} exitosamente"}
 
 async def obtener_clases_docente_db(db: AsyncSession, email: str):
     result = await db.execute(select(Usuario).filter(Usuario.email == email))
@@ -223,6 +225,44 @@ async def obtener_estudiantes_clase_db(db: AsyncSession, clase_id: int, user_ema
                 "fecha_creacion": ins.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if ins.fecha_creacion else "N/A"
             })
     return estudiantes_list
+
+async def abandonar_clase_db(db: AsyncSession, clase_id: int, estudiante_email: str):
+    result = await db.execute(select(Usuario).filter(Usuario.email == estudiante_email))
+    estudiante = result.scalars().first()
+    if not estudiante:
+        return JSONResponse(status_code=404, content={"error": "Estudiante no encontrado"})
+
+    result = await db.execute(select(Clase).filter(Clase.id == clase_id))
+    clase = result.scalars().first()
+    if not clase:
+        return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
+
+    result = await db.execute(select(Inscripcion).filter(
+        Inscripcion.clase_id == clase_id,
+        Inscripcion.estudiante_id == estudiante.id
+    ))
+    inscripcion = result.scalars().first()
+    if not inscripcion:
+        return JSONResponse(status_code=404, content={"error": "No estás inscrito en esta clase"})
+
+    nombre_clase = clase.nombre
+    nombre_estudiante = estudiante.nombre or estudiante.email
+
+    await db.delete(inscripcion)
+
+    result = await db.execute(select(Usuario).filter(Usuario.id == clase.docente_id))
+    docente = result.scalars().first()
+    if docente:
+        nueva_notificacion = Notificacion(
+            tipo="desmatriculacion",
+            mensaje=f"El estudiante {nombre_estudiante} ({estudiante.email}) ha abandonado la clase '{nombre_clase}'.",
+            usuario_id=docente.id,
+            leido=False
+        )
+        db.add(nueva_notificacion)
+
+    await db.commit()
+    return {"message": f"Te has desmatriculado de {nombre_clase} exitosamente"}
 
 async def desmatricular_estudiante_db(db: AsyncSession, clase_id: int, estudiante_id: int, user_email: str):
     result = await db.execute(select(Usuario).filter(Usuario.email == user_email))

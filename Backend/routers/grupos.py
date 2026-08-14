@@ -5,7 +5,7 @@ from models import Usuario
 from routers.auth import get_current_user
 
 # Importamos los validadores y el controlador
-from validators.grupos import NuevaClase, UnirseClase, ActualizarClase
+from validators.grupos import NuevaClase, UnirseClase, AbandonarClase, ActualizarClase
 from controllers import grupos as grupos_controller
 
 router = APIRouter()
@@ -13,6 +13,10 @@ router = APIRouter()
 @router.post("/crear_clase")
 async def crear_clase(datos: NuevaClase, db: AsyncSession = Depends(get_db)):
     return await grupos_controller.crear_clase_db(db, datos)
+
+@router.post("/abandonar_clase")
+async def abandonar_clase(datos: AbandonarClase, db: AsyncSession = Depends(get_db)):
+    return await grupos_controller.abandonar_clase_db(db, datos.clase_id, datos.estudiante_email)
 
 @router.put("/actualizar_clase")
 async def actualizar_clase(datos: ActualizarClase, db: AsyncSession = Depends(get_db)):

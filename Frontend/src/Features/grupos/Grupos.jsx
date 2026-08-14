@@ -166,6 +166,11 @@ export default function Grupos() {
   const [cursoAEliminar, setCursoAEliminar] = useState(null);
   const [palabraConfirmar, setPalabraConfirmar] = useState("");
 
+  // NUEVOS ESTADOS PARA ESTUDIANTE
+  const [mostrarModalDesmatricular, setMostrarModalDesmatricular] = useState(false);
+  const [cursoADesmatricular, setCursoADesmatricular] = useState(null);
+  const [procesandoUnion, setProcesandoUnion] = useState(false);
+
   // --- ESTADOS PARA BÚSQUEDA Y PAGINACIÓN ---
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -188,10 +193,20 @@ export default function Grupos() {
     try {
       if (esDocente || esAdmin) {
         const res = await fetch(`${BASE_URL}/mis_clases/${correoUsuario}`);
-        if (res.ok) setMisCursos(await res.json());
+        if (res.ok) {
+          const data = await res.json();
+          setMisCursos(data);
+        } else {
+          console.error("Error loading docente classes:", res.status, res.statusText);
+        }
       } else {
         const res = await fetch(`${BASE_URL}/mis_inscripciones/${correoUsuario}`);
-        if (res.ok) setCursosInscritos(await res.json());
+        if (res.ok) {
+          const data = await res.json();
+          setCursosInscritos(data);
+        } else {
+          console.error("Error loading student classes:", res.status, res.statusText);
+        }
       }
     } catch (error) {
       console.error("Error cargando cursos:", error);
@@ -199,21 +214,40 @@ export default function Grupos() {
   };
 
   useEffect(() => {
+    console.log("=== GRUPOS PAGE LOADED ===");
+    console.log("BASE_URL:", BASE_URL);
+    console.log("Usuario:", usuario);
+    console.log("Correo:", correoUsuario);
+    
+    // Verificar conexión al servidor
+    const verificarConexion = async () => {
+      try {
+        console.log("Verificando conexión a:", `${BASE_URL}/health`);
+        const res = await fetch(`${BASE_URL}/health`, { 
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        });
+        console.log("Health check:", res.status, res.statusText);
+      } catch (error) {
+        console.error("✗ NO PUEDE CONECTARSE AL SERVIDOR");
+        console.error("Error:", error.message);
+        alerta.error("Servidor no disponible", `No se puede conectar a ${BASE_URL}. Verifica que el servidor esté corriendo.`);
+      }
+    };
+    
     cargarCursos();
+    verificarConexion();
   }, [usuario]);
 
   // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
-  // Seleccionamos la lista correcta según el rol
   const listaBase = (esDocente || esAdmin) ? misCursos : cursosInscritos;
 
-  // Filtramos por término de búsqueda (nombre o código)
   const filteredCursos = listaBase.filter((curso) => {
     const nombreMatch = curso.nombre?.toLowerCase().includes(searchTerm.toLowerCase());
     const codigoMatch = curso.codigo?.toLowerCase().includes(searchTerm.toLowerCase());
     return nombreMatch || codigoMatch;
   });
 
-  // Cálculos para la paginación
   const totalPages = Math.ceil(filteredCursos.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentCursos = filteredCursos.slice(startIndex, startIndex + itemsPerPage);
@@ -223,7 +257,6 @@ export default function Grupos() {
     setCurrentPage(1); // Volver a la página 1 al buscar
   };
 
-  // Efecto para evitar quedarse en una página vacía si se elimina el último elemento de la página
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(totalPages);
@@ -335,7 +368,7 @@ export default function Grupos() {
     }
   };
 
-  // --- LÓGICA DEL ESTUDIANTE: Unirse a curso en la BD ---
+  // --- LÓGICA DEL ESTUDIANTE: Unirse a curso en la BD (CORREGIDA) ---
   const handleUnirseCurso = async () => {
     const codigoLimpiado = codigoBusqueda.trim().toUpperCase();
 
@@ -344,24 +377,119 @@ export default function Grupos() {
       return;
     }
 
+    if (procesandoUnion) return;
+    setProcesandoUnion(true);
+
+    const urlCompleta = `${BASE_URL}/unirse_clase`;
+    console.log("=== INTENTANDO MATRICULACIÓN ===");
+    console.log("URL completa:", urlCompleta);
+    console.log("Código:", codigoLimpiado);
+    console.log("Email:", correoUsuario);
+
     try {
-      const res = await fetch(`${BASE_URL}/unirse_clase`, {
+      console.log("Iniciando fetch...");
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+      
+      const res = await fetch(urlCompleta, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo_acceso: codigoLimpiado, estudiante_email: correoUsuario })
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({ 
+          codigo_acceso: codigoLimpiado, 
+          estudiante_email: correoUsuario 
+        }),
+        signal: controller.signal
       });
       
-      const data = await res.json();
+      clearTimeout(timeoutId);
+      console.log("✓ Respuesta recibida:", res.status, res.statusText);
       
+      let data = {};
+      let responseText = "";
+      try {
+        responseText = await res.text();
+        console.log("Texto de respuesta:", responseText.substring(0, 200));
+        
+        if (responseText.trim()) {
+          data = JSON.parse(responseText);
+          console.log("✓ JSON parseado correctamente");
+        }
+      } catch (jsonError) {
+        console.error("✗ Error parseando respuesta como JSON:", jsonError.message);
+        console.error("Respuesta recibida:", responseText);
+        data = {};
+      }
+      
+      const errorMsg = data.error || data.detail || "";
+
       if (res.ok) {
-        alerta.success("¡Inscripción Exitosa!", data.message);
-        setCodigoBusqueda(""); 
-        cargarCursos(); // Recargamos la mochila del estudiante
+        console.log("✓ Matriculación exitosa (200), recargando cursos...");
+        alerta.success("¡Inscripción Exitosa!", data.message || "Te has matriculado correctamente.");
+        setCodigoBusqueda("");
+        try {
+          await cargarCursos();
+          console.log("✓ Cursos recargados");
+        } catch (cargaError) {
+          console.error("✗ Error recargando cursos:", cargaError.message);
+        }
+      } else if (res.status === 409) {
+        console.log("⚠ Ya inscrito (409), recargando cursos...");
+        setCodigoBusqueda("");
+        try {
+          await cargarCursos();
+        } catch (cargaError) {
+          console.error("✗ Error recargando cursos:", cargaError.message);
+        }
+        alerta.warning("Ya matriculado", "Ya te encuentras inscrito en este curso.");
+      } else if (res.status >= 500) {
+        console.error("✗ Error del servidor:", res.status);
+        alerta.error("Error del servidor", `Código ${res.status}: El servidor experimentó un error.`);
+      } else if (res.status >= 400) {
+        console.error("✗ Error del cliente:", res.status, errorMsg);
+        alerta.error("No se pudo unir", errorMsg || "Asegúrate de escribir bien el código.");
       } else {
-        alerta.error("No se pudo unir", data.error || "Asegúrate de escribir bien el código.");
+        console.error("✗ Estado HTTP inesperado:", res.status);
+        alerta.error("Error inesperado", `Código HTTP ${res.status}: Ocurrió un error al procesar tu solicitud.`);
       }
     } catch (error) {
-      alerta.error("Error de conexión", "No hay respuesta del servidor.");
+      console.error("=== ERROR EN HANDLEUNIRSECURSO ===");
+      console.error("Tipo de error:", error.name);
+      console.error("Mensaje:", error.message);
+      console.error("Stack:", error.stack);
+      
+      if (error.name === "AbortError") {
+        alerta.error("Timeout", "El servidor tardó demasiado en responder. Intenta nuevamente.");
+      } else {
+        alerta.error("Error de conexión", `No se pudo conectar a ${BASE_URL}. Verifica: 1) El servidor esté corriendo, 2) La URL sea correcta, 3) Tu conexión de red.`);
+      }
+    } finally {
+      setProcesandoUnion(false);
+      console.log("=== FIN INTENTO MATRICULACIÓN ===\n");
+    }
+  };
+
+  // --- NUEVO: Abrir modal de desmatriculación (estudiante) ---
+  const handleOpenDesmatricular = (curso) => {
+    setCursoADesmatricular(curso);
+    setMostrarModalDesmatricular(true);
+  };
+
+  // --- NUEVO: Confirmar desmatriculación ---
+  const handleConfirmarDesmatricular = async () => {
+    if (!cursoADesmatricular) return;
+
+    try {
+      const res = await api.abandonarClase(cursoADesmatricular.id, correoUsuario);
+      alerta.success("Desmatriculado", res.message || "Has abandonado el curso correctamente.");
+      setMostrarModalDesmatricular(false);
+      setCursoADesmatricular(null);
+      await cargarCursos();
+    } catch (error) {
+      alerta.error("No se pudo desmatricular", error.message || "Ocurrió un error al abandonar el curso.");
     }
   };
 
@@ -575,9 +703,23 @@ export default function Grupos() {
                 onKeyDown={(e) => e.key === "Enter" && handleUnirseCurso()}
                 placeholder="Ingresa el código proporcionado por tu docente (Ej: MAT-205)..."
                 style={{ padding: "10px", flex: 1, borderRadius: "5px", border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-main)", textTransform: "uppercase" }}
+                disabled={procesandoUnion}
               />
-              <button id="tour-btn-unirse" onClick={handleUnirseCurso} style={{ background: "#27ae60", color: "white", padding: "10px 20px", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}>
-                Unirse al Curso
+              <button
+                id="tour-btn-unirse"
+                onClick={handleUnirseCurso}
+                disabled={procesandoUnion}
+                style={{
+                  background: procesandoUnion ? "#95a5a6" : "#27ae60",
+                  color: "white",
+                  padding: "10px 20px",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: procesandoUnion ? "not-allowed" : "pointer",
+                  fontWeight: "bold"
+                }}
+              >
+                {procesandoUnion ? "Procesando..." : "Unirse al Curso"}
               </button>
             </div>
           </div>
@@ -612,15 +754,72 @@ export default function Grupos() {
                   {currentCursos.map((curso) => (
                     <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", borderTop: "4px solid #27ae60" }}>
                       <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
-                      <button
-                        onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
-                        className="tour-ir-material"
-                        style={{ width: "100%", padding: "10px", background: "transparent", border: "1px solid #27ae60", color: "#27ae60", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", transition: "all 0.3s" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "#27ae60"; e.currentTarget.style.color = "white"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#27ae60"; }}
-                      >
-                        Ir a Material de Estudio
-                      </button>
+
+                      {/* INFORMACIÓN ADICIONAL DEL CURSO */}
+                      <div style={{ marginBottom: "10px", fontSize: "0.9rem", color: "var(--text-muted, #666)" }}>
+                        {curso.codigo && (
+                          <p style={{ margin: "4px 0" }}>
+                            <strong>Código:</strong> {curso.codigo}
+                          </p>
+                        )}
+                        {curso.docente_nombre && (
+                          <p style={{ margin: "4px 0" }}>
+                            <strong>Docente:</strong> {curso.docente_nombre}
+                          </p>
+                        )}
+                        {curso.fecha_limite_matriculacion && (
+                          <p style={{ margin: "4px 0" }}>
+                            <strong>Límite de matrícula:</strong> {curso.fecha_limite_matriculacion}
+                          </p>
+                        )}
+                        {curso.fecha_inscripcion && (
+                          <p style={{ margin: "4px 0" }}>
+                            <strong>Inscrito el:</strong> {curso.fecha_inscripcion}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* BOTONES LADO A LADO */}
+                      <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+                        <button
+                          onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
+                          className="tour-ir-material"
+                          style={{
+                            flex: 1,
+                            padding: "10px",
+                            background: "transparent",
+                            border: "1px solid #27ae60",
+                            color: "#27ae60",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                            transition: "all 0.3s"
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#27ae60"; e.currentTarget.style.color = "white"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#27ae60"; }}
+                        >
+                          Ir a Material
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenDesmatricular(curso)}
+                          style={{
+                            flex: 1,
+                            padding: "10px",
+                            background: "rgba(220, 38, 38, 0.1)",
+                            border: "1px solid #dc2626",
+                            color: "#dc2626",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                            transition: "all 0.3s"
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "#dc2626"; e.currentTarget.style.color = "#ffffff"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220, 38, 38, 0.1)"; e.currentTarget.style.color = "#dc2626"; }}
+                        >
+                          Desmatricular
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -795,6 +994,40 @@ export default function Grupos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================= */}
+      {/* NUEVO MODAL: DESMATRICULARSE (ESTUDIANTE) */}
+      {/* ========================================= */}
+      {mostrarModalDesmatricular && cursoADesmatricular && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
+          <div style={{ background: "var(--bg-card)", padding: "30px", borderRadius: "10px", width: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)", border: "1px solid rgba(220, 38, 38, 0.3)" }}>
+            <h2 style={{ marginTop: 0, color: "#dc2626" }}>Desmatricularse del Curso</h2>
+            <p style={{ color: "var(--text-main)", fontSize: "0.95rem", marginBottom: "15px" }}>
+              ¿Seguro que deseas abandonar el curso <strong>{cursoADesmatricular.nombre}</strong>?
+            </p>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "20px" }}>
+              Perderás acceso al material compartido y al historial de actividades de esta clase. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  setMostrarModalDesmatricular(false);
+                  setCursoADesmatricular(null);
+                }}
+                style={{ padding: "10px 15px", background: "var(--bg-main)", color: "var(--text-main)", border: "1px solid var(--border-color)", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarDesmatricular}
+                style={{ padding: "10px 20px", background: "#dc2626", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+              >
+                Sí, Desmatricular
+              </button>
+            </div>
           </div>
         </div>
       )}
