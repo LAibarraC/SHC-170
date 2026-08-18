@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { alerta } from '../../utils/Notificaciones';
 import { IconoBuscar, IconoEscudo, IconoAlerta } from '../../ui/iconos';
 import Skeleton from '../../ui/Skeleton';
+
 export default function Admin() {
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -11,6 +12,10 @@ export default function Admin() {
   // Modal de confirmación para eliminar
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
   const [confirmarNombre, setConfirmarNombre] = useState('');
+
+  // --- NUEVOS ESTADOS PARA PAGINACIÓN ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Cantidad de usuarios por página solicitada
 
   useEffect(() => {
     cargarUsuarios();
@@ -72,10 +77,76 @@ export default function Admin() {
     }
   };
 
+  // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
   const usuariosFiltrados = usuarios.filter(u => 
     u.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
     u.email.toLowerCase().includes(busqueda.toLowerCase())
   );
+
+  // Cálculos para la paginación
+  const totalPages = Math.ceil(usuariosFiltrados.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const usuariosPaginados = usuariosFiltrados.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleBusqueda = (e) => {
+    setBusqueda(e.target.value);
+    setCurrentPage(1); // Volver a la página 1 al buscar
+  };
+
+  // Efecto para evitar quedarse en una página vacía si se elimina el último elemento
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [usuariosFiltrados.length, currentPage, totalPages]);
+
+  // --- COMPONENTE REUTILIZABLE DE PAGINACIÓN ---
+  const ControlesPaginacion = () => {
+    if (totalPages <= 1) return null;
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "25px", paddingBottom: "10px" }}>
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === 1 ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === 1 ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === 1 ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.9rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Anterior
+        </button>
+
+        <span style={{ fontSize: "0.9rem", color: "var(--text-muted, #6b7280)", fontWeight: "bold" }}>
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === totalPages ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === totalPages ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.9rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Siguiente
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div style={{ maxWidth: '1100px', margin: 'clamp(15px, 4vw, 40px) auto', padding: '0 20px', position: 'relative' }}>
@@ -98,7 +169,7 @@ export default function Admin() {
             type="text" 
             placeholder="Buscar por nombre o correo..." 
             value={busqueda} 
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={handleBusqueda}
             style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', width: '100%', fontSize: '0.9rem' }}
           />
         </div>
@@ -155,139 +226,144 @@ export default function Admin() {
             No se encontraron usuarios registrados.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="tabla-responsive tabla-responsiva-panel" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Nombre / Correo</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Rol</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Estado</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Registro</th>
-                  <th style={{ padding: '12px 15px', fontWeight: 'bold', textAlign: 'center' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usuariosFiltrados.map((u, index) => (
-                  <tr 
-                    key={u.email} 
-                    style={{ 
-                      borderBottom: '1px solid var(--border-color)', 
-                      backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.02)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)'}
-                  >
-                    <td data-label="Nombre / Correo" style={{ padding: '15px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', wordBreak: 'break-word', overflowWrap: 'anywhere', maxWidth: '100%' }}>
-                        <div style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{u.nombre}</div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{u.email}</div>
-                      </div>
-                    </td>
-                    <td data-label="Rol" style={{ padding: '15px' }}>
-                      <select 
-                        value={u.rol} 
-                        onChange={(e) => handleCambiarRol(u.email, e.target.value)}
-                        disabled={u.rol === "Administrador"}
-                        style={{ 
-                          padding: '6px 12px', 
-                          borderRadius: '6px', 
-                          border: '1px solid var(--border-color)', 
-                          backgroundColor: u.rol === 'Administrador' ? 'rgba(239, 68, 68, 0.1)' : (u.rol === 'Docente' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'), 
-                          color: u.rol === 'Administrador' ? '#ef4444' : (u.rol === 'Docente' ? '#10b981' : '#3b82f6'), 
-                          fontWeight: 'bold',
-                          cursor: u.rol === 'Administrador' ? 'not-allowed' : 'pointer',
-                          outline: 'none',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        <option value="Estudiante" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>Estudiante</option>
-                        <option value="Docente" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>Docente</option>
-                        <option value="Administrador" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>Administrador</option>
-                      </select>
-                    </td>
-                    <td data-label="Estado" style={{ padding: '15px' }}>
-                      <span 
-                        style={{ 
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          borderRadius: '12px',
-                          fontSize: '0.8rem',
-                          fontWeight: 'bold',
-                          backgroundColor: u.activo ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                          color: u.activo ? '#10b981' : '#ef4444'
-                        }}
-                      >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: u.activo ? '#10b981' : '#ef4444' }}></span>
-                        {u.activo ? 'Activo' : 'Suspendido'}
-                      </span>
-                    </td>
-                    <td data-label="Registro" style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      {u.fecha_creacion ? u.fecha_creacion.split(' ')[0] : 'N/A'}
-                    </td>
-                    <td data-label="Acciones" style={{ padding: '15px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                        {u.rol !== 'Administrador' ? (
-                          <>
-                            <button
-                              onClick={() => handleCambiarEstado(u.email, !u.activo)}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: '1px solid ' + (u.activo ? '#f59e0b' : '#10b981'),
-                                background: 'transparent',
-                                color: u.activo ? '#f59e0b' : '#10b981',
-                                cursor: 'pointer',
-                                fontSize: '0.8rem',
-                                fontWeight: 'bold',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = u.activo ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                            >
-                              {u.activo ? 'Suspender' : 'Activar'}
-                            </button>
-                            <button
-                              onClick={() => setUsuarioAEliminar(u)}
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: '1px solid #ef4444',
-                                background: 'transparent',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                fontSize: '0.8rem',
-                                fontWeight: 'bold',
-                                transition: 'all 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                            >
-                              Eliminar
-                            </button>
-                          </>
-                        ) : (
-                          <span style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            Protegido <IconoEscudo width="14" height="14" style={{ color: '#10b981' }} />
-                          </span>
-                        )}
-                      </div>
-                    </td>
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tabla-responsive tabla-responsiva-panel" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Nombre / Correo</th>
+                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Rol</th>
+                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Estado</th>
+                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Registro</th>
+                    <th style={{ padding: '12px 15px', fontWeight: 'bold', textAlign: 'center' }}>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {usuariosPaginados.map((u, index) => (
+                    <tr 
+                      key={u.email} 
+                      style={{ 
+                        borderBottom: '1px solid var(--border-color)', 
+                        backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.02)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)'}
+                    >
+                      <td data-label="Nombre / Correo" style={{ padding: '15px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', wordBreak: 'break-word', overflowWrap: 'anywhere', maxWidth: '100%' }}>
+                          <div style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{u.nombre}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{u.email}</div>
+                        </div>
+                      </td>
+                      <td data-label="Rol" style={{ padding: '15px' }}>
+                        <select 
+                          value={u.rol} 
+                          onChange={(e) => handleCambiarRol(u.email, e.target.value)}
+                          disabled={u.rol === "Administrador"}
+                          style={{ 
+                            padding: '6px 12px', 
+                            borderRadius: '6px', 
+                            border: '1px solid var(--border-color)', 
+                            backgroundColor: u.rol === 'Administrador' ? 'rgba(239, 68, 68, 0.1)' : (u.rol === 'Docente' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'), 
+                            color: u.rol === 'Administrador' ? '#ef4444' : (u.rol === 'Docente' ? '#10b981' : '#3b82f6'), 
+                            fontWeight: 'bold',
+                            cursor: u.rol === 'Administrador' ? 'not-allowed' : 'pointer',
+                            outline: 'none',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          <option value="Estudiante" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>Estudiante</option>
+                          <option value="Docente" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>Docente</option>
+                          <option value="Administrador" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>Administrador</option>
+                        </select>
+                      </td>
+                      <td data-label="Estado" style={{ padding: '15px' }}>
+                        <span 
+                          style={{ 
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold',
+                            backgroundColor: u.activo ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: u.activo ? '#10b981' : '#ef4444'
+                          }}
+                        >
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: u.activo ? '#10b981' : '#ef4444' }}></span>
+                          {u.activo ? 'Activo' : 'Suspendido'}
+                        </span>
+                      </td>
+                      <td data-label="Registro" style={{ padding: '15px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        {u.fecha_creacion ? u.fecha_creacion.split(' ')[0] : 'N/A'}
+                      </td>
+                      <td data-label="Acciones" style={{ padding: '15px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                          {u.rol !== 'Administrador' ? (
+                            <>
+                              <button
+                                onClick={() => handleCambiarEstado(u.email, !u.activo)}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid ' + (u.activo ? '#f59e0b' : '#10b981'),
+                                  background: 'transparent',
+                                  color: u.activo ? '#f59e0b' : '#10b981',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 'bold',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = u.activo ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {u.activo ? 'Suspender' : 'Activar'}
+                              </button>
+                              <button
+                                onClick={() => setUsuarioAEliminar(u)}
+                                style={{
+                                  padding: '6px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #ef4444',
+                                  background: 'transparent',
+                                  color: '#ef4444',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 'bold',
+                                  transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                Eliminar
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Protegido <IconoEscudo width="14" height="14" style={{ color: '#10b981' }} />
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* AQUI SE RENDERIZAN LOS CONTROLES DE PAGINACIÓN */}
+            <ControlesPaginacion />
+          </>
         )}
       </div>
 
