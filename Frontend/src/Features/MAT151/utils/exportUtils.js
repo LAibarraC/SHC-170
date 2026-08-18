@@ -72,50 +72,97 @@ export const generarPDFReporte = async (elementId, nombreArchivo = "Reporte_Esta
         const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'in',
-            format: 'letter'
+            format: 'letter',
+            compress: true
         });
 
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         const margin = 0.5; // Margen de 0.5 pulgadas
         const contentWidth = pdfWidth - (margin * 2);
+        const usableHeight = pdfHeight - (margin * 2);
 
-        // 1. Buscamos todas las secciones marcadas
-        const secciones = input.querySelectorAll('.pdf-section');
-        let currentY = margin;
+        // 1. Guardamos la posición de cada sección ANTES de capturar (para no cortarlas)
+        const secciones = Array.from(input.querySelectorAll('.pdf-section'));
+        const inputTop = input.getBoundingClientRect().top + window.scrollY;
 
-        for (let i = 0; i < secciones.length; i++) {
-            const seccion = secciones[i];
+        const seccionesInfo = secciones.map(seccion => {
+            const rect = seccion.getBoundingClientRect();
+            return {
+                top: rect.top + window.scrollY - inputTop,
+                height: rect.height
+            };
+        });
 
-            // Capturamos solo esta sección
-            const canvas = await html2canvas(seccion, {
-                scale: 1.5,
-                useCORS: true,
-                backgroundColor: "#ffffff",
-                logging: false,
-                onclone: (clonedDoc) => {
-                    // Aseguramos que la sección sea visible y tenga el ancho correcto en el clon
-                    const el = clonedDoc.getElementById(seccion.id) || clonedDoc.querySelector(`[class*="${seccion.className}"]`);
-                    if (el) {
-                        el.style.display = "block";
-                        el.style.width = "800px";
-                    }
-                }
-            });
+        // 2. Capturamos TODO el contenedor de una sola vez
+        const canvas = await html2canvas(input, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            logging: false
+        });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.75);
-            const imgProps = pdf.getImageProperties(imgData);
-            const imgHeight = (imgProps.height * contentWidth) / imgProps.width;
+        const imgData = canvas.toDataURL('image/jpeg', 1.00);
+        const imgProps = pdf.getImageProperties(imgData);
+        const escalaCanvasAPdf = contentWidth / imgProps.width;
+        const escalaDomACanvas = canvas.width / input.scrollWidth;
 
-            // 2. ¿Cabe en la página actual?
-            if (currentY + imgHeight > pdfHeight - margin) {
-                pdf.addPage();
-                currentY = margin; // Reiniciamos en la nueva página
+        // 3. Convertimos las posiciones de las secciones a píxeles del canvas
+        const seccionesEnCanvas = seccionesInfo.map(s => ({
+            topPx: s.top * escalaDomACanvas,
+            heightPx: s.height * escalaDomACanvas,
+            bottomPx: (s.top + s.height) * escalaDomACanvas
+        }));
+
+        // 4. Calculamos los cortes de página evitando partir una sección
+        const maxAlturaPaginaPx = usableHeight / escalaCanvasAPdf;
+        const cortes = [0];
+        let cursor = 0;
+
+        while (cursor < canvas.height) {
+            let limite = cursor + maxAlturaPaginaPx;
+
+            if (limite >= canvas.height) break;
+
+            const seccionQueCruza = seccionesEnCanvas.find(
+                s => s.topPx < limite && s.bottomPx > limite
+            );
+
+            if (seccionQueCruza) {
+                limite = seccionQueCruza.heightPx > maxAlturaPaginaPx
+                    ? cursor + maxAlturaPaginaPx // sección más alta que una página: no queda otra que cortarla
+                    : seccionQueCruza.topPx;      // movemos el corte al inicio de esa sección
             }
 
-            // 3. Añadimos la sección
-            pdf.addImage(imgData, 'JPEG', margin, currentY, contentWidth, imgHeight);
-            currentY += imgHeight + 0.2; // Espacio de 0.2in entre secciones
+            cortes.push(limite);
+            cursor = limite;
+        }
+        cortes.push(canvas.height);
+
+        // 5. Generamos cada página a partir del canvas único
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        const ctx = pageCanvas.getContext('2d');
+
+        for (let i = 0; i < cortes.length - 1; i++) {
+            const sourceY = cortes[i];
+            const sliceHeight = cortes[i + 1] - sourceY;
+            if (sliceHeight <= 0) continue;
+
+            if (i > 0) pdf.addPage();
+
+            pageCanvas.height = Math.max(1, Math.ceil(sliceHeight));
+            ctx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
+            ctx.drawImage(
+                canvas,
+                0, sourceY, canvas.width, sliceHeight,
+                0, 0, canvas.width, pageCanvas.height
+            );
+
+            const pageImgData = pageCanvas.toDataURL('image/jpeg', 1.00);
+            const pageImgHeight = pageCanvas.height * escalaCanvasAPdf;
+
+            pdf.addImage(pageImgData, 'JPEG', margin, margin, contentWidth, pageImgHeight, undefined, "FAST");
         }
 
         pdf.save(`${nombreArchivo}.pdf`);
