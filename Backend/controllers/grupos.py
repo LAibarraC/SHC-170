@@ -55,6 +55,8 @@ async def actualizar_clase_db(db: AsyncSession, datos: ActualizarClase):
         clase.codigo_acceso = codigo_nuevo
         
     await db.commit()
+    await db.refresh(clase)
+    
     return {
         "message": "Clase actualizada exitosamente",
         "id": clase.id,

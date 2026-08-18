@@ -655,7 +655,7 @@ export default function Grupos() {
                               flex: 1, padding: "8px", background: hoveredCursoId === curso.id ? "#374151" : "#4b5563", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", color: "#ffffff", transition: "background-color 0.2s"
                             }}
                           >
-                            Gestionar
+                            Editar
                           </button>
                         )}
                         <button
