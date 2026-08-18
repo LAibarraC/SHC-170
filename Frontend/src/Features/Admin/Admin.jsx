@@ -461,11 +461,11 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
-
-            <ControlesPaginacion />
           </>
         )}
       </div>
+
+      <ControlesPaginacion />
 
       {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
       {usuarioAEliminar && (
