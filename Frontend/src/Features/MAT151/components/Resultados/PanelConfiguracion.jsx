@@ -94,15 +94,21 @@ export default function PanelConfiguracion({
   
   const addCol = (colKey, suffix, name, cssClass) => {
     if (colKey) {
-      // Usamos una clave única combinando la columna de Excel con el rol de la variable
-      const uniqueKey = `${colKey}__${suffix}`;
-      rdgColumns.push({
-        key: uniqueKey,
-        name,
-        renderEditCell: textEditor,
-        editable: true,
-        resizable: true,
-        cellClass: cssClass,
+      const variableCapturada = variables.find(variable => variable.nombre === colKey);
+      const nombresInternos = variableCapturada?.nombresColumnas || [];
+      const columnas = nombresInternos.length > 1 ? nombresInternos : [null];
+
+      columnas.forEach((nombreInterno, index) => {
+        // Una variable matricial necesita una columna visual por cada campo interno.
+        const uniqueKey = `${colKey}__${suffix}${nombreInterno ? `__${index}` : ""}`;
+        rdgColumns.push({
+          key: uniqueKey,
+          name: nombreInterno ? `${name} - ${nombreInterno}` : name,
+          renderEditCell: textEditor,
+          editable: true,
+          resizable: true,
+          cellClass: cssClass,
+        });
       });
     }
   };
@@ -154,17 +160,39 @@ export default function PanelConfiguracion({
     });
   }
 
+  const obtenerValoresVistaPrevia = (realKey) => {
+    if (excelData.length > 0 && excelData.some(row => row[realKey] !== undefined)) {
+      return excelData.map(row => row[realKey] ?? "");
+    }
+
+    const variableCapturada = variables.find(variable => variable.nombre === realKey);
+    return variableCapturada?.datos || [];
+  };
+
+  const cantidadFilasVistaPrevia = Math.max(
+    excelData.length,
+    ...rdgColumns.map(col => obtenerValoresVistaPrevia(col.key.split("__")).length),
+    0
+  );
+
   // Mapeamos los datos de las filas para asociar las propiedades únicas
-  const mappedRows = React.useMemo(() => {
-    return excelData.map((row) => {
-      const newRow = { ...row };
-      rdgColumns.forEach((col) => {
-        const realKey = col.key.split("__")[0];
-        newRow[col.key] = row[realKey];
-      });
-      return newRow;
+  const mappedRows = Array.from({ length: cantidadFilasVistaPrevia }, (_, index) => {
+    const newRow = { ...(excelData[index] || {}) };
+    rdgColumns.forEach((col) => {
+      const [realKey, , internalIndex] = col.key.split("__");
+      const valores = obtenerValoresVistaPrevia(realKey);
+      const valor = valores[index];
+      if (internalIndex !== undefined) {
+        const partes = Array.isArray(valor)
+          ? valor
+          : String(valor ?? "").split(/\s*\|\s*/);
+        newRow[col.key] = partes[Number(internalIndex)] ?? "";
+      } else {
+        newRow[col.key] = valor ?? "";
+      }
     });
-  }, [excelData, rdgColumns]);
+    return newRow;
+  });
 
   // Manejador intermedio para traducir las actualizaciones de celdas al formato original de Excel
   const handleMappedGridChange = (newRows, changeData) => {
@@ -810,7 +838,7 @@ export default function PanelConfiguracion({
                   </div>
                 )}
 
-                {mostrarTabla && excelData.length > 0 && (
+                {mostrarTabla && cantidadFilasVistaPrevia > 0 && (
                   <div id="tour-tabla-grid" ref={containerRef} className="container_dataset" style={{ marginTop: "10px", width: "100%" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                       <p className="info_vista" style={{ margin: 0 }}>Vista Previa (Doble clic para editar):</p>
