@@ -9,7 +9,7 @@ import pandas as pd
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 
 import models
 from validators.archivos import (
@@ -81,25 +81,31 @@ async def upload_file_logic(file: UploadFile, autor: str, visibilidad: str, curs
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    if clase_id:
-        result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
-        user = result.scalars().first()
-        user_id = user.id if user else 1
-        
-        result = await db.execute(select(models.Archivo).filter(
-            models.Archivo.nombre_original == file.filename,
-            models.Archivo.clase_id == clase_id
+    # El tamaño del archivo guardado es la fuente de verdad para la cuota.
+    file_size = os.path.getsize(file_path)
+
+    result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+    user = result.scalars().first()
+    user_id = user.id if user else 1
+
+    result = await db.execute(select(models.Archivo).filter(
+        models.Archivo.nombre_original == file.filename,
+        models.Archivo.clase_id == clase_id,
+        models.Archivo.usuario_id == user_id
+    ))
+    existente = result.scalars().first()
+    if existente:
+        existente.ruta_servidor = file_path.replace("\\", "/")
+        existente.size_bytes = file_size
+    else:
+        db.add(models.Archivo(
+            nombre_original=file.filename,
+            ruta_servidor=file_path.replace("\\", "/"),
+            clase_id=clase_id,
+            usuario_id=user_id,
+            size_bytes=file_size
         ))
-        existente = result.scalars().first()
-        if not existente:
-            nuevo_archivo = models.Archivo(
-                nombre_original=file.filename,
-                ruta_servidor=file_path.replace("\\", "/"),
-                clase_id=clase_id,
-                usuario_id=user_id
-            )
-            db.add(nuevo_archivo)
-            await db.commit()
+    await db.commit()
 
     return {"message": f"Archivo subido correctamente a {target_folder}"}
 
@@ -203,12 +209,26 @@ async def delete_file_logic(filename: str, autor: str, curso: str, db: AsyncSess
             if os.path.exists(meta_path):
                 os.remove(meta_path)
             
+            # --- NUEVA LÓGICA DE ELIMINACIÓN EN BD ---
+            result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+            user = result.scalars().first()
+            user_id = user.id if user else 1
+
             if clase_id:
+                # Borrar archivo de curso
                 await db.execute(delete(models.Archivo).filter(
                     models.Archivo.nombre_original == filename,
                     models.Archivo.clase_id == clase_id
                 ))
-                await db.commit()
+            else:
+                # Borrar archivo personal
+                await db.execute(delete(models.Archivo).filter(
+                    models.Archivo.nombre_original == filename,
+                    models.Archivo.usuario_id == user_id,
+                    models.Archivo.clase_id == None
+                ))
+            await db.commit()
+            # ------------------------------------------
 
             return {"message": f"Archivo {filename} eliminado correctamente"}
         except PermissionError:
@@ -227,6 +247,7 @@ async def save_table_hojas_logic(body: SaveTableHojasRequest, db: AsyncSession):
         if not hojas:
             return {"error": "No se recibieron hojas para guardar"}
 
+        # Archivo personal
         user_folder = await obtener_ruta_carpeta(autor, "personal", None, db)
         os.makedirs(user_folder, exist_ok=True)
 
@@ -257,7 +278,81 @@ async def save_table_hojas_logic(body: SaveTableHojasRequest, db: AsyncSession):
         with open(meta_path, "w") as f:
             json.dump(meta_data, f)
 
+        # ---------------------------------------------------------
+        # REGISTRAR EL ARCHIVO GENERADO EN LA BASE DE DATOS
+        # ---------------------------------------------------------
+        # 1. Calcular el peso real del archivo recién creado
+        file_size = os.path.getsize(filepath)
+
+        # 2. Buscar al usuario para obtener su ID
+        result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+        user = result.scalars().first()
+        user_id = user.id if user else 1 # Fallback por seguridad
+
+        # 3. Guardar el registro
+        nuevo_archivo = models.Archivo(
+            nombre_original=os.path.basename(filepath),
+            ruta_servidor=filepath.replace("\\", "/"),
+            clase_id=None, # Es un archivo personal, no pertenece a una clase
+            usuario_id=user_id,
+            size_bytes=file_size
+        )
+        db.add(nuevo_archivo)
+        await db.commit()
+        # ---------------------------------------------------------
+
         return {"filename": os.path.basename(filepath), "hojas": len(hojas)}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def save_table_logic(body: SaveTableRequest, db: AsyncSession):
+    try:
+        nombre = body.nombre
+        tabla = body.tabla
+        autor = body.autor
+
+        if not tabla:
+            return {"error": "No se recibieron datos para la tabla"}
+
+        df = pd.DataFrame(tabla)
+        user_folder = await obtener_ruta_carpeta(autor, "personal", None, db)
+        os.makedirs(user_folder, exist_ok=True)
+
+        filepath = os.path.join(user_folder, f"{nombre}.xlsx")
+        contador = 1
+        while os.path.exists(filepath):
+            contador += 1
+            filepath = os.path.join(user_folder, f"{nombre}_{contador}.xlsx")
+
+        df.to_excel(filepath, index=False, header=True)
+
+        meta_path = filepath + ".meta"
+        meta_data = {"filename": os.path.basename(filepath), "author": autor}
+        with open(meta_path, "w") as f:
+            json.dump(meta_data, f)
+
+        # ---------------------------------------------------------
+        # REGISTRAR EL ARCHIVO GENERADO EN LA BASE DE DATOS
+        # ---------------------------------------------------------
+        file_size = os.path.getsize(filepath)
+
+        result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+        user = result.scalars().first()
+        user_id = user.id if user else 1
+
+        nuevo_archivo = models.Archivo(
+            nombre_original=os.path.basename(filepath),
+            ruta_servidor=filepath.replace("\\", "/"),
+            clase_id=None, # Archivo personal
+            usuario_id=user_id,
+            size_bytes=file_size
+        )
+        db.add(nuevo_archivo)
+        await db.commit()
+        # ---------------------------------------------------------
+
+        return {"filename": os.path.basename(filepath)}
     except Exception as e:
         return {"error": str(e)}
 
@@ -278,6 +373,25 @@ async def create_table_logic(nombre: str, num_columnas: int, num_filas: int, aut
         file_path = os.path.join(EXCEL_FOLDER, filename)
         
     df.to_excel(file_path, index=False, header=False)
+
+    # --- NUEVO: REGISTRAR EN BD ---
+    if autor:
+        file_size = os.path.getsize(file_path)
+        result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+        user = result.scalars().first()
+        user_id = user.id if user else 1
+
+        nuevo_archivo = models.Archivo(
+            nombre_original=filename,
+            ruta_servidor=file_path.replace("\\", "/"),
+            clase_id=None, 
+            usuario_id=user_id,
+            size_bytes=file_size
+        )
+        db.add(nuevo_archivo)
+        await db.commit()
+    # ------------------------------
+
     return {"message": "Tabla creada correctamente", "filename": filename}
 
 async def save_table_logic(body: SaveTableRequest, db: AsyncSession):
@@ -334,6 +448,9 @@ async def update_excel_logic(body: UpdateExcelRequest, db: AsyncSession):
             sheet_names = xls.sheet_names
             nombre_hoja = sheet_names[hoja_index]
 
+        # Guardaremos la respuesta aquí para retornarla al final
+        response_data = {}
+
         if estrategia_guardado == "new_column":
             df_original = pd.read_excel(file_path, sheet_name=nombre_hoja)
             
@@ -355,7 +472,7 @@ async def update_excel_logic(body: UpdateExcelRequest, db: AsyncSession):
                     
             with pd.ExcelWriter(file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
                 df_original.to_excel(writer, sheet_name=nombre_hoja, index=False, header=True)
-            return {"message": "Columna agregada correctamente", "strategy": "new_column"}
+            response_data = {"message": "Columna agregada correctamente", "strategy": "new_column"}
 
         elif estrategia_guardado == "new_sheet":
             edited_sheets = [s for s in sheet_names if s.startswith("Datos_Editados_")]
@@ -371,12 +488,47 @@ async def update_excel_logic(body: UpdateExcelRequest, db: AsyncSession):
 
             with pd.ExcelWriter(file_path, engine='openpyxl', mode='a') as writer:
                 df_nuevo.to_excel(writer, sheet_name=new_sheet_name, index=False, header=True)
-            return {"message": "Nueva hoja agregada correctamente", "new_sheet": new_sheet_name, "strategy": "new_sheet"}
+            response_data = {"message": "Nueva hoja agregada correctamente", "new_sheet": new_sheet_name, "strategy": "new_sheet"}
 
         else: # "overwrite"
             with pd.ExcelWriter(file_path, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
                 df_nuevo.to_excel(writer, sheet_name=nombre_hoja, index=False, header=True)
-            return {"message": "Actualizado correctamente", "strategy": "overwrite"}
+            response_data = {"message": "Actualizado correctamente", "strategy": "overwrite"}
+
+        # ---------------------------------------------------------
+        # ACTUALIZAR EL PESO EN LA BASE DE DATOS
+        # ---------------------------------------------------------
+        new_size = os.path.getsize(file_path)
+
+        result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+        user = result.scalars().first()
+        user_id = user.id if user else 1
+
+        clase_id = None
+        if curso:
+            clase_id = int(curso) if str(curso).isdigit() else None
+            if not clase_id:
+                result_clase = await db.execute(select(models.Clase).filter(models.Clase.nombre == curso))
+                clase = result_clase.scalars().first()
+                if clase:
+                    clase_id = clase.id
+
+        if clase_id:
+            await db.execute(
+                update(models.Archivo)
+                .where(models.Archivo.nombre_original == filename, models.Archivo.clase_id == clase_id)
+                .values(size_bytes=new_size)
+            )
+        else:
+            await db.execute(
+                update(models.Archivo)
+                .where(models.Archivo.nombre_original == filename, models.Archivo.usuario_id == user_id, models.Archivo.clase_id == None)
+                .values(size_bytes=new_size)
+            )
+        await db.commit()
+        # ---------------------------------------------------------
+
+        return response_data
 
     except HTTPException as he:
         raise he
@@ -417,6 +569,39 @@ async def add_edit_sheet_logic(body: AddEditSheetRequest, db: AsyncSession):
 
         with pd.ExcelWriter(file_path, engine='openpyxl', mode='a') as writer:
             df_nuevo.to_excel(writer, sheet_name=new_sheet_name, index=False, header=True)
+
+        # ---------------------------------------------------------
+        # ACTUALIZAR EL PESO EN LA BASE DE DATOS
+        # ---------------------------------------------------------
+        new_size = os.path.getsize(file_path)
+
+        result = await db.execute(select(models.Usuario).filter(models.Usuario.nombre == autor))
+        user = result.scalars().first()
+        user_id = user.id if user else 1
+
+        clase_id = None
+        if curso:
+            clase_id = int(curso) if str(curso).isdigit() else None
+            if not clase_id:
+                result_clase = await db.execute(select(models.Clase).filter(models.Clase.nombre == curso))
+                clase = result_clase.scalars().first()
+                if clase:
+                    clase_id = clase.id
+
+        if clase_id:
+            await db.execute(
+                update(models.Archivo)
+                .where(models.Archivo.nombre_original == filename, models.Archivo.clase_id == clase_id)
+                .values(size_bytes=new_size)
+            )
+        else:
+            await db.execute(
+                update(models.Archivo)
+                .where(models.Archivo.nombre_original == filename, models.Archivo.usuario_id == user_id, models.Archivo.clase_id == None)
+                .values(size_bytes=new_size)
+            )
+        await db.commit()
+        # ---------------------------------------------------------
 
         return {"message": "Hoja agregada correctamente", "new_sheet": new_sheet_name}
     except HTTPException as he:

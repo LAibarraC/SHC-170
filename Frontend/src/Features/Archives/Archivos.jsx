@@ -21,7 +21,10 @@ export default function Archivos({ usuario }) {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // 🆕 ESTADO PARA LAS PESTAÑAS
+  // 🆕 ESTADO PARA LA CUOTA DE ALMACENAMIENTO (Límite por defecto 10MB)
+  const [espacio, setEspacio] = useState({ usado: 0, limite: 10 * 1024 * 1024 });
+
+  // ESTADO PARA LAS PESTAÑAS
   const [tabActiva, setTabActiva] = useState("personales"); // 'personales' o 'cursos'
 
   const location = useLocation();
@@ -48,6 +51,15 @@ export default function Archivos({ usuario }) {
           popover: {
             title: 'Organización por Pestañas',
             description: 'Cambia entre "Mi Espacio" para tus archivos privados y "Mis Cursos" para el material académico.',
+            side: "bottom",
+            align: 'start'
+          }
+        },
+        {
+          element: '#tour-cuota',
+          popover: {
+            title: 'Almacenamiento',
+            description: 'Revisa cuánto espacio de tu cuota gratuita estás utilizando. ¡Recuerda limpiar archivos viejos!',
             side: "bottom",
             align: 'start'
           }
@@ -97,17 +109,14 @@ export default function Archivos({ usuario }) {
   // EFECTO PARA DETECTAR SI VENIMOS DE LA PÁGINA DE GRUPOS
   useEffect(() => {
     if (location.state && location.state.cursoIdSeleccionado) {
-      // Si recibimos un código, saltamos a la pestaña de cursos y lo seleccionamos
       setTabActiva("cursos");
       setCursoSeleccionado(location.state.cursoIdSeleccionado);
-      // Limpiamos de forma segura el estado de react-router
       navigate("/archivos", { replace: true, state: {} });
     }
   }, [location, navigate]);
 
   // Estados para la lógica de Cursos
   const [cursoSeleccionado, setCursoSeleccionado] = useState("");
-  // (Mockup de cursos - esto luego vendrá del backend)
   const [misCursos, setMisCursos] = useState([]);
 
   useEffect(() => {
@@ -130,14 +139,25 @@ export default function Archivos({ usuario }) {
     cargarCursos();
   }, [usuario]);
 
+  // 🆕 FUNCIÓN PARA CARGAR LA CUOTA DE MEMORIA
+  const cargarCuota = async () => {
+    if (!usuario) return;
+    try {
+      const data = await api.obtenerEspacioUsado();
+      if (data) {
+        setEspacio({ usado: data.usado_bytes, limite: data.limite_bytes });
+      }
+    } catch (err) {
+      console.error("Error al cargar cuota:", err);
+    }
+  };
+
   const loadFiles = async () => {
     if (!usuario) return;
     try {
       const esPestañaCursos = tabActiva === "cursos";
       const visibilidad = esPestañaCursos ? "privado" : "personal";
 
-      // Para el estudiante, el "autor" de los archivos de curso es el servidor/docente
-      // así que enviamos el cursoSeleccionado con prioridad.
       const data = await api.obtenerArchivos(
         usuario.nombre,
         visibilidad,
@@ -150,15 +170,29 @@ export default function Archivos({ usuario }) {
     }
   };
 
-  // 🚀 CRÍTICO: Este useEffect debe observar estos 3 cambios
+  // 🚀 CRÍTICO: Efecto principal para refrescar datos y memoria
   useEffect(() => {
     loadFiles();
+    cargarCuota(); // Actualizamos la memoria cada vez que se recarga la lista
   }, [usuario, tabActiva, cursoSeleccionado]);
 
   const handleUploadFile = async (fileObj) => {
     if (!fileObj || !usuario) return;
 
-    // Si estamos en la pestaña de Cursos, forzamos que el archivo vaya a ese curso
+    // 🆕 1. Validar el tamaño del archivo de forma individual
+    if (fileObj.size > espacio.limite) {
+      alerta.error("Archivo demasiado grande", `El archivo supera el límite total de ${(espacio.limite / 1048576).toFixed(2)}MB.`);
+      return;
+    }
+
+    // 🆕 2. Validar si el archivo cabe en el espacio restante
+    if (espacio.usado + fileObj.size > espacio.limite) {
+      const libreMB = ((espacio.limite - espacio.usado) / 1048576).toFixed(2);
+      alerta.error("Espacio insuficiente", `El archivo pesa ${(fileObj.size / 1048576).toFixed(2)}MB, pero solo te quedan ${libreMB}MB libres.`);
+      return;
+    }
+
+    // Validación de curso
     if (tabActiva === "cursos" && !cursoSeleccionado) {
       alerta.error(
         "Faltan datos",
@@ -171,7 +205,6 @@ export default function Archivos({ usuario }) {
     formData.append("file", fileObj);
     formData.append("autor", usuario.nombre);
 
-    // Etiquetamos el archivo según la pestaña en la que estemos
     formData.append(
       "visibilidad",
       tabActiva === "cursos" ? "privado" : "personal",
@@ -181,6 +214,7 @@ export default function Archivos({ usuario }) {
     try {
       await api.subirArchivo(formData);
       loadFiles();
+      cargarCuota(); // 🆕 Refrescar la cuota después de subir
       alerta.success("¡Archivo Subido!");
     } catch (err) {
       alerta.error("Error al subir archivo", err.message);
@@ -188,7 +222,6 @@ export default function Archivos({ usuario }) {
   };
 
   const handleDeleteFile = async (filename) => {
-    // Evitamos que los estudiantes borren archivos de la pestaña de cursos
     if (tabActiva === "cursos" && usuario.rol === "Estudiante") {
       alerta.error(
         "Acceso Denegado",
@@ -201,6 +234,8 @@ export default function Archivos({ usuario }) {
       await api.eliminarArchivo(filename, usuario.nombre, tabActiva === "cursos" ? cursoSeleccionado : "");
       setFiles((prev) => prev.filter((f) => f.filename !== filename));
       if (selectedFile === filename) setSelectedFile(null);
+      
+      cargarCuota(); // 🆕 Refrescar la cuota para mostrar el espacio recuperado
       alerta.success("Archivo eliminado correctamente");
     } catch (err) {
       alerta.error("Error al eliminar", err.message || "No se pudo eliminar el archivo.");
@@ -219,25 +254,17 @@ export default function Archivos({ usuario }) {
 
       if (window.showSaveFilePicker) {
         try {
-          // 1. Abre la ventana y ESPERA a que elijas el lugar y presiones "Guardar"
           const fileHandle = await window.showSaveFilePicker({ suggestedName: filename });
-
-          // 2. ¡El lugar ya fue seleccionado! Mostramos el mensaje AHORA:
           alerta.exito("Descarga iniciada", "Guardando el archivo en tu equipo...");
-
-          // 3. Procedemos a escribir el archivo físicamente en el disco
           const writable = await fileHandle.createWritable();
           await writable.write(blob);
           await writable.close();
-
         } catch (error) {
-          // Si cierras la ventana o presionas "Cancelar", no muestra nada.
           if (error.name !== 'AbortError') {
             alerta.error("Error al guardar", "Hubo un problema al escribir el archivo.");
           }
         }
       } else {
-        // Método clásico (para Firefox/Safari) donde no se puede detectar la ventana
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = downloadUrl;
@@ -255,6 +282,12 @@ export default function Archivos({ usuario }) {
       alerta.error("Error al descargar", err.message || "No se pudo conectar con el servidor.");
     }
   };
+
+  // 🆕 Cálculos para la barra de memoria
+  const usadoMB = (espacio.usado / 1048576).toFixed(2);
+  const limiteMB = (espacio.limite / 1048576).toFixed(2);
+  const porcentajeUso = Math.min((espacio.usado / espacio.limite) * 100, 100).toFixed(1);
+  const cuotaLlena = espacio.usado >= espacio.limite;
 
   return (
     <div className="page-container">
@@ -333,7 +366,7 @@ export default function Archivos({ usuario }) {
         {/* ========================================================= */}
         {panelAbierto && (
           <div className="archivos-col-izq">
-            {/* 🆕 SELECTOR DE PESTAÑAS */}
+            {/* SELECTOR DE PESTAÑAS */}
             <div
               id="tour-pestanas"
               style={{
@@ -342,6 +375,7 @@ export default function Archivos({ usuario }) {
                 borderRadius: "8px",
                 padding: "5px",
                 border: "1px solid var(--border-color)",
+                marginBottom: "15px"
               }}
             >
               <button
@@ -397,6 +431,36 @@ export default function Archivos({ usuario }) {
                 </svg>
                 Mis Cursos
               </button>
+            </div>
+
+            {/* 🆕 WIDGET DE CUOTA DE ALMACENAMIENTO */}
+            <div
+              id="tour-cuota"
+              style={{
+                background: "var(--bg-card)",
+                padding: "15px",
+                borderRadius: "8px",
+                border: "1px solid var(--border-color)",
+                marginBottom: "15px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "0.85rem", color: "var(--text-main)", fontWeight: "bold" }}>
+                <span>Almacenamiento Total</span>
+                <span>{usadoMB} MB / {limiteMB} MB</span>
+              </div>
+              
+              <div style={{ background: "#e2e8f0", width: "100%", height: "8px", borderRadius: "4px", overflow: "hidden" }}>
+                <div style={{
+                  background: porcentajeUso > 90 ? "#ef4444" : "var(--accent-color)",
+                  width: `${porcentajeUso}%`,
+                  height: "100%",
+                  transition: "width 0.4s ease"
+                }}></div>
+              </div>
+              
+              <p style={{ margin: "5px 0 0 0", fontSize: "0.75rem", color: porcentajeUso > 90 ? "#ef4444" : "var(--text-muted)", textAlign: "right" }}>
+                {porcentajeUso}% utilizado
+              </p>
             </div>
 
             {/* CONTENIDO SEGÚN LA PESTAÑA */}
@@ -466,7 +530,7 @@ export default function Archivos({ usuario }) {
                 </div>
               )}
 
-              {/* Subida de archivos: Oculta para estudiantes en la pestaña de cursos */}
+              {/* Subida de archivos */}
               {!(tabActiva === "cursos" && usuario?.rol === "Estudiante") && (
                 <div
                   id="tour-subida"
@@ -481,7 +545,15 @@ export default function Archivos({ usuario }) {
                       ? "Subir Material al Curso"
                       : "Subir Archivo Personal"}
                   </h3>
-                  <ExcelUploader onUpload={handleUploadFile} />
+                  
+                  {/* 🆕 Alerta si la cuota está llena */}
+                  {cuotaLlena ? (
+                    <div style={{ backgroundColor: "#fee2e2", color: "#b91c1c", padding: "10px", borderRadius: "6px", fontSize: "0.85rem", borderLeft: "4px solid #ef4444" }}>
+                      <strong>⚠️ Espacio insuficiente:</strong> Has alcanzado tu límite de almacenamiento ({limiteMB}MB). Por favor, elimina archivos existentes antes de subir nuevos.
+                    </div>
+                  ) : (
+                    <ExcelUploader onUpload={handleUploadFile} />
+                  )}
                 </div>
               )}
 
@@ -539,8 +611,6 @@ export default function Archivos({ usuario }) {
               />
             </div>
           ) : (
-
-
             <div
               style={{
                 display: "flex",

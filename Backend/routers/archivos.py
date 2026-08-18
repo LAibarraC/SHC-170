@@ -3,6 +3,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.database import get_db
+from middlewares.quota import verificar_cuota_almacenamiento # <-- ADD THIS
+from middlewares.auth import get_current_user
 
 from validators.archivos import (
     SaveTableHojasRequest,
@@ -25,7 +27,6 @@ from controllers.archivos import (
     add_edit_sheet_logic
 )
 
-
 router = APIRouter()
 
 @router.post("/upload")
@@ -34,7 +35,8 @@ async def upload_file(
     autor: str = Form(...),
     visibilidad: str = Form("personal"), 
     curso: str = Form(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    espacio_usado: int = Depends(verificar_cuota_almacenamiento) # <-- ENFORCE QUOTA HERE
 ):
     resultado = await upload_file_logic(file, autor, visibilidad, curso, db)
     if "error" in resultado:
@@ -79,7 +81,6 @@ async def download_file(
     curso: str = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    # Obtenemos la ruta limpia del controlador
     file_path = await get_download_file_path(filename, autor, curso, db)
     return FileResponse(
         path=file_path,
@@ -96,9 +97,12 @@ async def delete_file(
 ):
     return await delete_file_logic(filename, autor, curso, db)
 
-
 @router.post("/save_table_hojas")
-async def save_table_hojas(body: SaveTableHojasRequest, db: AsyncSession = Depends(get_db)):
+async def save_table_hojas(
+    body: SaveTableHojasRequest, 
+    db: AsyncSession = Depends(get_db),
+    espacio_usado: int = Depends(verificar_cuota_almacenamiento) 
+):
     return await save_table_hojas_logic(body, db)
 
 @router.post("/create_table")
@@ -107,18 +111,44 @@ async def create_table(
     num_columnas: int = 1, 
     num_filas: int = 1, 
     autor: str = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    espacio_usado: int = Depends(verificar_cuota_almacenamiento) 
 ):
     return await create_table_logic(nombre, num_columnas, num_filas, autor, db)
 
 @router.post("/save_table")
-async def save_table(body: SaveTableRequest, db: AsyncSession = Depends(get_db)):
+async def save_table(
+    body: SaveTableRequest, 
+    db: AsyncSession = Depends(get_db),
+    espacio_usado: int = Depends(verificar_cuota_almacenamiento) 
+):
     return await save_table_logic(body, db)
 
 @router.post("/update_excel")
-async def update_excel(body: UpdateExcelRequest, db: AsyncSession = Depends(get_db)):
+async def update_excel(
+    body: UpdateExcelRequest, 
+    db: AsyncSession = Depends(get_db),
+):
     return await update_excel_logic(body, db)
 
 @router.post("/add_edit_sheet")
-async def add_edit_sheet(body: AddEditSheetRequest, db: AsyncSession = Depends(get_db)):
+async def add_edit_sheet(
+    body: AddEditSheetRequest, 
+    db: AsyncSession = Depends(get_db),
+):
     return await add_edit_sheet_logic(body, db)
+    
+@router.get("/espacio-usado")
+async def obtener_espacio(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user) 
+):
+    from sqlalchemy import func
+    from models.archivo import Archivo
+    from sqlalchemy.future import select
+    
+    result = await db.execute(
+        select(func.sum(Archivo.size_bytes)).filter(Archivo.usuario_id == current_user.id)
+    )
+    espacio_usado = result.scalar() or 0
+    return {"usado_bytes": espacio_usado, "limite_bytes": 10 * 1024 * 1024}

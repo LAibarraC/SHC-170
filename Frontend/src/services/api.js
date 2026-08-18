@@ -36,12 +36,12 @@ export const api = {
   },
 
   // --- OBTENER ESTUDIANTES DE UNA CLASE ---
-  obtenerEstudiantesClase: async (claseId, userEmail) => { 
+  obtenerEstudiantesClase: async (claseId, userEmail) => {
     const res = await fetch(`${BASE_URL}/clases/${claseId}/estudiantes?user_email=${encodeURIComponent(userEmail)}`);
     if (!res.ok) throw new Error("Error al obtener los estudiantes de la clase");
     return await res.json();
   },
-  
+
   // --- DESMATRICULAR/ELIMINAR ESTUDIANTE DE UNA CLASE (por el docente) ---
   desmatricularEstudiante: async (claseId, estudianteId, userEmail) => {
     const res = await fetch(`${BASE_URL}/clases/${claseId}/desmatricular/${estudianteId}?user_email=${encodeURIComponent(userEmail)}`, {
@@ -51,7 +51,7 @@ export const api = {
     return await res.json();
   },
 
-   // --- NUEVA: ABANDONAR CLASE (estudiante se desmatricula a sí mismo) ---
+  // --- NUEVA: ABANDONAR CLASE (estudiante se desmatricula a sí mismo) ---
   abandonarClase: async (claseId, estudianteEmail) => {
     const res = await fetch(`${BASE_URL}/abandonar_clase`, {
       method: "POST",
@@ -150,11 +150,11 @@ export const api = {
 
   // --- ACTUALIZAR EXCEL ---
   actualizarExcel: async (filename, hoja, datos, autor = "", curso = "", estrategia_guardado = "overwrite") => {
-    const payload = { 
-      filename, 
-      hoja_index: hoja, 
-      datos, 
-      autor, 
+    const payload = {
+      filename,
+      hoja_index: hoja,
+      datos,
+      autor,
       curso,
       estrategia_guardado
     };
@@ -175,11 +175,11 @@ export const api = {
 
   // --- AÑADIR HOJA DE CAMBIOS (NO DESTRUCTIVO) ---
   agregarHojaCambios: async (filename, datos, autor = "", curso = "") => {
-    const payload = { 
-      filename, 
-      datos, 
-      autor, 
-      curso 
+    const payload = {
+      filename,
+      datos,
+      autor,
+      curso
     };
     const response = await fetch(
       `${BASE_URL}/add_edit_sheet`,
@@ -245,53 +245,6 @@ export const api = {
     }
   },
 
-  guardarTabla: async (nombre, datos, autor) => {
-    try {
-      const res = await fetch(`${BASE_URL}/save_table`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: nombre, tabla: datos, autor: autor }),
-      });
-      if (!res.ok) throw new Error("Error al guardar la tabla");
-      return await res.json();
-    } catch (error) {
-      console.error("Error en api.guardarTabla:", error);
-      throw error;
-    }
-  },
-
-  // Guardar múltiples hojas en un solo archivo Excel
-  guardarTablaHojas: async (nombre, hojas, autor) => {
-    try {
-      const res = await fetch(`${BASE_URL}/save_table_hojas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, hojas, autor }),
-      });
-      if (!res.ok) throw new Error("Error al guardar las hojas");
-      return await res.json();
-    } catch (error) {
-      console.error("Error en api.guardarTablaHojas:", error);
-      throw error;
-    }
-  },
-
-  subirArchivo: async (formData) => {
-    try {
-      const res = await fetch(`${BASE_URL}/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data.detail?.[0]?.msg || "Error al subir el archivo");
-      return data;
-    } catch (error) {
-      console.error("Error en api.subirArchivo:", error);
-      throw error;
-    }
-  },
-
   eliminarArchivo: async (filename, autor, curso = "") => {
     try {
       let url = `${BASE_URL}/files/${encodeURIComponent(filename)}?autor=${encodeURIComponent(autor)}`;
@@ -347,8 +300,8 @@ export const api = {
         }),
       });
       if (!res.ok) {
-         const err = await res.json();
-         throw new Error(err.error || "Error al guardar en el servidor");
+        const err = await res.json();
+        throw new Error(err.error || "Error al guardar en el servidor");
       }
       return await res.json();
     } catch (error) {
@@ -356,7 +309,7 @@ export const api = {
       throw error;
     }
   },
-  
+
   obtenerHistorial: async (autor) => {
     try {
       const res = await fetch(
@@ -552,6 +505,86 @@ export const api = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al crear la notificación");
     return data;
+  },
+
+  // --- OBTENER ESPACIO DE ALMACENAMIENTO USADO ---
+  obtenerEspacioUsado: async () => {
+    const token = localStorage.getItem("token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    try {
+      const res = await fetch(`${BASE_URL}/espacio-usado`, { headers });
+      if (!res.ok) throw new Error("Error al obtener la cuota de almacenamiento");
+      return await res.json();
+    } catch (error) {
+      console.error("Error en api.obtenerEspacioUsado:", error);
+      return null;
+    }
+  },
+
+  guardarTabla: async (nombre, datos, autor) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`; // <-- TOKEN AÑADIDO
+
+      const res = await fetch(`${BASE_URL}/save_table`, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ nombre: nombre, tabla: datos, autor: autor }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.error || "Error al guardar la tabla");
+      return data;
+    } catch (error) {
+      console.error("Error en api.guardarTabla:", error);
+      throw error;
+    }
+  },
+
+  guardarTablaHojas: async (nombre, hojas, autor) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`; // <-- TOKEN AÑADIDO
+
+      const res = await fetch(`${BASE_URL}/save_table_hojas`, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ nombre, hojas, autor }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.error || "Error al guardar las hojas");
+      return data;
+    } catch (error) {
+      console.error("Error en api.guardarTablaHojas:", error);
+      throw error;
+    }
+  },
+
+  subirArchivo: async (formData) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = {};
+      // NOTA: No seteamos 'Content-Type' aquí, fetch lo hace automático para FormData
+      if (token) headers["Authorization"] = `Bearer ${token}`; // <-- TOKEN AÑADIDO
+
+      const res = await fetch(`${BASE_URL}/upload`, {
+        method: "POST",
+        headers: headers,
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.error || "Error al subir el archivo");
+      return data;
+    } catch (error) {
+      console.error("Error en api.subirArchivo:", error);
+      throw error;
+    }
   },
 };
 
