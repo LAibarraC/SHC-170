@@ -4,16 +4,20 @@ import { alerta } from '../../utils/Notificaciones';
 import { IconoBuscar, IconoEscudo, IconoAlerta } from '../../ui/iconos';
 import Skeleton from '../../ui/Skeleton';
 
+// Importaciones para el Tour (Guía Rápida)
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+
 export default function Admin() {
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
-  
+
   // Modal de confirmación para eliminar
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
   const [confirmarNombre, setConfirmarNombre] = useState('');
 
-  // --- NUEVOS ESTADOS PARA PAGINACIÓN ---
+  // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5; // Cantidad de usuarios por página solicitada
 
@@ -24,8 +28,7 @@ export default function Admin() {
   const cargarUsuarios = async () => {
     try {
       setCargando(true);
-      // Retraso artificial de 2 segundos para ver el Skeleton (¡Bórralo luego!)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Retraso artificial para skeleton
       const data = await api.obtenerUsuarios();
       setUsuarios(data);
     } catch (error) {
@@ -35,11 +38,92 @@ export default function Admin() {
     }
   };
 
+  // --- FUNCIÓN DEL TOUR (GUÍA RÁPIDA) ---
+  const iniciarTour = () => {
+    const tourSteps = [
+      {
+        element: '#tour-admin-titulo',
+        popover: {
+          title: 'Panel de Administración',
+          description: '¡Bienvenido! Desde aquí puedes gestionar a todos los usuarios, cambiar sus roles o suspender sus cuentas.',
+          side: "bottom",
+          align: 'start'
+        }
+      },
+      {
+        element: '#tour-admin-buscador',
+        popover: {
+          title: 'Buscador de Usuarios',
+          description: 'Usa esta barra para encontrar rápidamente a cualquier persona por su nombre o correo electrónico.',
+          side: "bottom",
+          align: 'center'
+        }
+      }
+    ];
+
+    if (document.querySelector('#tour-admin-tabla')) {
+      tourSteps.push({
+        element: '#tour-admin-tabla',
+        popover: {
+          title: 'Lista de Usuarios',
+          description: 'Aquí se visualiza la información de los usuarios registrados, su estado actual y su fecha de registro.',
+          side: "top",
+          align: 'center'
+        }
+      });
+    }
+
+    if (document.querySelector('.tour-admin-rol')) {
+      tourSteps.push({
+        element: '.tour-admin-rol',
+        popover: {
+          title: 'Gestión de Roles',
+          description: 'Despliega este menú para cambiar los privilegios de un usuario (Estudiante, Docente, etc.).',
+          side: "left",
+          align: 'center'
+        }
+      });
+    }
+
+    if (document.querySelector('.tour-admin-estado')) {
+      tourSteps.push({
+        element: '.tour-admin-estado',
+        popover: {
+          title: 'Activar / Suspender',
+          description: 'Controla el acceso. Si suspendes a un usuario, este no podrá ingresar al sistema hasta que lo reactives.',
+          side: "left",
+          align: 'center'
+        }
+      });
+    }
+
+    if (document.querySelector('.tour-admin-eliminar')) {
+      tourSteps.push({
+        element: '.tour-admin-eliminar',
+        popover: {
+          title: 'Eliminar Registro',
+          description: 'Usa este botón para borrar de manera permanente la cuenta de un usuario y todos sus datos asociados.',
+          side: "left",
+          align: 'center'
+        }
+      });
+    }
+
+    const driverObj = driver({
+      showProgress: true,
+      nextBtnText: 'Siguiente',
+      prevBtnText: 'Anterior',
+      doneBtnText: 'Finalizar',
+      progressText: '{{current}} de {{total}}',
+      steps: tourSteps
+    });
+    driverObj.drive();
+  };
+
   const handleCambiarRol = async (email, nuevoRol) => {
     try {
       await api.cambiarRol(email, nuevoRol);
       alerta.exito("Rol actualizado", `El rol de ${email} ha sido actualizado a ${nuevoRol}`);
-      // Actualizamos el estado local
       setUsuarios(prev => prev.map(u => u.email === email ? { ...u, rol: nuevoRol, perfil: nuevoRol } : u));
     } catch (error) {
       alerta.error("Error", error.message || "No se pudo cambiar el rol");
@@ -78,29 +162,26 @@ export default function Admin() {
   };
 
   // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
-  const usuariosFiltrados = usuarios.filter(u => 
-    u.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
+  const usuariosFiltrados = usuarios.filter(u =>
+    u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
     u.email.toLowerCase().includes(busqueda.toLowerCase())
   );
 
-  // Cálculos para la paginación
   const totalPages = Math.ceil(usuariosFiltrados.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const usuariosPaginados = usuariosFiltrados.slice(startIndex, startIndex + itemsPerPage);
 
   const handleBusqueda = (e) => {
     setBusqueda(e.target.value);
-    setCurrentPage(1); // Volver a la página 1 al buscar
+    setCurrentPage(1);
   };
 
-  // Efecto para evitar quedarse en una página vacía si se elimina el último elemento
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(totalPages);
     }
   }, [usuariosFiltrados.length, currentPage, totalPages]);
 
-  // --- COMPONENTE REUTILIZABLE DE PAGINACIÓN ---
   const ControlesPaginacion = () => {
     if (totalPages <= 1) return null;
     return (
@@ -150,10 +231,27 @@ export default function Admin() {
 
   return (
     <div style={{ maxWidth: '1100px', margin: 'clamp(15px, 4vw, 40px) auto', padding: '0 20px', position: 'relative' }}>
-      
+
+      {/* BOTÓN FLOTANTE DEL TOUR */}
+      <button
+        onClick={iniciarTour}
+        className="guia-rapida-flotante"
+        style={{
+          bottom: '20px',
+          zIndex: 10000
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span className="guia-rapida-flotante-texto">Guía Rápida</span>
+      </button>
+
       {/* CABECERA */}
       <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'clamp(15px, 4vw, 30px)', flexWrap: 'wrap', gap: 'clamp(10px, 3vw, 20px)' }}>
-        <div className="admin-title-container">
+        <div className="admin-title-container" id="tour-admin-titulo">
           <h2 style={{ fontSize: 'clamp(1.4rem, 5vw, 2rem)', margin: '0 0 5px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
             Panel de Administración
           </h2>
@@ -163,12 +261,12 @@ export default function Admin() {
         </div>
 
         {/* Buscador */}
-        <div className="admin-search-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-card)', padding: '6px 15px', borderRadius: '30px', border: '1px solid var(--border-color)', minWidth: '280px', flex: '1', maxWidth: '380px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+        <div id="tour-admin-buscador" className="admin-search-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-card)', padding: '6px 15px', borderRadius: '30px', border: '1px solid var(--border-color)', minWidth: '280px', flex: '1', maxWidth: '380px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
           <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}><IconoBuscar width="18" height="18" /></span>
-          <input 
-            type="text" 
-            placeholder="Buscar por nombre o correo..." 
-            value={busqueda} 
+          <input
+            type="text"
+            placeholder="Buscar por nombre o correo..."
+            value={busqueda}
             onChange={handleBusqueda}
             style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', width: '100%', fontSize: '0.9rem' }}
           />
@@ -176,12 +274,12 @@ export default function Admin() {
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
-      <div 
-        className="grafico-card" 
-        style={{ 
-          borderRadius: '12px', 
-          boxShadow: '0 8px 24px rgba(0,0,0,0.1)', 
-          backgroundColor: 'var(--bg-card)', 
+      <div
+        className="grafico-card"
+        style={{
+          borderRadius: '12px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+          backgroundColor: 'var(--bg-card)',
           padding: '25px',
           border: '1px solid var(--border-color)',
           overflow: 'hidden'
@@ -197,27 +295,27 @@ export default function Admin() {
               <div style={{ flex: '1' }}><Skeleton height="15px" width="60%" /></div>
               <div style={{ flex: '1.5' }}><Skeleton height="15px" width="70%" /></div>
             </div>
-            
+
             {/* 5 filas de datos fantasma */}
             {[1, 2, 3, 4, 5].map(i => (
               <div key={i} style={{ display: 'flex', gap: '20px', marginBottom: '15px', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '15px' }}>
-                 <div style={{ flex: '1.5', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                   <Skeleton height="18px" width="80%" />
-                   <Skeleton height="14px" width="50%" />
-                 </div>
-                 <div style={{ flex: '1' }}>
-                   <Skeleton height="32px" width="90%" borderRadius="6px" />
-                 </div>
-                 <div style={{ flex: '1' }}>
-                   <Skeleton height="24px" width="70%" borderRadius="12px" />
-                 </div>
-                 <div style={{ flex: '1' }}>
-                   <Skeleton height="14px" width="50%" />
-                 </div>
-                 <div style={{ flex: '1.5', display: 'flex', gap: '10px' }}>
-                   <Skeleton height="30px" width="45%" borderRadius="6px" />
-                   <Skeleton height="30px" width="45%" borderRadius="6px" />
-                 </div>
+                <div style={{ flex: '1.5', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <Skeleton height="18px" width="80%" />
+                  <Skeleton height="14px" width="50%" />
+                </div>
+                <div style={{ flex: '1' }}>
+                  <Skeleton height="32px" width="90%" borderRadius="6px" />
+                </div>
+                <div style={{ flex: '1' }}>
+                  <Skeleton height="24px" width="70%" borderRadius="12px" />
+                </div>
+                <div style={{ flex: '1' }}>
+                  <Skeleton height="14px" width="50%" />
+                </div>
+                <div style={{ flex: '1.5', display: 'flex', gap: '10px' }}>
+                  <Skeleton height="30px" width="45%" borderRadius="6px" />
+                  <Skeleton height="30px" width="45%" borderRadius="6px" />
+                </div>
               </div>
             ))}
           </div>
@@ -227,7 +325,7 @@ export default function Admin() {
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto' }} id="tour-admin-tabla">
               <table className="tabla-responsive tabla-responsiva-panel" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -240,10 +338,10 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {usuariosPaginados.map((u, index) => (
-                    <tr 
-                      key={u.email} 
-                      style={{ 
-                        borderBottom: '1px solid var(--border-color)', 
+                    <tr
+                      key={u.email}
+                      style={{
+                        borderBottom: '1px solid var(--border-color)',
                         backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.01)',
                         transition: 'background-color 0.2s'
                       }}
@@ -257,16 +355,17 @@ export default function Admin() {
                         </div>
                       </td>
                       <td data-label="Rol" style={{ padding: '15px' }}>
-                        <select 
-                          value={u.rol} 
+                        <select
+                          className="tour-admin-rol"
+                          value={u.rol}
                           onChange={(e) => handleCambiarRol(u.email, e.target.value)}
                           disabled={u.rol === "Administrador"}
-                          style={{ 
-                            padding: '6px 12px', 
-                            borderRadius: '6px', 
-                            border: '1px solid var(--border-color)', 
-                            backgroundColor: u.rol === 'Administrador' ? 'rgba(239, 68, 68, 0.1)' : (u.rol === 'Docente' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'), 
-                            color: u.rol === 'Administrador' ? '#ef4444' : (u.rol === 'Docente' ? '#10b981' : '#3b82f6'), 
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-color)',
+                            backgroundColor: u.rol === 'Administrador' ? 'rgba(239, 68, 68, 0.1)' : (u.rol === 'Docente' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)'),
+                            color: u.rol === 'Administrador' ? '#ef4444' : (u.rol === 'Docente' ? '#10b981' : '#3b82f6'),
                             fontWeight: 'bold',
                             cursor: u.rol === 'Administrador' ? 'not-allowed' : 'pointer',
                             outline: 'none',
@@ -279,8 +378,8 @@ export default function Admin() {
                         </select>
                       </td>
                       <td data-label="Estado" style={{ padding: '15px' }}>
-                        <span 
-                          style={{ 
+                        <span
+                          style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
@@ -304,6 +403,7 @@ export default function Admin() {
                           {u.rol !== 'Administrador' ? (
                             <>
                               <button
+                                className="tour-admin-estado"
                                 onClick={() => handleCambiarEstado(u.email, !u.activo)}
                                 style={{
                                   padding: '6px 12px',
@@ -326,6 +426,7 @@ export default function Admin() {
                                 {u.activo ? 'Suspender' : 'Activar'}
                               </button>
                               <button
+                                className="tour-admin-eliminar"
                                 onClick={() => setUsuarioAEliminar(u)}
                                 style={{
                                   padding: '6px 12px',
@@ -361,7 +462,6 @@ export default function Admin() {
               </table>
             </div>
 
-            {/* AQUI SE RENDERIZAN LOS CONTROLES DE PAGINACIÓN */}
             <ControlesPaginacion />
           </>
         )}
@@ -370,14 +470,14 @@ export default function Admin() {
       {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
       {usuarioAEliminar && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 11000, backdropFilter: 'blur(3px)' }}>
-          <div 
+          <div
             className="grafico-card"
-            style={{ 
-              width: '95%', 
-              maxWidth: '500px', 
-              backgroundColor: 'var(--bg-card)', 
-              borderRadius: '12px', 
-              padding: '30px', 
+            style={{
+              width: '95%',
+              maxWidth: '500px',
+              backgroundColor: 'var(--bg-card)',
+              borderRadius: '12px',
+              padding: '30px',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)',
               border: '1px solid rgba(239, 68, 68, 0.2)'
             }}
@@ -394,8 +494,8 @@ export default function Admin() {
                 <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', display: 'block', marginBottom: '6px' }}>
                   Escribe el nombre del usuario para confirmar (<strong>{usuarioAEliminar.nombre}</strong>):
                 </label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={confirmarNombre}
                   onChange={(e) => setConfirmarNombre(e.target.value)}
                   placeholder="Escribe el nombre exacto"
@@ -405,8 +505,8 @@ export default function Admin() {
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '10px', justifyContent: 'flex-end' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => {
                     setUsuarioAEliminar(null);
                     setConfirmarNombre('');
@@ -415,8 +515,8 @@ export default function Admin() {
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   style={{ padding: '10px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#ef4444', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
                 >
                   Confirmar Borrado

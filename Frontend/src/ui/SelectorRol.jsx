@@ -52,7 +52,7 @@ export default function SelectorRol() {
       onMouseLeave={() => setExpandido(false)}
       style={{
         position: 'fixed',
-        bottom: bottomPosition,
+        bottom: '80px',
         left: '20px',
         zIndex: 999999,
         background: 'var(--bg-card)', // Ajustado para modo oscuro
