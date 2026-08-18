@@ -561,31 +561,6 @@ export default function Grupos() {
           pointerEvents: "none"
         }}
       />
-      
-      <div style={{ marginBottom: "clamp(15px, 4vw, 30px)", borderBottom: "2px solid var(--border-color)", paddingBottom: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px" }}>
-        <div>
-          <h1 style={{ color: "var(--text-main)", margin: 0, fontSize: "clamp(1.3rem, 4vw, 1.8rem)" }}>Gestión Académica y Cursos</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "clamp(0.9rem, 3vw, 1.1rem)", margin: "5px 0 0 0" }}>
-            Bienvenido, {usuario.nombre || usuario.nombres}
-          </p>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-          <button
-            onClick={iniciarTour}
-            className="guia-rapida-flotante"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-            <span className="guia-rapida-flotante-texto">Guía Rápida</span>
-          </button>
-          <span style={{ backgroundColor: "var(--accent-color)", color: "white", padding: "5px 15px", borderRadius: "20px", fontWeight: "bold", fontSize: "0.9rem" }}>
-            Rol: {usuario.rol}
-          </span>
-        </div>
-      </div>
 
       {/* ========================================= */}
       {/* VISTA DEL DOCENTE / ADMINISTRADOR         */}

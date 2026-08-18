@@ -155,7 +155,7 @@ export default function Admin() {
       <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'clamp(15px, 4vw, 30px)', flexWrap: 'wrap', gap: 'clamp(10px, 3vw, 20px)' }}>
         <div className="admin-title-container">
           <h2 style={{ fontSize: 'clamp(1.4rem, 5vw, 2rem)', margin: '0 0 5px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            Panel de Administración Real
+            Panel de Administración
           </h2>
           <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 'clamp(0.85rem, 3vw, 0.95rem)' }}>
             Administra roles, suspende cuentas y elimina registros de forma centralizada.
