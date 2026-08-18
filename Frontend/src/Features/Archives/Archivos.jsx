@@ -212,7 +212,7 @@ export default function Archivos({ usuario }) {
       const autorParam = encodeURIComponent(usuario.nombre);
       const cursoParam = tabActiva === "cursos" && cursoSeleccionado ? `&curso=${encodeURIComponent(cursoSeleccionado)}` : "";
       const url = `${BASE_URL}/files/${encodeURIComponent(filename)}?autor=${autorParam}${cursoParam}`;
-      
+
       const response = await fetch(url);
       if (!response.ok) throw new Error("No se pudo descargar el archivo del servidor.");
       const blob = await response.blob();
@@ -221,7 +221,7 @@ export default function Archivos({ usuario }) {
         try {
           // 1. Abre la ventana y ESPERA a que elijas el lugar y presiones "Guardar"
           const fileHandle = await window.showSaveFilePicker({ suggestedName: filename });
-          
+
           // 2. ¡El lugar ya fue seleccionado! Mostramos el mensaje AHORA:
           alerta.exito("Descarga iniciada", "Guardando el archivo en tu equipo...");
 
@@ -229,7 +229,7 @@ export default function Archivos({ usuario }) {
           const writable = await fileHandle.createWritable();
           await writable.write(blob);
           await writable.close();
-          
+
         } catch (error) {
           // Si cierras la ventana o presionas "Cancelar", no muestra nada.
           if (error.name !== 'AbortError') {
@@ -245,11 +245,11 @@ export default function Archivos({ usuario }) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         alerta.exito("Descarga iniciada", "Elige el lugar donde se va a guardar el archivo.");
         setTimeout(() => window.URL.revokeObjectURL(downloadUrl), 5000);
       }
-      
+
     } catch (err) {
       console.error(err);
       alerta.error("Error al descargar", err.message || "No se pudo conectar con el servidor.");
@@ -260,7 +260,7 @@ export default function Archivos({ usuario }) {
     <div className="page-container">
 
       {/* Marca de agua de fondo */}
-      <div 
+      <div
         style={{
           position: "fixed",
           top: "50%",
@@ -316,195 +316,205 @@ export default function Archivos({ usuario }) {
           ❮
         </span>
       </button>
-
+      <button
+        onClick={iniciarTour}
+        className="guia-rapida-flotante"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span className="guia-rapida-flotante-texto">Guía Rápida</span>
+      </button>
       <div className="files-layout">
         {/* ========================================================= */}
         {/* COLUMNA IZQUIERDA: Pestañas y Gestión (35%)               */}
         {/* ========================================================= */}
         {panelAbierto && (
           <div className="archivos-col-izq">
-          {/* 🆕 SELECTOR DE PESTAÑAS */}
-          <div
-            id="tour-pestanas"
-            style={{
-              display: "flex",
-              background: "var(--bg-card)",
-              borderRadius: "8px",
-              padding: "5px",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <button
-              onClick={() => setTabActiva("personales")}
+            {/* 🆕 SELECTOR DE PESTAÑAS */}
+            <div
+              id="tour-pestanas"
               style={{
-                flex: 1,
-                padding: "10px",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "bold",
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "6px",
-                background:
-                  tabActiva === "personales"
-                    ? "var(--accent-color)"
-                    : "transparent",
-                color:
-                  tabActiva === "personales" ? "white" : "var(--text-muted)",
+                background: "var(--bg-card)",
+                borderRadius: "8px",
+                padding: "5px",
+                border: "1px solid var(--border-color)",
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-              Mi Espacio
-            </button>
-            <button
-              onClick={() => setTabActiva("cursos")}
-              style={{
-                flex: 1,
-                padding: "10px",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "6px",
-                background:
-                  tabActiva === "cursos"
-                    ? "var(--primary-color)"
-                    : "transparent",
-                color: tabActiva === "cursos" ? "white" : "var(--text-muted)",
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-              </svg>
-              Mis Cursos
-            </button>
-          </div>
-
-          {/* CONTENIDO SEGÚN LA PESTAÑA */}
-          <div
-            style={{
-              background: "var(--bg-card)",
-              padding: "20px",
-              borderRadius: "8px",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            {tabActiva === "cursos" && (
-              <div style={{ marginBottom: "20px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontWeight: "bold",
-                  }}
-                >
-                  Selecciona un Curso:
-                </label>
-                <select
-                  value={cursoSeleccionado}
-                  onChange={(e) => setCursoSeleccionado(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    borderRadius: "4px",
-                    border: "1px solid var(--border-color)",
-                    backgroundColor: "var(--bg-input)",
-                    color: "var(--text-main)",
-                  }}
-                >
-                  <option value="" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-main)" }}>
-                    -- Elige un curso para ver material --
-                  </option>
-                  {misCursos.map((c) => (
-                    <option key={c.id} value={c.id} style={{ backgroundColor: "var(--bg-input)", color: "var(--text-main)" }}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* AVISO VISUAL DE CURSO SELECCIONADO CON LÓGICA DE ROL */}
-            {tabActiva === "cursos" && cursoSeleccionado && (
-              <div
+              <button
+                onClick={() => setTabActiva("personales")}
                 style={{
-                  backgroundColor: "#e8f4fd",
-                  padding: "12px",
+                  flex: 1,
+                  padding: "10px",
+                  border: "none",
                   borderRadius: "6px",
-                  marginBottom: "15px",
-                  borderLeft: "4px solid var(--primary-color)",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  background:
+                    tabActiva === "personales"
+                      ? "var(--accent-color)"
+                      : "transparent",
+                  color:
+                    tabActiva === "personales" ? "white" : "var(--text-muted)",
                 }}
               >
-                <p style={{ margin: 0, fontSize: "0.95rem", color: "#0056b3" }}>
-                  {" "}
-                  {["Docente", "Administrador"].includes(usuario?.rol)
-                    ? "Estás gestionando el material del curso:"
-                    : "Viendo material de estudio del curso:"}{" "}
-                  <strong>
-                    {misCursos.find((c) => String(c.id) === String(cursoSeleccionado))?.nombre || cursoSeleccionado}
-                  </strong>
-                </p>
-              </div>
-            )}
-
-            {/* Subida de archivos: Oculta para estudiantes en la pestaña de cursos */}
-            {!(tabActiva === "cursos" && usuario?.rol === "Estudiante") && (
-              <div
-                id="tour-subida"
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Mi Espacio
+              </button>
+              <button
+                onClick={() => setTabActiva("cursos")}
                 style={{
-                  marginBottom: "20px",
-                  paddingBottom: "20px",
-                  borderBottom: "1px solid var(--border-color)",
+                  flex: 1,
+                  padding: "10px",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  background:
+                    tabActiva === "cursos"
+                      ? "var(--primary-color)"
+                      : "transparent",
+                  color: tabActiva === "cursos" ? "white" : "var(--text-muted)",
                 }}
               >
-                <h3 style={{ margin: "0 0 10px 0", fontSize: "1.1rem" }}>
-                  {tabActiva === "cursos"
-                    ? "Subir Material al Curso"
-                    : "Subir Archivo Personal"}
-                </h3>
-                <ExcelUploader onUpload={handleUploadFile} />
-              </div>
-            )}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+                Mis Cursos
+              </button>
+            </div>
 
-            <h3 style={{ margin: "0 0 15px 0", fontSize: "1.1rem" }}>
-              {tabActiva === "cursos" ? "Material Compartido" : "Mis Archivos"}
-            </h3>
+            {/* CONTENIDO SEGÚN LA PESTAÑA */}
+            <div
+              style={{
+                background: "var(--bg-card)",
+                padding: "20px",
+                borderRadius: "8px",
+                border: "1px solid var(--border-color)",
+              }}
+            >
+              {tabActiva === "cursos" && (
+                <div style={{ marginBottom: "20px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "8px",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Selecciona un Curso:
+                  </label>
+                  <select
+                    value={cursoSeleccionado}
+                    onChange={(e) => setCursoSeleccionado(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: "4px",
+                      border: "1px solid var(--border-color)",
+                      backgroundColor: "var(--bg-input)",
+                      color: "var(--text-main)",
+                    }}
+                  >
+                    <option value="" style={{ backgroundColor: "var(--bg-input)", color: "var(--text-main)" }}>
+                      -- Elige un curso para ver material --
+                    </option>
+                    {misCursos.map((c) => (
+                      <option key={c.id} value={c.id} style={{ backgroundColor: "var(--bg-input)", color: "var(--text-main)" }}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            <div id="tour-visor">
-              {/* Si es curso y no ha seleccionado uno, no mostramos la lista */}
-              {tabActiva === "cursos" && !cursoSeleccionado ? (
-                <p
+              {/* AVISO VISUAL DE CURSO SELECCIONADO CON LÓGICA DE ROL */}
+              {tabActiva === "cursos" && cursoSeleccionado && (
+                <div
                   style={{
-                    color: "var(--text-muted)",
-                    fontStyle: "italic",
-                    textAlign: "center",
+                    backgroundColor: "#e8f4fd",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    marginBottom: "15px",
+                    borderLeft: "4px solid var(--primary-color)",
                   }}
                 >
-                  Selecciona un curso arriba para ver sus archivos.
-                </p>
-              ) : (
-                <ExcelViewer
-                  files={files}
-                  onSelect={setSelectedFile}
-                  onDelete={handleDeleteFile}
-                  onDownload={handleDownload}
-                  rol={usuario?.rol}
-                  esPersonal={tabActiva === "personales"}
-                />
+                  <p style={{ margin: 0, fontSize: "0.95rem", color: "#0056b3" }}>
+                    {" "}
+                    {["Docente", "Administrador"].includes(usuario?.rol)
+                      ? "Estás gestionando el material del curso:"
+                      : "Viendo material de estudio del curso:"}{" "}
+                    <strong>
+                      {misCursos.find((c) => String(c.id) === String(cursoSeleccionado))?.nombre || cursoSeleccionado}
+                    </strong>
+                  </p>
+                </div>
               )}
+
+              {/* Subida de archivos: Oculta para estudiantes en la pestaña de cursos */}
+              {!(tabActiva === "cursos" && usuario?.rol === "Estudiante") && (
+                <div
+                  id="tour-subida"
+                  style={{
+                    marginBottom: "20px",
+                    paddingBottom: "20px",
+                    borderBottom: "1px solid var(--border-color)",
+                  }}
+                >
+                  <h3 style={{ margin: "0 0 10px 0", fontSize: "1.1rem" }}>
+                    {tabActiva === "cursos"
+                      ? "Subir Material al Curso"
+                      : "Subir Archivo Personal"}
+                  </h3>
+                  <ExcelUploader onUpload={handleUploadFile} />
+                </div>
+              )}
+
+              <h3 style={{ margin: "0 0 15px 0", fontSize: "1.1rem" }}>
+                {tabActiva === "cursos" ? "Material Compartido" : "Mis Archivos"}
+              </h3>
+
+              <div id="tour-visor">
+                {/* Si es curso y no ha seleccionado uno, no mostramos la lista */}
+                {tabActiva === "cursos" && !cursoSeleccionado ? (
+                  <p
+                    style={{
+                      color: "var(--text-muted)",
+                      fontStyle: "italic",
+                      textAlign: "center",
+                    }}
+                  >
+                    Selecciona un curso arriba para ver sus archivos.
+                  </p>
+                ) : (
+                  <ExcelViewer
+                    files={files}
+                    onSelect={setSelectedFile}
+                    onDelete={handleDeleteFile}
+                    onDownload={handleDownload}
+                    rol={usuario?.rol}
+                    esPersonal={tabActiva === "personales"}
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
         {/* ========================================================= */}
         {/* COLUMNA DERECHA: Vista Previa                            */}
@@ -530,7 +540,7 @@ export default function Archivos({ usuario }) {
             </div>
           ) : (
 
-        
+
             <div
               style={{
                 display: "flex",

@@ -24,6 +24,11 @@ export default function Historial() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [registroAEliminar, setRegistroAEliminar] = useState(null);
 
+  // --- ESTADOS PARA BÚSQUEDA Y PAGINACIÓN ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // 10 registros por página
+
   const iniciarTour = () => {
     const tourSteps = [
       {
@@ -111,7 +116,7 @@ export default function Historial() {
   const cargarHistorial = async () => {
     if (!usuario) return;
     try {
-      // Retraso artificial de 2 segundos para ver el Skeleton (¡Bórralo luego!)
+      // Retraso artificial de 1 segundo para ver el Skeleton (¡Bórralo luego si deseas!)
       await new Promise(resolve => setTimeout(resolve, 1000));
       const data = await api.obtenerHistorial(usuario.nombre);
       setRegistros(data.historial || []);
@@ -152,10 +157,84 @@ export default function Historial() {
     }
   };
 
+  // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
+  const filteredRegistros = registros.filter((reg) => {
+    const term = searchTerm.toLowerCase();
+    const matchCalculo = reg.calculo?.toLowerCase().includes(term);
+    const matchArchivo = reg.archivo_origen?.toLowerCase().includes(term);
+    const matchFecha = reg.fecha?.toLowerCase().includes(term);
+    return matchCalculo || matchArchivo || matchFecha;
+  });
+
+  const totalPages = Math.ceil(filteredRegistros.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentRegistros = filteredRegistros.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Volver a la primera página al buscar
+  };
+
+  // Evitar quedarse en una página vacía si se elimina el último elemento de la misma
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [filteredRegistros.length, currentPage, totalPages]);
+
+  // Componente de Paginación
+  const ControlesPaginacion = () => {
+    if (totalPages <= 1) return null;
+    return (
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px" }}>
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === 1 ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === 1 ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === 1 ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.85rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Anterior
+        </button>
+
+        <span style={{ fontSize: "0.85rem", color: "var(--text-muted, #6b7280)", fontWeight: "bold" }}>
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "6px",
+            border: "1px solid var(--border-color, #d1d5db)",
+            background: currentPage === totalPages ? "var(--bg-input, #f3f4f6)" : "transparent",
+            color: currentPage === totalPages ? "#9ca3af" : "var(--text-main, #333)",
+            cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+            fontWeight: "bold",
+            fontSize: "0.85rem",
+            transition: "all 0.2s"
+          }}
+        >
+          Siguiente
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+
       {/* Marca de agua de fondo */}
-      <div 
+      <div
         style={{
           position: "fixed",
           top: "50%",
@@ -172,6 +251,18 @@ export default function Historial() {
           pointerEvents: "none"
         }}
       />
+      <button
+        onClick={iniciarTour}
+        className="guia-rapida-flotante"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <span className="guia-rapida-flotante-texto">Guía Rápida</span>
+      </button>
+
 
       {cargando ? (
         <div className="historial-container">
@@ -185,7 +276,7 @@ export default function Historial() {
               </tr>
             </thead>
             <tbody>
-              {[1, 2, 3, 4].map(i => (
+              {[1, 2, 3, 4, 5].map(i => (
                 <tr key={i} className="historial-fila" style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <td className="historial-celda">
                     <div className="fecha-col">
@@ -215,91 +306,109 @@ export default function Historial() {
           <p>No tienes cálculos guardados todavía.</p>
         </div>
       ) : (
-        <div className="historial-container" id="tour-historial-tabla">
-          <table className="historial-tabla">
-            <thead>
-              <tr>
-                <th>Fecha / Hora</th>
-                <th>Tipo de Cálculo</th>
-                <th>Archivo Fuente</th>
-                <th style={{ textAlign: "center" }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {registros.map((reg) => (
-                <tr key={reg.id} className="historial-fila">
-                  <td className="historial-celda" data-label="Fecha / Hora">
-                    <div className="fecha-col">
-                      <strong>{reg.fecha}</strong>
-                      <small className="text-muted">{reg.hora}</small>
-                    </div>
-                  </td>
-                  <td className="historial-celda" data-label="Tipo de Cálculo">
-                    <span className="tipo-calculo tour-tipo-calculo">
-                      {reg.calculo.replace(/_/g, " ").toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="historial-celda" data-label="Archivo Fuente">
-                    <span className="archivo-origen tour-archivo-origen">{reg.archivo_origen}</span>
-                  </td>
+        <>
+          {/* BUSCADOR */}
+          <div style={{ marginBottom: "20px" }}>
+            <input
+              type="text"
+              placeholder="Buscar por operación, archivo o fecha..."
+              value={searchTerm}
+              onChange={handleSearch}
+              style={{ width: "100%", padding: "10px 15px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)", color: "var(--text-main)", outline: "none", fontSize: "0.95rem" }}
+            />
+          </div>
 
-                  <td className="historial-celda" data-label="Acciones">
-                    <div className="acciones-container" style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-                      <button
-                        className="btn-reabrir tour-btn-reabrir"
-                        onClick={() => {
-                          // 1. Buscamos los datos donde sea que estén guardados (versión nueva o vieja)
-                          const datosBrutos =
-                            reg.snapshot || reg.resultados_json;
+          {/* TABLA Y PAGINACIÓN */}
+          {filteredRegistros.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+              No se encontraron registros que coincidan con "{searchTerm}".
+            </div>
+          ) : (
+            <div className="historial-container" id="tour-historial-tabla">
+              <table className="historial-tabla">
+                <thead>
+                  <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Tipo de Cálculo</th>
+                    <th>Archivo Fuente</th>
+                    <th style={{ textAlign: "center" }}>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentRegistros.map((reg) => (
+                    <tr key={reg.id} className="historial-fila">
+                      <td className="historial-celda" data-label="Fecha / Hora">
+                        <div className="fecha-col">
+                          <strong>{reg.fecha}</strong>
+                          <small className="text-muted">{reg.hora}</small>
+                        </div>
+                      </td>
+                      <td className="historial-celda" data-label="Tipo de Cálculo">
+                        <span className="tipo-calculo tour-tipo-calculo">
+                          {reg.calculo.replace(/_/g, " ").toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="historial-celda" data-label="Archivo Fuente">
+                        <span className="archivo-origen tour-archivo-origen">{reg.archivo_origen}</span>
+                      </td>
 
-                          // 2. Nos aseguramos de que sea un objeto real y no un string
-                          const snapshotListo =
-                            typeof datosBrutos === "string"
-                              ? JSON.parse(datosBrutos)
-                              : datosBrutos;
+                      <td className="historial-celda" data-label="Acciones">
+                        <div className="acciones-container" style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                          <button
+                            className="btn-reabrir tour-btn-reabrir"
+                            onClick={() => {
+                              // 1. Buscamos los datos donde sea que estén guardados
+                              const datosBrutos = reg.snapshot || reg.resultados_json;
+                              // 2. Nos aseguramos de que sea un objeto real
+                              const snapshotListo = typeof datosBrutos === "string" ? JSON.parse(datosBrutos) : datosBrutos;
+                              // 3. Enviamos a la calculadora
+                              navigate("/calculadora", {
+                                state: {
+                                  archivoReabrir: reg.archivo_origen,
+                                  calculoReabrir: reg.calculo,
+                                  snapshot: snapshotListo,
+                                },
+                              });
+                            }}
+                            title="Cargar este cálculo"
+                          >
+                            Reabrir
+                          </button>
 
-                          // 3. Ahora sí enviamos la variable correcta "snapshotListo"
-                          navigate("/calculadora", {
-                            state: {
-                              archivoReabrir: reg.archivo_origen,
-                              calculoReabrir: reg.calculo,
-                              snapshot: snapshotListo,
-                            },
-                          });
-                        }}
-                        title="Cargar este cálculo"
-                      >
-                        Reabrir
-                      </button>
-
-                      <button
-                        className="btn-eliminar tour-btn-eliminar"
-                        onClick={() => solicitarEliminacion(reg.id)}
-                        title="Eliminar registro"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                          <button
+                            className="btn-eliminar tour-btn-eliminar"
+                            onClick={() => solicitarEliminacion(reg.id)}
+                            title="Eliminar registro"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div>
+            {/* Controles de paginación */}
+            <ControlesPaginacion />
+          </div>
+        </>
       )}
 
       {/* MODAL DE CONFIRMACIÓN */}
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={cancelarEliminacion} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={cancelarEliminacion}
         title="Confirmar eliminación"
       >
         <p style={{ color: 'var(--text-main)', fontSize: '1rem', marginBottom: '20px' }}>
           ¿Estás seguro de que deseas eliminar este cálculo de tu historial? Esta acción no se puede deshacer.
         </p>
-        
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          <button 
+          <button
             onClick={cancelarEliminacion}
             style={{
               padding: '8px 16px',
@@ -316,8 +425,8 @@ export default function Historial() {
           >
             Cancelar
           </button>
-          
-          <button 
+
+          <button
             onClick={confirmarEliminacion}
             style={{
               padding: '8px 16px',

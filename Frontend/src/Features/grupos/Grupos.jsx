@@ -100,7 +100,7 @@ export default function Grupos() {
         element: '.tour-curso-subir',
         popover: {
           title: 'Cargar Material Excel',
-          description: esEstudiante 
+          description: esEstudiante
             ? 'Accede al gestor de archivos para descargar o visualizar los libros de trabajo compartidos por tu profesor.'
             : 'Accede al gestor de archivos para subir bases de datos de Excel que tus estudiantes usarán en sus análisis.',
           side: "bottom",
@@ -147,7 +147,7 @@ export default function Grupos() {
   // Estados vacíos (se llenarán desde la Base de Datos)
   const [misCursos, setMisCursos] = useState([]);
   const [cursosInscritos, setCursosInscritos] = useState([]);
-  
+
   const [codigoBusqueda, setCodigoBusqueda] = useState("");
   const [mostrarModal, setMostrarModal] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -218,12 +218,12 @@ export default function Grupos() {
     console.log("BASE_URL:", BASE_URL);
     console.log("Usuario:", usuario);
     console.log("Correo:", correoUsuario);
-    
+
     // Verificar conexión al servidor
     const verificarConexion = async () => {
       try {
         console.log("Verificando conexión a:", `${BASE_URL}/health`);
-        const res = await fetch(`${BASE_URL}/health`, { 
+        const res = await fetch(`${BASE_URL}/health`, {
           method: "GET",
           headers: { "Accept": "application/json" }
         });
@@ -234,7 +234,7 @@ export default function Grupos() {
         alerta.error("Servidor no disponible", `No se puede conectar a ${BASE_URL}. Verifica que el servidor esté corriendo.`);
       }
     };
-    
+
     cargarCursos();
     verificarConexion();
   }, [usuario]);
@@ -276,15 +276,15 @@ export default function Grupos() {
       const res = await fetch(`${BASE_URL}/crear_clase`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          nombre: nuevoNombre, 
+        body: JSON.stringify({
+          nombre: nuevoNombre,
           docente_email: correoUsuario,
           fecha_limite_matriculacion: fechaLimiteMatriculacion || null
-        }) 
+        })
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok) {
         alerta.success("Curso creado", `El código para tus alumnos es: ${data.codigo_acceso}`);
         setNuevoNombre("");
@@ -388,32 +388,32 @@ export default function Grupos() {
 
     try {
       console.log("Iniciando fetch...");
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
-      
+
       const res = await fetch(urlCompleta, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify({ 
-          codigo_acceso: codigoLimpiado, 
-          estudiante_email: correoUsuario 
+        body: JSON.stringify({
+          codigo_acceso: codigoLimpiado,
+          estudiante_email: correoUsuario
         }),
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
       console.log("✓ Respuesta recibida:", res.status, res.statusText);
-      
+
       let data = {};
       let responseText = "";
       try {
         responseText = await res.text();
         console.log("Texto de respuesta:", responseText.substring(0, 200));
-        
+
         if (responseText.trim()) {
           data = JSON.parse(responseText);
           console.log("✓ JSON parseado correctamente");
@@ -423,7 +423,7 @@ export default function Grupos() {
         console.error("Respuesta recibida:", responseText);
         data = {};
       }
-      
+
       const errorMsg = data.error || data.detail || "";
 
       if (res.ok) {
@@ -460,7 +460,7 @@ export default function Grupos() {
       console.error("Tipo de error:", error.name);
       console.error("Mensaje:", error.message);
       console.error("Stack:", error.stack);
-      
+
       if (error.name === "AbortError") {
         alerta.error("Timeout", "El servidor tardó demasiado en responder. Intenta nuevamente.");
       } else {
@@ -540,11 +540,11 @@ export default function Grupos() {
       </div>
     );
   };
-  
+
   return (
     <div className="page-container" style={{ position: "relative" }}>
       {/* Marca de agua de fondo */}
-      <div 
+      <div
         style={{
           position: "fixed",
           top: "50%",
@@ -561,6 +561,20 @@ export default function Grupos() {
           pointerEvents: "none"
         }}
       />
+
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <button
+          onClick={iniciarTour}
+          className="guia-rapida-flotante"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span className="guia-rapida-flotante-texto">Guía Rápida</span>
+        </button>
+      </div>
 
       {/* ========================================= */}
       {/* VISTA DEL DOCENTE / ADMINISTRADOR         */}
