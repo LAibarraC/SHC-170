@@ -18,18 +18,9 @@ export default function Grupos() {
         element: '#tour-matriculacion-seccion',
         popover: {
           title: 'Matricularse a un Curso',
-          description: 'Introduce el código único de matriculación (proporcionado por tu docente) para registrarte en tu clase.',
+          description: 'Haz clic en este botón para abrir la ventana y registrarte en tu clase usando el código de tu docente.',
           side: "bottom",
           align: 'start'
-        }
-      },
-      {
-        element: '#tour-btn-unirse',
-        popover: {
-          title: 'Confirmar Inscripción',
-          description: 'Haz clic aquí para validar tu código y agregarte a la asignatura/materia correspondiente de forma inmediata.',
-          side: "left",
-          align: 'center'
         }
       },
       {
@@ -167,6 +158,7 @@ export default function Grupos() {
   const [palabraConfirmar, setPalabraConfirmar] = useState("");
 
   // NUEVOS ESTADOS PARA ESTUDIANTE
+  const [mostrarModalMatricular, setMostrarModalMatricular] = useState(false); // <-- Nuevo estado para el modal de estudiante
   const [mostrarModalDesmatricular, setMostrarModalDesmatricular] = useState(false);
   const [cursoADesmatricular, setCursoADesmatricular] = useState(null);
   const [procesandoUnion, setProcesandoUnion] = useState(false);
@@ -430,6 +422,7 @@ export default function Grupos() {
         console.log("✓ Matriculación exitosa (200), recargando cursos...");
         alerta.success("¡Inscripción Exitosa!", data.message || "Te has matriculado correctamente.");
         setCodigoBusqueda("");
+        setMostrarModalMatricular(false); // Cierra el modal al tener éxito
         try {
           await cargarCursos();
           console.log("✓ Cursos recargados");
@@ -439,6 +432,7 @@ export default function Grupos() {
       } else if (res.status === 409) {
         console.log("⚠ Ya inscrito (409), recargando cursos...");
         setCodigoBusqueda("");
+        setMostrarModalMatricular(false); // Cierra el modal también aquí
         try {
           await cargarCursos();
         } catch (cargaError) {
@@ -562,7 +556,7 @@ export default function Grupos() {
         }}
       />
 
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "15px" }}>
         <button
           onClick={iniciarTour}
           className="guia-rapida-flotante"
@@ -682,20 +676,154 @@ export default function Grupos() {
       {/* ========================================= */}
       {esEstudiante && (
         <div>
-          <div id="tour-matriculacion-seccion" style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", marginBottom: "30px" }}>
-            <h3 style={{ margin: "0 0 15px 0", color: "var(--text-main, #333)" }}>Matricularse a un Curso</h3>
-            <div style={{ display: "flex", gap: "10px" }}>
+          <div id="tour-clases-activas" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "15px" }}>
+            <h2 style={{ color: "#27ae60", margin: 0, fontSize: "clamp(1.1rem, 3vw, 1.5rem)" }}>Mis Clases Activas</h2>
+            <button
+              id="tour-matriculacion-seccion"
+              onClick={() => setMostrarModalMatricular(true)}
+              style={{ background: "#27ae60", color: "white", padding: "10px 20px", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold", transition: "background 0.3s", textAlign: "center" }}
+            >
+              + Matricularse
+            </button>
+          </div>
+
+          {/* BUSCADOR ESTUDIANTE */}
+          {(listaBase.length > 0 || searchTerm !== "") && (
+            <div style={{ marginBottom: "20px" }}>
+              <input
+                type="text"
+                placeholder="Buscar materia por nombre..."
+                value={searchTerm}
+                onChange={handleSearch}
+                style={{ width: "100%", padding: "10px 15px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)", color: "var(--text-main)", outline: "none", fontSize: "0.95rem" }}
+              />
+            </div>
+          )}
+
+          {listaBase.length === 0 ? (
+            <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
+              Aún no estás inscrito en ninguna materia. ¡Haz clic en "+ Matricularse" para empezar!
+            </div>
+          ) : filteredCursos.length === 0 ? (
+            <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
+              No se encontraron materias que coincidan con "{searchTerm}".
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
+                {currentCursos.map((curso) => (
+                  <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", borderTop: "4px solid #27ae60" }}>
+                    <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
+
+                    {/* INFORMACIÓN ADICIONAL DEL CURSO */}
+                    <div style={{ marginBottom: "10px", fontSize: "0.9rem", color: "var(--text-muted, #666)" }}>
+                      {curso.codigo && (
+                        <p style={{ margin: "4px 0" }}>
+                          <strong>Código:</strong> {curso.codigo}
+                        </p>
+                      )}
+                      {curso.docente_nombre && (
+                        <p style={{ margin: "4px 0" }}>
+                          <strong>Docente:</strong> {curso.docente_nombre}
+                        </p>
+                      )}
+                      {curso.fecha_limite_matriculacion && (
+                        <p style={{ margin: "4px 0" }}>
+                          <strong>Límite de matrícula:</strong> {curso.fecha_limite_matriculacion}
+                        </p>
+                      )}
+                      {curso.fecha_inscripcion && (
+                        <p style={{ margin: "4px 0" }}>
+                          <strong>Inscrito el:</strong> {curso.fecha_inscripcion}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* BOTONES LADO A LADO */}
+                    <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+                      <button
+                        onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
+                        className="tour-ir-material"
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          background: "transparent",
+                          border: "1px solid #27ae60",
+                          color: "#27ae60",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          transition: "all 0.3s"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#27ae60"; e.currentTarget.style.color = "white"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#27ae60"; }}
+                      >
+                        Ir a Material
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenDesmatricular(curso)}
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          background: "rgba(220, 38, 38, 0.1)",
+                          border: "1px solid #dc2626",
+                          color: "#dc2626",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          fontWeight: "bold",
+                          transition: "all 0.3s"
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#dc2626"; e.currentTarget.style.color = "#ffffff"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220, 38, 38, 0.1)"; e.currentTarget.style.color = "#dc2626"; }}
+                      >
+                        Desmatricular
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <ControlesPaginacion />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ========================================= */}
+      {/* NUEVO MODAL: MATRICULARSE (ESTUDIANTE)    */}
+      {/* ========================================= */}
+      {mostrarModalMatricular && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
+          <div style={{ background: "var(--bg-card)", padding: "30px", borderRadius: "10px", width: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)", border: "1px solid var(--border-color)" }}>
+            <h2 style={{ marginTop: 0, color: "#27ae60" }}>Matricularse a un Curso</h2>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "20px" }}>
+              Introduce el código único de matriculación proporcionado por tu docente.
+            </p>
+
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>Código de Matriculación:</label>
               <input
                 type="text"
                 value={codigoBusqueda}
                 onChange={(e) => setCodigoBusqueda(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleUnirseCurso()}
-                placeholder="Ingresa el código proporcionado por tu docente (Ej: MAT-205)..."
-                style={{ padding: "10px", flex: 1, borderRadius: "5px", border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-main)", textTransform: "uppercase" }}
+                placeholder="Ej. MAT-205..."
+                style={{ width: "100%", padding: "10px", borderRadius: "5px", border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-main)", textTransform: "uppercase", boxSizing: "border-box" }}
                 disabled={procesandoUnion}
+                autoFocus
               />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
               <button
-                id="tour-btn-unirse"
+                onClick={() => setMostrarModalMatricular(false)}
+                style={{ padding: "10px 15px", background: "var(--bg-main)", color: "var(--text-main)", border: "1px solid var(--border-color)", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+                disabled={procesandoUnion}
+              >
+                Cancelar
+              </button>
+              <button
                 onClick={handleUnirseCurso}
                 disabled={procesandoUnion}
                 style={{
@@ -711,111 +839,6 @@ export default function Grupos() {
                 {procesandoUnion ? "Procesando..." : "Unirse al Curso"}
               </button>
             </div>
-          </div>
-
-          <div id="tour-clases-activas">
-            <h2 style={{ color: "#27ae60", marginBottom: "20px" }}>Mis Clases Activas</h2>
-
-            {/* BUSCADOR ESTUDIANTE */}
-            {(listaBase.length > 0 || searchTerm !== "") && (
-              <div style={{ marginBottom: "20px" }}>
-                <input
-                  type="text"
-                  placeholder="Buscar materia por nombre..."
-                  value={searchTerm}
-                  onChange={handleSearch}
-                  style={{ width: "100%", padding: "10px 15px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-input)", color: "var(--text-main)", outline: "none", fontSize: "0.95rem" }}
-                />
-              </div>
-            )}
-
-            {listaBase.length === 0 ? (
-              <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
-                Aún no estás inscrito en ninguna materia. Ingresa un código arriba.
-              </div>
-            ) : filteredCursos.length === 0 ? (
-              <div style={{ padding: "30px", textAlign: "center", background: "var(--bg-main)", borderRadius: "8px", color: "var(--text-muted)" }}>
-                No se encontraron materias que coincidan con "{searchTerm}".
-              </div>
-            ) : (
-              <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-                  {currentCursos.map((curso) => (
-                    <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", borderTop: "4px solid #27ae60" }}>
-                      <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
-
-                      {/* INFORMACIÓN ADICIONAL DEL CURSO */}
-                      <div style={{ marginBottom: "10px", fontSize: "0.9rem", color: "var(--text-muted, #666)" }}>
-                        {curso.codigo && (
-                          <p style={{ margin: "4px 0" }}>
-                            <strong>Código:</strong> {curso.codigo}
-                          </p>
-                        )}
-                        {curso.docente_nombre && (
-                          <p style={{ margin: "4px 0" }}>
-                            <strong>Docente:</strong> {curso.docente_nombre}
-                          </p>
-                        )}
-                        {curso.fecha_limite_matriculacion && (
-                          <p style={{ margin: "4px 0" }}>
-                            <strong>Límite de matrícula:</strong> {curso.fecha_limite_matriculacion}
-                          </p>
-                        )}
-                        {curso.fecha_inscripcion && (
-                          <p style={{ margin: "4px 0" }}>
-                            <strong>Inscrito el:</strong> {curso.fecha_inscripcion}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* BOTONES LADO A LADO */}
-                      <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
-                        <button
-                          onClick={() => navigate("/archivos", { state: { cursoIdSeleccionado: curso.id } })}
-                          className="tour-ir-material"
-                          style={{
-                            flex: 1,
-                            padding: "10px",
-                            background: "transparent",
-                            border: "1px solid #27ae60",
-                            color: "#27ae60",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            fontWeight: "bold",
-                            transition: "all 0.3s"
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#27ae60"; e.currentTarget.style.color = "white"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#27ae60"; }}
-                        >
-                          Ir a Material
-                        </button>
-
-                        <button
-                          onClick={() => handleOpenDesmatricular(curso)}
-                          style={{
-                            flex: 1,
-                            padding: "10px",
-                            background: "rgba(220, 38, 38, 0.1)",
-                            border: "1px solid #dc2626",
-                            color: "#dc2626",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            fontWeight: "bold",
-                            transition: "all 0.3s"
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#dc2626"; e.currentTarget.style.color = "#ffffff"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(220, 38, 38, 0.1)"; e.currentTarget.style.color = "#dc2626"; }}
-                        >
-                          Desmatricular
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <ControlesPaginacion />
-              </>
-            )}
           </div>
         </div>
       )}
