@@ -7,10 +7,11 @@ import Skeleton from '../../ui/Skeleton';
 
 export default function Perfil({ usuario, setUsuario }) {
   const navigate = useNavigate();
-  
+
   // --- ESTADOS PARA DATOS REALES ---
   const [historial, setHistorial] = useState([]);
   const [archivosCount, setArchivosCount] = useState(0);
+  const [espacio, setEspacio] = useState({ usado: 0, limite: 10 * 1024 * 1024 });
   const [cargandoDatos, setCargandoDatos] = useState(true);
 
   // --- ESTADOS PARA CAMBIAR CONTRASEÑA ---
@@ -45,6 +46,11 @@ export default function Perfil({ usuario, setUsuario }) {
       const filesData = await api.obtenerArchivos(usuario.nombre, "personal");
       const filesList = filesData.files || filesData || [];
       setArchivosCount(filesList.length);
+
+      const espacioData = await api.obtenerEspacioUsado();
+      if (espacioData) {
+        setEspacio({ usado: espacioData.usado_bytes, limite: espacioData.limite_bytes });
+      }
     } catch (error) {
       console.error("Error al cargar datos del perfil:", error);
     } finally {
@@ -64,8 +70,8 @@ export default function Perfil({ usuario, setUsuario }) {
 
   const handleCerrarSesion = () => {
     localStorage.removeItem("token");
-    setUsuario(null); 
-    navigate('/login'); 
+    setUsuario(null);
+    navigate('/login');
   };
 
   const handleCambiarPassword = async (e) => {
@@ -114,85 +120,128 @@ export default function Perfil({ usuario, setUsuario }) {
     }
   };
 
-  if (!usuario) return null; 
+  if (!usuario) return null;
 
   const getIniciales = (nombre) => {
-    if (!nombre) return 'U'; 
+    if (!nombre) return 'U';
     const nombreLimpio = nombre.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
     const partes = nombreLimpio.split(/\s+/).filter(Boolean);
-    
+
     if (partes.length > 1) {
       return (partes[0][0] + partes[1][0]).toUpperCase();
     }
     if (partes.length === 1) {
       return partes[0][0].toUpperCase();
     }
-    return 'U'; 
+    return 'U';
   };
+
+  const usadoMB = (espacio.usado / 1048576).toFixed(2);
+  const limiteMB = (espacio.limite / 1048576).toFixed(2);
+  const porcentajeUso = Math.min((espacio.usado / espacio.limite) * 100, 100).toFixed(1);
 
   return (
     <div className="perfil-container">
-      
+
       {/* TARJETA DE PERFIL */}
       <div className="perfil-card">
         <div className="perfil-banner"></div>
 
         <div className="perfil-card-body">
-            
-            <div className="perfil-avatar">
-              {getIniciales(usuario.nombre)}
-            </div>
-            
-            <h2 className="perfil-name">
-              {usuario.nombre}
-            </h2>
-            <p className="perfil-email">
-              {usuario.email || "usuario@correo.com"}
-            </p>
-            
-            <div className="perfil-badges">
-              <span className="perfil-badge-rol">
-                 {usuario.perfil || usuario.rol || 'Estudiante Externo'}
+
+          <div className="perfil-avatar">
+            {getIniciales(usuario.nombre)}
+          </div>
+
+          <h2 className="perfil-name">
+            {usuario.nombre}
+          </h2>
+          <p className="perfil-email">
+            {usuario.email || "usuario@correo.com"}
+          </p>
+
+          <div className="perfil-badges">
+            <span className="perfil-badge-rol">
+              {usuario.perfil || usuario.rol || 'Estudiante Externo'}
+            </span>
+
+            {usuario.institucion && (
+              <span className="perfil-badge-inst">
+                {usuario.institucion}
               </span>
-              
-              {usuario.institucion && (
-                <span className="perfil-badge-inst">
-                   {usuario.institucion}
-                 </span>
-              )}
+            )}
+          </div>
+
+          <div className="perfil-stats">
+            <div className="perfil-stat-box">
+              <h4 className="perfil-stat-value">
+                {cargandoDatos ? <Skeleton height="28px" width="40px" style={{ margin: '0 auto' }} /> : historial.length}
+              </h4>
+              <p className="perfil-stat-label">Cálculos Guardados</p>
+            </div>
+            <div className="perfil-stat-box">
+              <h4 className="perfil-stat-value">
+                {cargandoDatos ? <Skeleton height="28px" width="40px" style={{ margin: '0 auto' }} /> : archivosCount}
+              </h4>
+              <p className="perfil-stat-label">Archivos Excel</p>
+            </div>
+          </div>
+
+          {/* --- BARRA DE ALMACENAMIENTO MEJORADA --- */}
+          <div id="tour-cuota" className="cuota-container">
+            <div className="cuota-header">
+              <div className="cuota-titulo">
+                <span className="cuota-icono">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 7H4C2.9 7 2 7.9 2 9V17C2 18.1 2.9 19 4 19H20C21.1 19 22 18.1 22 17V9C22 7.9 21.1 7 20 7Z" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M2 11H22" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M6 15H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span>Almacenamiento</span>
+              </div>
+              <span className={`cuota-porcentaje ${porcentajeUso > 90 ? 'cuota-critico' : porcentajeUso > 60 ? 'cuota-alerta' : ''}`}>
+                {porcentajeUso}%
+              </span>
             </div>
 
-            <div className="perfil-stats">
-                <div className="perfil-stat-box">
-                    <h4 className="perfil-stat-value">
-                      {cargandoDatos ? <Skeleton height="28px" width="40px" style={{ margin: '0 auto' }} /> : historial.length}
-                    </h4>
-                    <p className="perfil-stat-label">Cálculos Guardados</p>
-                </div>
-                <div className="perfil-stat-box">
-                    <h4 className="perfil-stat-value">
-                      {cargandoDatos ? <Skeleton height="28px" width="40px" style={{ margin: '0 auto' }} /> : archivosCount}
-                    </h4>
-                    <p className="perfil-stat-label">Archivos Excel</p>
-                </div>
-            </div>
-
-            <hr className="perfil-divider" />
-
-            <div className="perfil-actions">
-              <button 
-                onClick={() => navigate('/calculadora')}
-                className="btn-perfil btn-perfil-back"
+            <div className="cuota-barra-track">
+              <div
+                className={`cuota-barra-fill ${porcentajeUso > 90 ? 'fill-critico' : porcentajeUso > 60 ? 'fill-alerta' : 'fill-normal'}`}
+                style={{ width: `${porcentajeUso}%` }}
               >
-                Volver a la Calculadora
-              </button>
-              <button 
-                onClick={handleCerrarSesion}
-                className="btn-perfil btn-perfil-logout"
-              >
-                Cerrar Sesión
-              </button>
+                <div className="cuota-barra-shine"></div>
+              </div>
             </div>
+
+            <div className="cuota-footer">
+              <span className="cuota-usado">{usadoMB} MB usados</span>
+              <span className="cuota-limite">de {limiteMB} MB</span>
+            </div>
+
+            {porcentajeUso > 90 && (
+              <p className="cuota-warning-text">
+                Estás por alcanzar tu límite de almacenamiento
+              </p>
+            )}
+          </div>
+
+          <hr className="perfil-divider" />
+
+          <div className="perfil-actions">
+            <button
+              onClick={() => navigate('/calculadora')}
+              className="btn-perfil btn-perfil-back"
+            >
+              Volver a la Calculadora
+            </button>
+            <button
+              onClick={handleCerrarSesion}
+              className="btn-perfil btn-perfil-logout"
+            >
+              Cerrar Sesión
+            </button>
+          </div>
 
         </div>
       </div>
@@ -201,7 +250,7 @@ export default function Perfil({ usuario, setUsuario }) {
       <div className="perfil-card-secondary">
         <h3 className="perfil-section-title">
           <span>Mi Historial de Cálculos Recientes</span>
-          <button 
+          <button
             onClick={() => navigate('/historial')}
             className="btn-perfil-link"
           >
@@ -306,7 +355,7 @@ export default function Perfil({ usuario, setUsuario }) {
             </table>
             {historial.length > 5 && (
               <p className="perfil-footer-notice">
-                Mostrando los 5 cálculos más recientes. Para ver la lista completa haz clic en 
+                Mostrando los 5 cálculos más recientes. Para ver la lista completa haz clic en
                 <span onClick={() => navigate('/historial')} className="perfil-notice-link">Ver Historial Completo</span>.
               </p>
             )}
@@ -319,29 +368,29 @@ export default function Perfil({ usuario, setUsuario }) {
         <h3 className="perfil-section-title">
           Seguridad y Contraseña
         </h3>
-        
+
         <form onSubmit={handleCambiarPassword} className="perfil-form">
           <div className="perfil-form-group">
             <label className="etiqueta">Contraseña Actual</label>
-            <input 
-              type="password" 
-              value={passActual} 
-              onChange={(e) => setPassActual(e.target.value)} 
-              placeholder="Contraseña actual" 
-              className="perfil-input" 
+            <input
+              type="password"
+              value={passActual}
+              onChange={(e) => setPassActual(e.target.value)}
+              placeholder="Contraseña actual"
+              className="perfil-input"
               required
             />
           </div>
-          
+
           <div className="perfil-form-row">
             <div className="perfil-form-col">
               <label className="etiqueta">Nueva Contraseña (mínimo 6 caracteres)</label>
-              <input 
-                type="password" 
-                value={passNueva} 
-                onChange={(e) => setPassNueva(e.target.value)} 
-                placeholder="Mínimo 6 caracteres" 
-                className={`perfil-input ${isNuevaPasswordTooShort ? 'input-error' : ''}`} 
+              <input
+                type="password"
+                value={passNueva}
+                onChange={(e) => setPassNueva(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className={`perfil-input ${isNuevaPasswordTooShort ? 'input-error' : ''}`}
                 required
               />
               {isNuevaPasswordTooShort && (
@@ -352,12 +401,12 @@ export default function Perfil({ usuario, setUsuario }) {
             </div>
             <div className="perfil-form-col">
               <label className="etiqueta">Confirmar Nueva Contraseña</label>
-              <input 
-                type="password" 
-                value={passNuevaConf} 
-                onChange={(e) => setPassNuevaConf(e.target.value)} 
-                placeholder="Repite nueva contraseña" 
-                className={`perfil-input ${!isNuevaPasswordMatch && passNuevaConf !== "" ? 'input-error' : ''}`} 
+              <input
+                type="password"
+                value={passNuevaConf}
+                onChange={(e) => setPassNuevaConf(e.target.value)}
+                placeholder="Repite nueva contraseña"
+                className={`perfil-input ${!isNuevaPasswordMatch && passNuevaConf !== "" ? 'input-error' : ''}`}
                 required
               />
               {!isNuevaPasswordMatch && passNuevaConf !== "" && (
@@ -367,9 +416,9 @@ export default function Perfil({ usuario, setUsuario }) {
               )}
             </div>
           </div>
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             className="btn-submit-perfil"
           >
             Actualizar Contraseña
@@ -387,7 +436,7 @@ export default function Perfil({ usuario, setUsuario }) {
         </p>
 
         {!mostrarConfirmarEliminar ? (
-          <button 
+          <button
             onClick={() => setMostrarConfirmarEliminar(true)}
             className="btn-danger-perfil"
           >
@@ -398,17 +447,17 @@ export default function Perfil({ usuario, setUsuario }) {
             <p className="perfil-danger-warning-title">
               Confirmación de Seguridad requerida:
             </p>
-            
+
             <div className="perfil-form-group">
               <label className="etiqueta">
                 Escribe la palabra <strong>ELIMINAR</strong> en mayúsculas:
               </label>
-              <input 
-                type="text" 
-                value={palabraConfirmacion} 
-                onChange={(e) => setPalabraConfirmacion(e.target.value)} 
-                placeholder="Escribe ELIMINAR" 
-                className="perfil-input input-error" 
+              <input
+                type="text"
+                value={palabraConfirmacion}
+                onChange={(e) => setPalabraConfirmacion(e.target.value)}
+                placeholder="Escribe ELIMINAR"
+                className="perfil-input input-error"
                 required
               />
             </div>
@@ -417,25 +466,25 @@ export default function Perfil({ usuario, setUsuario }) {
               <label className="etiqueta">
                 Confirma ingresando tu contraseña actual:
               </label>
-              <input 
-                type="password" 
-                value={passEliminar} 
-                onChange={(e) => setPassEliminar(e.target.value)} 
-                placeholder="Tu contraseña" 
-                className="perfil-input" 
+              <input
+                type="password"
+                value={passEliminar}
+                onChange={(e) => setPassEliminar(e.target.value)}
+                placeholder="Tu contraseña"
+                className="perfil-input"
                 required
               />
             </div>
 
             <div className="perfil-btn-group">
-              <button 
+              <button
                 type="submit"
                 className="btn-danger-confirm"
               >
                 Confirmar Borrado de Cuenta
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => {
                   setMostrarConfirmarEliminar(false);
                   setPalabraConfirmacion("");

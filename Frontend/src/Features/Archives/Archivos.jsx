@@ -56,15 +56,6 @@ export default function Archivos({ usuario }) {
           }
         },
         {
-          element: '#tour-cuota',
-          popover: {
-            title: 'Almacenamiento',
-            description: 'Revisa cuánto espacio de tu cuota gratuita estás utilizando. ¡Recuerda limpiar archivos viejos!',
-            side: "bottom",
-            align: 'start'
-          }
-        },
-        {
           element: '#tour-subida',
           popover: {
             title: 'Subir Archivos',
@@ -431,36 +422,6 @@ export default function Archivos({ usuario }) {
                 </svg>
                 Mis Cursos
               </button>
-            </div>
-
-            {/* 🆕 WIDGET DE CUOTA DE ALMACENAMIENTO */}
-            <div
-              id="tour-cuota"
-              style={{
-                background: "var(--bg-card)",
-                padding: "15px",
-                borderRadius: "8px",
-                border: "1px solid var(--border-color)",
-                marginBottom: "15px",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "0.85rem", color: "var(--text-main)", fontWeight: "bold" }}>
-                <span>Almacenamiento Total</span>
-                <span>{usadoMB} MB / {limiteMB} MB</span>
-              </div>
-              
-              <div style={{ background: "#e2e8f0", width: "100%", height: "8px", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{
-                  background: porcentajeUso > 90 ? "#ef4444" : "var(--accent-color)",
-                  width: `${porcentajeUso}%`,
-                  height: "100%",
-                  transition: "width 0.4s ease"
-                }}></div>
-              </div>
-              
-              <p style={{ margin: "5px 0 0 0", fontSize: "0.75rem", color: porcentajeUso > 90 ? "#ef4444" : "var(--text-muted)", textAlign: "right" }}>
-                {porcentajeUso}% utilizado
-              </p>
             </div>
 
             {/* CONTENIDO SEGÚN LA PESTAÑA */}
