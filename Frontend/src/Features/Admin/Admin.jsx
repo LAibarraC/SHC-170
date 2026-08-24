@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api';
 import { alerta } from '../../utils/Notificaciones';
 import { IconoBuscar, IconoEscudo, IconoAlerta } from '../../ui/iconos';
@@ -8,10 +8,43 @@ import Skeleton from '../../ui/Skeleton';
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 
+// Icono SVG de Ajustes/Filtro
+const IconoAjustes = ({ width = 14, height = 14, style = {} }) => (
+  <svg 
+    width={width} 
+    height={height} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    style={style}
+  >
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
+  </svg>
+);
+
 export default function Admin() {
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
+
+  // Estados para filtros por columna
+  const [menuFiltroAbierto, setMenuFiltroAbierto] = useState(null); // 'rol', 'estado', 'registro'
+  const [filtroRol, setFiltroRol] = useState('TODOS');
+  const [filtroEstado, setFiltroEstado] = useState('TODOS');
+  const [ordenFecha, setOrdenFecha] = useState('ninguno'); // 'asc', 'desc', 'ninguno'
+
+  const menuRef = useRef(null);
 
   // Modal de confirmación para eliminar
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
@@ -19,16 +52,27 @@ export default function Admin() {
 
   // Estados para paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5; // Cantidad de usuarios por página solicitada
+  const itemsPerPage = 5;
 
   useEffect(() => {
     cargarUsuarios();
   }, []);
 
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuFiltroAbierto(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const cargarUsuarios = async () => {
     try {
       setCargando(true);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Retraso artificial para skeleton
+      await new Promise(resolve => setTimeout(resolve, 1000));
       const data = await api.obtenerUsuarios();
       setUsuarios(data);
     } catch (error) {
@@ -161,11 +205,31 @@ export default function Admin() {
     }
   };
 
-  // --- LÓGICA DE BÚSQUEDA Y PAGINACIÓN ---
-  const usuariosFiltrados = usuarios.filter(u =>
-    u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    u.email.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  // --- LÓGICA DE FILTRADO Y PAGINACIÓN ---
+  const usuariosFiltrados = usuarios
+    .filter(u => {
+      const coincideBusquedaGeneral = 
+        u.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        u.email.toLowerCase().includes(busqueda.toLowerCase());
+
+      const coincideRol = filtroRol === 'TODOS' || u.rol === filtroRol;
+
+      const coincideEstado = 
+        filtroEstado === 'TODOS' || 
+        (filtroEstado === 'ACTIVO' && u.activo) || 
+        (filtroEstado === 'SUSPENDIDO' && !u.activo);
+
+      return coincideBusquedaGeneral && coincideRol && coincideEstado;
+    })
+    .sort((a, b) => {
+      if (ordenFecha === 'asc') {
+        return new Date(a.fecha_creacion || 0) - new Date(b.fecha_creacion || 0);
+      }
+      if (ordenFecha === 'desc') {
+        return new Date(b.fecha_creacion || 0) - new Date(a.fecha_creacion || 0);
+      }
+      return 0;
+    });
 
   const totalPages = Math.ceil(usuariosFiltrados.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -181,6 +245,10 @@ export default function Admin() {
       setCurrentPage(totalPages);
     }
   }, [usuariosFiltrados.length, currentPage, totalPages]);
+
+  const toggleMenu = (columna) => {
+    setMenuFiltroAbierto(prev => (prev === columna ? null : columna));
+  };
 
   const ControlesPaginacion = () => {
     if (totalPages <= 1) return null;
@@ -228,6 +296,55 @@ export default function Admin() {
       </div>
     );
   };
+
+  // Función para obtener estilos dinámicos del popover para que no se corte hacia los lados
+  const getPopoverStyle = (columna) => ({
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    // Si es una de las últimas columnas, alineamos el menú a la derecha para evitar corte horizontal
+    left: columna === 'registro' || columna === 'estado' ? 'auto' : 0,
+    right: columna === 'registro' || columna === 'estado' ? 0 : 'auto',
+    backgroundColor: 'var(--bg-card, #fff)',
+    border: '1px solid var(--border-color, #e5e7eb)',
+    borderRadius: '8px',
+    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+    padding: '6px',
+    zIndex: 50,
+    minWidth: '160px',
+    textTransform: 'none',
+    fontWeight: 'normal',
+    color: 'var(--text-main, #1f2937)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px'
+  });
+
+  const btnAjustesStyle = (activo) => ({
+    background: activo ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    color: activo ? '#3b82f6' : 'var(--text-muted, #6b7280)',
+    transition: 'all 0.2s'
+  });
+
+  const btnOpcionStyle = (isSelected) => ({
+    display: 'block',
+    width: '100%',
+    textAlign: 'left',
+    padding: '8px 12px',
+    background: isSelected ? 'var(--bg-input, #f3f4f6)' : 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    color: isSelected ? '#3b82f6' : 'var(--text-main, #333)',
+    fontWeight: isSelected ? 'bold' : 'normal',
+    fontSize: '0.85rem',
+    borderRadius: '4px',
+    transition: 'background 0.2s'
+  });
 
   return (
     <div style={{ maxWidth: '1100px', margin: 'clamp(15px, 4vw, 40px) auto', padding: '0 20px', position: 'relative' }}>
@@ -281,8 +398,7 @@ export default function Admin() {
           boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
           backgroundColor: 'var(--bg-card)',
           padding: '25px',
-          border: '1px solid var(--border-color)',
-          overflow: 'hidden'
+          border: '1px solid var(--border-color)'
         }}
       >
         {cargando ? (
@@ -319,25 +435,167 @@ export default function Admin() {
               </div>
             ))}
           </div>
-        ) : usuariosFiltrados.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-            No se encontraron usuarios registrados.
-          </div>
         ) : (
-          <>
-            <div style={{ overflowX: 'auto' }} id="tour-admin-tabla">
-              <table className="tabla-responsive tabla-responsiva-panel" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Nombre / Correo</th>
-                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Rol</th>
-                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Estado</th>
-                    <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>Registro</th>
-                    <th style={{ padding: '12px 15px', fontWeight: 'bold', textAlign: 'center' }}>Acciones</th>
+          <div 
+            style={{ 
+              overflowX: 'auto', 
+              // Esto asegura que haya espacio hacia abajo para el menú sin cortarse
+              paddingBottom: menuFiltroAbierto ? '160px' : '10px',
+              transition: 'padding-bottom 0.3s ease'
+            }} 
+            id="tour-admin-tabla"
+          >
+            <table className="tabla-responsive tabla-responsiva-panel" style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  
+                  {/* COLUMNA: NOMBRE / CORREO */}
+                  <th style={{ padding: '12px 15px', fontWeight: 'bold' }}>
+                    Nombre / Correo
+                  </th>
+
+                  {/* COLUMNA: ROL */}
+                  <th style={{ padding: '12px 15px', fontWeight: 'bold', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Rol</span>
+                      <button 
+                        style={btnAjustesStyle(filtroRol !== 'TODOS')} 
+                        onClick={() => toggleMenu('rol')} 
+                        title="Filtrar por rol"
+                      >
+                        <IconoAjustes />
+                      </button>
+                    </div>
+
+                    {menuFiltroAbierto === 'rol' && (
+                      <div ref={menuRef} style={getPopoverStyle('rol')}>
+                        {[
+                          { label: 'Todos', value: 'TODOS' },
+                          { label: 'Estudiante', value: 'Estudiante' },
+                          { label: 'Docente', value: 'Docente' },
+                          { label: 'Administrador', value: 'Administrador' }
+                        ].map(opcion => (
+                          <button
+                            key={opcion.value}
+                            onClick={() => {
+                              setFiltroRol(opcion.value);
+                              setCurrentPage(1);
+                              setMenuFiltroAbierto(null);
+                            }}
+                            style={btnOpcionStyle(filtroRol === opcion.value)}
+                            onMouseEnter={(e) => {
+                              if (filtroRol !== opcion.value) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (filtroRol !== opcion.value) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {opcion.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </th>
+
+                  {/* COLUMNA: ESTADO */}
+                  <th style={{ padding: '12px 15px', fontWeight: 'bold', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Estado</span>
+                      <button 
+                        style={btnAjustesStyle(filtroEstado !== 'TODOS')} 
+                        onClick={() => toggleMenu('estado')} 
+                        title="Filtrar por estado"
+                      >
+                        <IconoAjustes />
+                      </button>
+                    </div>
+
+                    {menuFiltroAbierto === 'estado' && (
+                      <div ref={menuRef} style={getPopoverStyle('estado')}>
+                        {[
+                          { label: 'Todos', value: 'TODOS' },
+                          { label: 'Activos', value: 'ACTIVO' },
+                          { label: 'Suspendidos', value: 'SUSPENDIDO' }
+                        ].map(opcion => (
+                          <button
+                            key={opcion.value}
+                            onClick={() => {
+                              setFiltroEstado(opcion.value);
+                              setCurrentPage(1);
+                              setMenuFiltroAbierto(null);
+                            }}
+                            style={btnOpcionStyle(filtroEstado === opcion.value)}
+                            onMouseEnter={(e) => {
+                              if (filtroEstado !== opcion.value) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (filtroEstado !== opcion.value) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {opcion.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </th>
+
+                  {/* COLUMNA: REGISTRO */}
+                  <th style={{ padding: '12px 15px', fontWeight: 'bold', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Registro</span>
+                      <button 
+                        style={btnAjustesStyle(ordenFecha !== 'ninguno')} 
+                        onClick={() => toggleMenu('registro')} 
+                        title="Ordenar por fecha"
+                      >
+                        <IconoAjustes />
+                      </button>
+                    </div>
+
+                    {menuFiltroAbierto === 'registro' && (
+                      <div ref={menuRef} style={getPopoverStyle('registro')}>
+                        {[
+                          { label: 'Sin orden', value: 'ninguno' },
+                          { label: 'Más recientes primero', value: 'desc' },
+                          { label: 'Más antiguos primero', value: 'asc' }
+                        ].map(opcion => (
+                          <button
+                            key={opcion.value}
+                            onClick={() => {
+                              setOrdenFecha(opcion.value);
+                              setCurrentPage(1);
+                              setMenuFiltroAbierto(null);
+                            }}
+                            style={btnOpcionStyle(ordenFecha === opcion.value)}
+                            onMouseEnter={(e) => {
+                              if (ordenFecha !== opcion.value) e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (ordenFecha !== opcion.value) e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {opcion.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </th>
+
+                  {/* COLUMNA: ACCIONES */}
+                  <th style={{ padding: '12px 15px', fontWeight: 'bold', textAlign: 'center' }}>
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {usuariosFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                      No se encontraron usuarios registrados con los filtros aplicados.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {usuariosPaginados.map((u, index) => (
+                ) : (
+                  usuariosPaginados.map((u, index) => (
                     <tr
                       key={u.email}
                       style={{
@@ -450,18 +708,18 @@ export default function Admin() {
                               </button>
                             </>
                           ) : (
-                            <span style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               Protegido <IconoEscudo width="14" height="14" style={{ color: '#10b981' }} />
                             </span>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
