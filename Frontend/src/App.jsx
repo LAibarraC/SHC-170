@@ -24,6 +24,8 @@ import { DataProvider, CalculadoraDataProvider, MAT251DataProvider, ActiveModule
 import LtiTester from "./pages/LtiTester";
 import Historial from "./Features/History/Historial";
 import Grupos from './Features/grupos/Grupos';
+import GenerarQR from "./Features/qr/GenerarQR";
+import Matricular from "./Features/qr/Matricular";
 import api from "./services/api";
 
 import "./App.css";
@@ -104,6 +106,10 @@ function App() {
 
                       <Route path="/lti-tester" element={<LtiTester onLogin={setUsuario} />} />
 
+                      {/* Ruta pública de matriculación por QR (accesible también sin sesión; Matricular.jsx
+                          redirige a /login preservando la URL completa cuando no hay sesión). */}
+                      <Route path="/matricular/:token" element={<Matricular />} />
+
                       <Route path="*" element={<Navigate to="/login" />} />
                     </>
                   ) : (
@@ -118,6 +124,9 @@ function App() {
                       <Route path="/historial" element={<Historial />} />
                       <Route path="/about" element={<About />} />
                       <Route path="/grupos" element={<Grupos />} />
+
+                      {/* Ruta pública de matriculación por QR (cuando ya hay sesión iniciada) */}
+                      <Route path="/matricular/:token" element={<Matricular />} />
 
                       <Route path="/lti-tester" element={<Navigate to="/" />} />
                       <Route path="/login" element={<Navigate to="/" />} />
@@ -134,6 +143,9 @@ function App() {
                       <Route path="/perfil" element={<Perfil usuario={usuario} setUsuario={setUsuario} />} />
                       <Route path="/admin" element={usuario?.rol === "Administrador" ? <Admin /> : <Navigate to="/" />} />
                       <Route path="/gestion-docente" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <GestionDocente usuario={usuario} /> : <Navigate to="/" />} />
+
+                      {/* Ruta protegida para generación de códigos QR (solo Docente/Administrador) */}
+                      <Route path="/qr" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <GenerarQR /> : <Navigate to="/" />} />
                     </>
                   )}
                 </Routes>

@@ -3,9 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { useData } from "../../components/Gestion_Datos/DataContext";
 import { alerta } from "../../utils/Notificaciones";
 import api, { BASE_URL } from "../../services/api";
+import qrApi from "../../services/qrApi";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import escudoAdmin from "../../assets/images/escudoAdmin.png";
+import ModalQR from "../qr/ModalQR";
+import { IconoQr } from "../../ui/iconos";
 
 export default function Grupos() {
   const { usuario } = useData();
@@ -163,6 +166,12 @@ export default function Grupos() {
   const [cursoADesmatricular, setCursoADesmatricular] = useState(null);
   const [procesandoUnion, setProcesandoUnion] = useState(false);
 
+  // 🆕 ESTADOS PARA EL MODAL DE QR
+  const [mostrarModalQR, setMostrarModalQR] = useState(false);
+  const [cursoParaQR, setCursoParaQR] = useState(null);
+  const [qrsActivos, setQrsActivos] = useState({}); // { clase_id: qrObject }
+  const [cargandoQRs, setCargandoQRs] = useState(false);
+
   // --- ESTADOS PARA BÚSQUEDA Y PAGINACIÓN ---
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -205,6 +214,49 @@ export default function Grupos() {
     }
   };
 
+  // 🆕 CARGAR QRs ACTIVOS PARA LOS CURSOS DEL DOCENTE
+  const cargarQRsActivos = async () => {
+    if (!esDocente && !esAdmin) return; // Solo para docentes
+    setCargandoQRs(true);
+    try {
+      const listaQRs = await qrApi.listarMisQRs();
+      const qrsPorClase = {};
+      (listaQRs || []).forEach((qr) => {
+        // Verificar si el QR está activo y no expirado
+        if (qr.activo) {
+          const exp = new Date((qr.fecha_expiracion || "").replace(" ", "T") + "Z");
+          if (!Number.isNaN(exp.getTime()) && exp.getTime() >= Date.now()) {
+            qrsPorClase[qr.clase_id] = qr;
+          }
+        }
+      });
+      setQrsActivos(qrsPorClase);
+    } catch (error) {
+      console.error("Error cargando QRs activos:", error);
+    } finally {
+      setCargandoQRs(false);
+    }
+  };
+
+  // 🆕 HELPER: Obtener QR activo para una clase
+  const obtenerQRActivoDeClase = (claseId) => {
+    return qrsActivos[claseId] || null;
+  };
+
+  // 🆕 CALLBACK: Al desactivar un QR, actualizar el estado local
+  const handleQRDesactivado = (qrId) => {
+    setQrsActivos((prev) => {
+      const newState = { ...prev };
+      // Buscar y eliminar el QR desactivado
+      for (const claseId in newState) {
+        if (newState[claseId]?.id === qrId) {
+          delete newState[claseId];
+        }
+      }
+      return newState;
+    });
+  };
+
   useEffect(() => {
     console.log("=== GRUPOS PAGE LOADED ===");
     console.log("BASE_URL:", BASE_URL);
@@ -227,7 +279,13 @@ export default function Grupos() {
       }
     };
 
-    cargarCursos();
+    const cargarTodo = async () => {
+      await cargarCursos();
+      // Cargar QRs activos después de cargar los cursos
+      await cargarQRsActivos();
+    };
+
+    cargarTodo();
     verificarConexion();
   }, [usuario]);
 
@@ -627,7 +685,7 @@ export default function Grupos() {
                           <strong>Docente:</strong> {curso.docente_nombre}
                         </p>
                       )}
-                      <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+                      <div style={{ display: "flex", gap: "10px", marginTop: "15px", flexWrap: "wrap" }}>
                         {puedeGestionar && (
                           <button
                             onClick={() => handleOpenEditar(curso)}
@@ -649,6 +707,67 @@ export default function Grupos() {
                           Subir Material
                         </button>
                       </div>
+
+                      {/* Botón Dinámico de QR (solo para Docente/Administrador que gestionan el curso).
+                          - Si hay QR activo: muestra "Ver QR Activo" en verde con ícono QR verde + indicador
+                          - Si no hay QR activo: muestra "Generar QR" como botón principal con ícono QR blanco */}
+                      {puedeGestionar && (() => {
+                        const qrActivo = obtenerQRActivoDeClase(curso.id);
+                        const esQRActivo = qrActivo !== null;
+                        const bgColor = esQRActivo
+                          ? "rgba(16, 185, 129, 0.1)"
+                          : "#4f46e5";
+                        const borderColor = esQRActivo
+                          ? "rgba(16, 185, 129, 0.4)"
+                          : "#4f46e5";
+                        const textColor = esQRActivo ? "#10b981" : "#ffffff";
+                        const hoverBg = esQRActivo ? "#10b981" : "#4338ca";
+
+                        return (
+                          <button
+                            onClick={() => {
+                              setCursoParaQR(curso);
+                              setMostrarModalQR(true);
+                            }}
+                            className="tour-curso-qr"
+                            title={esQRActivo ? `Ver código QR activo para ${curso.nombre}` : `Generar código QR para ${curso.nombre}`}
+                            style={{
+                              width: "100%",
+                              padding: "8px",
+                              marginTop: "10px",
+                              background: bgColor,
+                              border: `1px solid ${borderColor}`,
+                              borderRadius: "4px",
+                              cursor: "pointer",
+                              fontWeight: "bold",
+                              color: textColor,
+                              transition: "all 0.2s",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "8px",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = hoverBg;
+                              e.currentTarget.style.color = "#ffffff";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = bgColor;
+                              e.currentTarget.style.color = textColor;
+                            }}
+                          >
+                            {esQRActivo ? (
+                              <IconoQr indicador width="16" height="16" />
+                            ) : (
+                              <IconoQr width="16" height="16" />
+                            )}
+                            <span>
+                              {esQRActivo ? "Ver QR Activo" : "Generar QR"}
+                            </span>
+                          </button>
+                        );
+                      })() || null}
+
                       {puedeGestionar && (
                         <button
                           onClick={() => handleOpenEliminar(curso)}
@@ -1042,6 +1161,23 @@ export default function Grupos() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================= */}
+      {/* 🆕 MODAL: GENERAR QR (DOCENTE / ADMIN)   */}
+      {/* ========================================= */}
+      {mostrarModalQR && cursoParaQR && (
+        <ModalQR
+          curso={cursoParaQR}
+          qrActivo={obtenerQRActivoDeClase(cursoParaQR.id)}
+          onClose={async () => {
+            setMostrarModalQR(false);
+            setCursoParaQR(null);
+            // Recargar QRs activos al cerrar para sincronizar la UI
+            await cargarQRsActivos();
+          }}
+          onDesactivar={handleQRDesactivado}
+        />
       )}
     </div>
   );
