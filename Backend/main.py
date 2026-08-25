@@ -6,7 +6,7 @@ load_dotenv()  # Cargar variables de entorno desde .env
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from routers import auth, archivos, calculos, historial, grupos, notificaciones
+from routers import auth, archivos, calculos, historial, grupos, notificaciones, qr as qr_router
 from config.database import async_engine, get_db
 import models
 
@@ -39,6 +39,7 @@ origins = [
     "https://backend-shc170.onrender.com",
     "https://simulador-empresarial-swart.vercel.app", #por las dudas
     "http://10.250.54.12:5173",
+    "http://10.250.50.52:5173",
 ]
 
 app.add_middleware(
@@ -56,6 +57,10 @@ app.include_router(calculos.router)
 app.include_router(historial.router)
 app.include_router(grupos.router)
 app.include_router(notificaciones.router)
+# 🆕 Router de QR para matriculación por código
+# Las rutas internas del router ya están declaradas con el prefijo "/api/qr/...",
+# por lo que se registra sin prefix para evitar duplicarlo.
+app.include_router(qr_router.router)
 
 # Utilidades globales del núcleo
 VISITAS_FILE = "visitas.txt"

@@ -198,3 +198,77 @@ export const IconoBasura = ({ width = "16", height = "16", style }) => (
         <line x1="14" y1="11" x2="14" y2="17"></line>
     </svg>
 );
+
+export const Descargar = ({ width = "18", height = "18", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+);
+
+export const Copiar = ({ width = "18", height = "18", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+);
+
+export const Compartir = ({ width = "18", height = "18", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+    </svg>
+);
+
+export const Desactivar = ({ width = "18", height = "18", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+    </svg>
+);
+
+export const Regenerar = ({ width = "18", height = "18", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+);
+
+export const Graduacion = ({ width = "20", height = "20", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+    </svg>
+);
+
+export const CheckCirculo = ({ width = "20", height = "20", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>
+);
+
+export const CierreX = ({ width = "20", height = "20", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+);
+
+export const IconoQr = ({ width = "16", height = "16", style, indicador = false }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <line x1="14" y1="14" x2="14" y2="17" />
+        <line x1="14" y1="20" x2="17" y2="20" />
+        <line x1="20" y1="14" x2="20" y2="17" />
+        <line x1="20" y1="20" x2="21" y2="20" />
+        {indicador && <circle cx="20" cy="5" r="3" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />}
+    </svg>
+);
