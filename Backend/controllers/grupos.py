@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, func
 from models import Clase, Inscripcion, Usuario, Archivo, HistorialCalculo, Notificacion
-from validators.grupos import NuevaClase, UnirseClase, ActualizarClase
+from validators.grupos import NuevaClase, UnirseClase, CambiarClase, ActualizarClase
 
 async def crear_clase_db(db: AsyncSession, datos: NuevaClase):
     result = await db.execute(select(Usuario).filter(Usuario.email == datos.docente_email))
@@ -111,6 +111,59 @@ async def unirse_clase_db(db: AsyncSession, datos: UnirseClase):
 
     await db.commit()
     return {"message": f"Te has unido a {nombre_clase} exitosamente"}
+
+async def cambiar_clase_db(db: AsyncSession, datos: CambiarClase):
+    result = await db.execute(select(Usuario).filter(Usuario.email == datos.user_email))
+    usuario = result.scalars().first()
+    if not usuario:
+        return JSONResponse(status_code=404, content={"error": "Usuario no encontrado"})
+
+    result = await db.execute(select(Usuario).filter(Usuario.id == datos.estudiante_id))
+    estudiante = result.scalars().first()
+    if not estudiante:
+        return JSONResponse(status_code=404, content={"error": "Estudiante no encontrado"})
+
+    result = await db.execute(select(Clase).filter(Clase.id == datos.clase_actual_id))
+    clase_actual = result.scalars().first()
+    result = await db.execute(select(Clase).filter(Clase.id == datos.nueva_clase_id))
+    nueva_clase = result.scalars().first()
+    if not clase_actual or not nueva_clase:
+        return JSONResponse(status_code=404, content={"error": "Una de las clases no existe"})
+
+    if usuario.rol != "Administrador" and clase_actual.docente_id != usuario.id:
+        return JSONResponse(status_code=403, content={"error": "No tienes permisos para modificar esta clase"})
+
+    result = await db.execute(select(Inscripcion).filter(
+        Inscripcion.clase_id == datos.clase_actual_id,
+        Inscripcion.estudiante_id == datos.estudiante_id
+    ))
+    inscripcion = result.scalars().first()
+    if not inscripcion:
+        return JSONResponse(status_code=404, content={"error": "Inscripción actual no encontrada"})
+
+    result = await db.execute(select(Inscripcion).filter(
+        Inscripcion.clase_id == datos.nueva_clase_id,
+        Inscripcion.estudiante_id == datos.estudiante_id
+    ))
+    if result.scalars().first():
+        return JSONResponse(status_code=409, content={"error": "El estudiante ya está inscrito en la nueva clase"})
+
+    nueva_clase_id = nueva_clase.id
+    nueva_clase_nombre = nueva_clase.nombre
+    clase_actual_nombre = clase_actual.nombre
+    inscripcion.clase_id = datos.nueva_clase_id
+    db.add(Notificacion(
+        tipo="personal",
+        mensaje=f"Has sido cambiado del grupo '{clase_actual_nombre}' al grupo '{nueva_clase_nombre}' por tu docente.",
+        usuario_id=estudiante.id,
+        leido=False
+    ))
+    await db.commit()
+    return {
+        "message": "Estudiante cambiado de clase exitosamente",
+        "clase_id": nueva_clase_id,
+        "clase_nombre": nueva_clase_nombre
+    }
 
 async def obtener_clases_docente_db(db: AsyncSession, email: str):
     result = await db.execute(select(Usuario).filter(Usuario.email == email))
@@ -292,7 +345,14 @@ async def desmatricular_estudiante_db(db: AsyncSession, clase_id: int, estudiant
     if not inscripcion:
         return JSONResponse(status_code=404, content={"error": "Inscripción no encontrada"})
         
+    nombre_clase = clase.nombre
     await db.delete(inscripcion)
+    db.add(Notificacion(
+        tipo="personal",
+        mensaje=f"Has sido eliminado del grupo '{nombre_clase}' por tu docente.",
+        usuario_id=estudiante.id,
+        leido=False
+    ))
     await db.commit()
     return {"message": "Estudiante desmatriculado exitosamente"}
 

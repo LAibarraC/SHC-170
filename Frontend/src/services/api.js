@@ -51,6 +51,22 @@ export const api = {
     return await res.json();
   },
 
+  cambiarCursoEstudiante: async (estudianteId, claseActualId, nuevaClaseId, userEmail) => {
+    const res = await fetch(`${BASE_URL}/cambiar_clase`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        estudiante_id: estudianteId,
+        clase_actual_id: claseActualId,
+        nueva_clase_id: nuevaClaseId,
+        user_email: userEmail,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.detail || "Error al cambiar al estudiante de curso");
+    return data;
+  },
+
   // --- NUEVA: ABANDONAR CLASE (estudiante se desmatricula a sí mismo) ---
   abandonarClase: async (claseId, estudianteEmail) => {
     const res = await fetch(`${BASE_URL}/abandonar_clase`, {

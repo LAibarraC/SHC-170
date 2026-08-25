@@ -10,6 +10,12 @@ class UnirseClase(BaseModel):
     codigo_acceso: str
     estudiante_email: str
 
+class CambiarClase(BaseModel):
+    estudiante_id: int
+    clase_actual_id: int
+    nueva_clase_id: int
+    user_email: str
+
 class AbandonarClase(BaseModel):
     clase_id: int
     estudiante_email: str
