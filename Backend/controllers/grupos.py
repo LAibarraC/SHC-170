@@ -350,7 +350,7 @@ async def desmatricular_estudiante_db(db: AsyncSession, clase_id: int, estudiant
     db.add(Notificacion(
         tipo="personal",
         mensaje=f"Has sido eliminado del grupo '{nombre_clase}' por tu docente.",
-        usuario_id=estudiante.id,
+        usuario_id=estudiante_id,
         leido=False
     ))
     await db.commit()
