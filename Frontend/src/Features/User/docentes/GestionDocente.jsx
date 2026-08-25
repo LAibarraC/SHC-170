@@ -221,7 +221,7 @@ export default function GestionDocente({ usuario }) {
       alerta.error("Error", error.message || "No se pudo desmatricular al estudiante");
     } finally {
       setIsModalOpen(false);
-      setEstudianteAEliminar(null);
+      setEstudianteAEliminar(null); 
     }
   };
 
