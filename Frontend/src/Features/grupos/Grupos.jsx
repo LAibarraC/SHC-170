@@ -8,7 +8,8 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import escudoAdmin from "../../assets/images/escudoAdmin.png";
 import ModalQR from "../qr/ModalQR";
-import { IconoQr } from "../../ui/iconos";
+import EscanerQR from "../qr/EscanerQR";
+import { IconoQr, CierreX } from "../../ui/iconos";
 
 export default function Grupos() {
   const { usuario } = useData();
@@ -165,6 +166,7 @@ export default function Grupos() {
   const [mostrarModalDesmatricular, setMostrarModalDesmatricular] = useState(false);
   const [cursoADesmatricular, setCursoADesmatricular] = useState(null);
   const [procesandoUnion, setProcesandoUnion] = useState(false);
+  const [escanerActivo, setEscanerActivo] = useState(false);
 
   // 🆕 ESTADOS PARA EL MODAL DE QR
   const [mostrarModalQR, setMostrarModalQR] = useState(false);
@@ -419,6 +421,37 @@ export default function Grupos() {
   };
 
   // --- LÓGICA DEL ESTUDIANTE: Unirse a curso en la BD (CORREGIDA) ---
+
+  /**
+   * Extrae el token limpio a partir del texto leído por el escáner QR
+   * (cámara o archivo). Acepta:
+   *   - token puro (ej. "abc123")
+   *   - URL completa con token al final (ej. https://app.com/matricular/abc123)
+   *   - hash router (ej. https://app.com/#/matricular/abc123)
+   *   - URLs con query params (ej. https://app.com/matricular/abc123?foo=bar)
+   */
+  const extraerTokenDeQR = (texto) => {
+    let crudo = (texto || "").trim();
+    if (!crudo) return "";
+
+    let candidato = crudo;
+
+    // 1) Caso hash router: #/matricular/TOKEN
+    if (candidato.includes("#")) {
+      const despuesDelHash = candidato.split("#").pop();
+      const partes = despuesDelHash.split("/").filter(Boolean);
+      if (partes.length > 0) candidato = partes[partes.length - 1];
+    } else if (candidato.includes("/")) {
+      // 2) URL con paths: https://.../matricular/TOKEN
+      const sinQuery = candidato.split("?")[0];
+      const partes = sinQuery.split("/").filter(Boolean);
+      candidato = partes[partes.length - 1] || candidato;
+    }
+
+    // 3) Limpiar query/fragment sobrante por si quedó pegado.
+    return (candidato || "").split(/[?#]/)[0].trim();
+  };
+
   const handleUnirseCurso = async () => {
     const codigoLimpiado = codigoBusqueda.trim().toUpperCase();
 
@@ -913,30 +946,147 @@ export default function Grupos() {
       {/* NUEVO MODAL: MATRICULARSE (ESTUDIANTE)    */}
       {/* ========================================= */}
       {mostrarModalMatricular && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
-          <div style={{ background: "var(--bg-card)", padding: "30px", borderRadius: "10px", width: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)", border: "1px solid var(--border-color)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999, padding: "16px" }}>
+          <div style={{ background: "var(--bg-card)", padding: "clamp(20px, 4vw, 30px)", borderRadius: "10px", width: "100%", maxWidth: "440px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.2)", border: "1px solid var(--border-color)", boxSizing: "border-box" }}>
             <h2 style={{ marginTop: 0, color: "#27ae60" }}>Matricularse a un Curso</h2>
             <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "20px" }}>
-              Introduce el código único de matriculación proporcionado por tu docente.
+              Introduce el código único de matriculación proporcionado por tu docente o
+              escanea el código QR con tu cámara.
             </p>
 
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>Código de Matriculación:</label>
-              <input
-                type="text"
-                value={codigoBusqueda}
-                onChange={(e) => setCodigoBusqueda(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleUnirseCurso()}
-                placeholder="Ej. MAT-205..."
-                style={{ width: "100%", padding: "10px", borderRadius: "5px", border: "1px solid var(--border-color)", background: "var(--bg-input)", color: "var(--text-main)", textTransform: "uppercase", boxSizing: "border-box" }}
-                disabled={procesandoUnion}
-                autoFocus
-              />
+              <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>
+                Código de Matriculación:
+              </label>
+              <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                <input
+                  type="text"
+                  value={codigoBusqueda}
+                  onChange={(e) => setCodigoBusqueda(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleUnirseCurso()}
+                  placeholder="Ej. MAT-205..."
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    padding: "10px",
+                    borderRadius: "5px",
+                    border: "1px solid var(--border-color)",
+                    background: "var(--bg-input)",
+                    color: "var(--text-main)",
+                    textTransform: "uppercase",
+                    boxSizing: "border-box",
+                  }}
+                  disabled={procesandoUnion}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setEscanerActivo((v) => !v)}
+                  disabled={procesandoUnion}
+                  title={escanerActivo ? "Cerrar cámara" : "Escanear código QR"}
+                  aria-label="Escanear código QR"
+                  style={{
+                    flexShrink: 0,
+                    width: "44px",
+                    height: "44px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: escanerActivo ? "#dc2626" : "#27ae60", // Color sólido verde
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "5px",
+                    cursor: procesandoUnion ? "not-allowed" : "pointer",
+                    padding: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  {escanerActivo ? (
+                    <CierreX width="22" height="22" style={{ color: "#ffffff", stroke: "#ffffff" }} />
+                  ) : (
+                    <IconoQr width="22" height="22" style={{ color: "#ffffff", stroke: "#ffffff" }} />
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            {/* Escáner de QR — se monta dentro del modal cuando está activo */}
+            <EscanerQR
+              activo={escanerActivo}
+              onDeteccion={async (texto) => {
+                // 1) Cierra la cámara / lector de archivo inmediatamente.
+                //    NO pegamos nada en el input manual: se reutiliza el mismo
+                //    flujo que ya se activa con la cámara o el link directo.
+                setEscanerActivo(false);
+                setProcesandoUnion(false);
+
+                const tokenLimpio = extraerTokenDeQR(texto);
+                if (!tokenLimpio) {
+                  alerta.error(
+                    "QR Inválido",
+                    "No se detectó un código de matriculación en la lectura."
+                  );
+                  return;
+                }
+
+                // 2) Validamos contra el backend usando el mismo endpoint público
+                //    (infoQR) que usa la ruta /matricular/:token. Si el QR está
+                //    expirado / desactivado / no existe, mostramos el mismo tipo
+                //    de alerta que la cámara / el link directo.
+                try {
+                  const info = await qrApi.infoQR(tokenLimpio);
+
+                  if (info?.estado === "valido") {
+                    // 3) Reutilizamos el modal de confirmación ya existente en
+                    //    /matricular/:token cerrando primero el modal actual.
+                    setMostrarModalMatricular(false);
+                    setCodigoBusqueda("");
+                    navigate(`/matricular/${encodeURIComponent(tokenLimpio)}`);
+                    return;
+                  }
+
+                  if (info?.estado === "expirado") {
+                    alerta.warning(
+                      "QR expirado",
+                      info.mensaje ||
+                        "Este código QR ha expirado. Pide al docente que genere uno nuevo."
+                    );
+                    return;
+                  }
+
+                  if (info?.estado === "desactivado") {
+                    alerta.warning(
+                      "QR desactivado",
+                      info.mensaje ||
+                        "Este código QR fue desactivado por el docente y ya no permite nuevas matrículas."
+                    );
+                    return;
+                  }
+
+                  alerta.error(
+                    "QR no válido",
+                    info?.mensaje || "El código QR no existe o no se pudo verificar."
+                  );
+                } catch (err) {
+                  // Cualquier error HTTP del endpoint se mapea a la misma
+                  // experiencia que el link directo.
+                  alerta.error(
+                    "QR no válido",
+                    err?.message || "El código QR no existe o no se pudo verificar."
+                  );
+                }
+              }}
+              onErrorCamara={(mensaje) => alerta.warning("Cámara no disponible", mensaje)}
+              onErrorArchivo={(mensaje) => alerta.warning("No se pudo leer la imagen", mensaje)}
+              onCerrar={() => setEscanerActivo(false)}
+            />
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: escanerActivo ? "16px" : 0, flexWrap: "wrap" }}>
               <button
-                onClick={() => setMostrarModalMatricular(false)}
+                onClick={() => {
+                  setEscanerActivo(false);
+                  setMostrarModalMatricular(false);
+                }}
                 style={{ padding: "10px 15px", background: "var(--bg-main)", color: "var(--text-main)", border: "1px solid var(--border-color)", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
                 disabled={procesandoUnion}
               >

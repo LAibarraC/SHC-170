@@ -29,6 +29,7 @@ import Matricular from "./Features/qr/Matricular";
 import api from "./services/api";
 
 import "./App.css";
+import ConfirmHost from "./utils/ConfirmHost";
 
 function App() {
 
@@ -80,6 +81,9 @@ function App() {
               <div style={{ position: 'fixed', zIndex: 99999, inset: 0, pointerEvents: 'none' }}>
                 <Toaster position="bottom-right" />
               </div>
+
+              {/* Host global de confirmaciones (reemplazo de window.confirm) */}
+              <ConfirmHost />
 
               {/* Menú de navegación unificado */}
               {/* Menú de navegación unificado */}

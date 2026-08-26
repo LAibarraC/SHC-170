@@ -110,7 +110,14 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
 
   const handleDesactivar = async () => {
     if (!qr?.id) return;
-    if (!window.confirm("¿Desactivar este QR? Las matrículas ya realizadas NO se eliminarán.")) return;
+    const confirmado = await alerta.confirmar({
+      titulo: "Desactivar QR",
+      mensaje: "¿Desactivar este QR? Las matrículas ya realizadas NO se eliminarán.",
+      textoConfirmar: "Sí, desactivar",
+      textoCancelar: "Cancelar",
+      variant: "danger",
+    });
+    if (!confirmado) return;
     setDesactivando(true);
     try {
       await qrApi.desactivarQR(qr.id);
@@ -206,7 +213,14 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
     // antes de volver a la configuración; si se generó en esta sesión, basta
     // con limpiar el estado local.
     if (qrActivoProp && qr?.id) {
-      if (!window.confirm("¿Desactivar el QR actual y generar uno nuevo?")) return;
+      const confirmado = await alerta.confirmar({
+        titulo: "Reemplazar QR activo",
+        mensaje: "¿Desactivar el QR actual y generar uno nuevo?",
+        textoConfirmar: "Sí, reemplazar",
+        textoCancelar: "Cancelar",
+        variant: "danger",
+      });
+      if (!confirmado) return;
 
       setDesactivando(true);
       try {

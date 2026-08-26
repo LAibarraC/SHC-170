@@ -260,8 +260,19 @@ export const CierreX = ({ width = "20", height = "20", style }) => (
     </svg>
 );
 
-export const IconoQr = ({ width = "16", height = "16", style, indicador = false }) => (
-    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+export const IconoQr = ({ width = "20", height = "20", style, indicador = false }) => (
+    <svg 
+      width={width} 
+      height={height} 
+      style={{ display: "block", color: "inherit", ...style }} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      aria-hidden="true"
+    >
         <rect x="3" y="3" width="7" height="7" />
         <rect x="14" y="3" width="7" height="7" />
         <rect x="3" y="14" width="7" height="7" />
