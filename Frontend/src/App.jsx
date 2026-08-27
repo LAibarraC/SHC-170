@@ -29,6 +29,7 @@ import Matricular from "./Features/qr/Matricular";
 import api from "./services/api";
 
 import "./App.css";
+import ConfirmHost from "./utils/ConfirmHost";
 
 function App() {
   const [usuario, setUsuario] = useState(null);
