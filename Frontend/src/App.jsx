@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import Menu from "./ui/Menu";
 import Pie_pagina from "./ui/Pie_pagina";
 import { useState, useEffect } from "react";
@@ -7,7 +7,6 @@ import { sileo, Toaster } from "sileo";
 import Inicio from "./Features/Start/Inicio";
 import Archivos from "./Features/Archives/Archivos";
 import Calculadora from "./Features/MAT151/pages/Calculadora";
-import About from "./pages/About";
 import Login from "./Features/auth/Login";
 import MAT251 from "./Features/MAT251/pages/EstadisticaMatematica";
 import Registro from "./Features/auth/Registro";
@@ -18,6 +17,7 @@ import Admin from "./Features/Admin/Admin";
 import GestionDocente from "./Features/User/docentes/GestionDocente";
 
 import SelectorRol from './ui/SelectorRol';
+import OscuroClaro from "./ui/oscuro_claro";
 
 import { DataProvider, CalculadoraDataProvider, MAT251DataProvider, ActiveModuleContext } from "./components/Gestion_Datos/DataContext";
 
@@ -31,7 +31,6 @@ import api from "./services/api";
 import "./App.css";
 
 function App() {
-
   const [usuario, setUsuario] = useState(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
 
@@ -49,11 +48,9 @@ function App() {
       }
       setCargandoSesion(false);
     };
-
     restaurarSesion();
   }, []);
 
-  // 🆕 2. Variable derivada: Si usuario no es nulo, significa que alguien inició sesión
   const isAuth = usuario !== null;
 
   if (cargandoSesion) {
@@ -69,48 +66,48 @@ function App() {
   }
 
   return (
-    // 👇 2. ENVOLVEMOS TODA LA APLICACIÓN CON EL DATAPROVIDER Y LOS PROVIDERS DE MÓDULOS
     <DataProvider usuario={usuario} setUsuario={setUsuario}>
       <CalculadoraDataProvider usuario={usuario}>
         <MAT251DataProvider usuario={usuario}>
           <HashRouter>
             <SelectorRol />
-            <div className={!isAuth ? "app-login" : "app-main"}>
-
+            <div className="app-main" style={{ backgroundColor: 'var(--bg-main)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ position: 'fixed', zIndex: 99999, inset: 0, pointerEvents: 'none' }}>
                 <Toaster position="bottom-right" />
               </div>
 
-              {/* Menú de navegación unificado */}
-              {/* Menú de navegación unificado */}
-              {isAuth && (
-                <header style={{ width: '100%' }}>
-                  {/* Le pasamos la variable 'usuario' como prop al componente Menu */}
+              {/* 🆕 CONTROLES FLOTANTES MODERNOS PARA INVITADOS */}
+              <header className="guest-header">
+                {isAuth ? (
                   <Menu usuario={usuario} setUsuario={setUsuario} />
-                </header>
-              )}
+                ) : (
+                  <div className="guest-actions">
+                    <OscuroClaro />
 
-              {/* Contenido que cambia según la ruta */}
-              <div className="content">
+                    <Link
+                      to="/login"
+                      className="login-link"
+                      onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                      onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+                    >
+                      Iniciar Sesión
+                    </Link>
+                  </div>
+                )}
+              </header>
+
+              <div className="content" style={{ flex: 1 }}>
                 <Routes>
                   {!isAuth ? (
                     <>
-                      {/* 🆕 3. Pasamos setUsuario a tus puertas de acceso en lugar de setIsAuth */}
+                      <Route path="/" element={<Inicio />} />
                       <Route path="/login" element={<Login onLogin={setUsuario} />} />
-
-                      {/* 🆕 NUEVO: Añadimos la ruta del Registro aquí */}
                       <Route path="/registro" element={<Registro onLogin={setUsuario} />} />
-
                       <Route path="/forgot-password" element={<ForgotPassword />} />
                       <Route path="/reset-password" element={<ResetPassword />} />
-
                       <Route path="/lti-tester" element={<LtiTester onLogin={setUsuario} />} />
-
-                      {/* Ruta pública de matriculación por QR (accesible también sin sesión; Matricular.jsx
-                          redirige a /login preservando la URL completa cuando no hay sesión). */}
                       <Route path="/matricular/:token" element={<Matricular />} />
-
-                      <Route path="*" element={<Navigate to="/login" />} />
+                      <Route path="*" element={<Navigate to="/" />} />
                     </>
                   ) : (
                     <>
@@ -122,16 +119,11 @@ function App() {
                         </ActiveModuleContext.Provider>
                       } />
                       <Route path="/historial" element={<Historial />} />
-                      <Route path="/about" element={<About />} />
                       <Route path="/grupos" element={<Grupos />} />
-
-                      {/* Ruta pública de matriculación por QR (cuando ya hay sesión iniciada) */}
                       <Route path="/matricular/:token" element={<Matricular />} />
 
                       <Route path="/lti-tester" element={<Navigate to="/" />} />
                       <Route path="/login" element={<Navigate to="/" />} />
-
-                      {/* 🆕 NUEVO: Si ya inició sesión y trata de registrarse, lo mandamos al inicio */}
                       <Route path="/registro" element={<Navigate to="/" />} />
 
                       <Route path="/MAT251" element={
@@ -143,15 +135,13 @@ function App() {
                       <Route path="/perfil" element={<Perfil usuario={usuario} setUsuario={setUsuario} />} />
                       <Route path="/admin" element={usuario?.rol === "Administrador" ? <Admin /> : <Navigate to="/" />} />
                       <Route path="/gestion-docente" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <GestionDocente usuario={usuario} /> : <Navigate to="/" />} />
-
-                      {/* Ruta protegida para generación de códigos QR (solo Docente/Administrador) */}
                       <Route path="/qr" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <GenerarQR /> : <Navigate to="/" />} />
                     </>
                   )}
                 </Routes>
               </div>
 
-              {isAuth && <Pie_pagina />}
+              <Pie_pagina />
 
             </div>
           </HashRouter>

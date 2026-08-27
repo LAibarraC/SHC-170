@@ -6,7 +6,7 @@ import { alerta } from '../../utils/Notificaciones.jsx';
 import '../../styles/ui/Login.css';
 import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 
-// 🆕 Importamos tu componente original (Ajusta la ruta si tu carpeta se llama distinto)
+// Importamos tu componente original (Ajusta la ruta si tu carpeta se llama distinto)
 import OscuroClaro from "../../ui/oscuro_claro.jsx";
 import { IconoCorreo } from "../../ui/iconos.jsx";
 
@@ -15,7 +15,6 @@ export default function Login({ onLogin }) {
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
 
   // Estados para recuperación de contraseña
   const [vista, setVista] = useState("login"); // login | forgot | reset
@@ -78,10 +77,42 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-container" style={{ position: 'relative' }}>
+      
+      {/* 🆕 Ocultamos el pie de página Y el encabezado (header) global de App.jsx */}
+      <style>{`
+        .pie-top, footer, header {
+          display: none !important;
+        }
+      `}</style>
 
-      {/* 🆕 Aquí insertamos tu botón oficial en la esquina superior izquierda */}
-      <div className="login-theme-toggle" style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+      {/* Botones modernos en la esquina superior derecha solo para esta vista */}
+      <div className="guest-actions" style={{ 
+        position: 'absolute', 
+        top: '20px', 
+        right: '20px', 
+        zIndex: 1000, 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '15px' 
+      }}>
         <OscuroClaro />
+        <Link 
+          to="/" 
+          className="login-link"
+          style={{ 
+            padding: '10px 24px', 
+            backgroundColor: 'var(--accent-color, #007bff)', 
+            color: 'white', 
+            textDecoration: 'none', 
+            borderRadius: '30px', 
+            fontWeight: 'bold',
+            fontSize: '0.95rem',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+            transition: 'transform 0.2s, box-shadow 0.2s'
+          }}
+        >
+          Inicio
+        </Link>
       </div>
 
       <div className="login-card">
@@ -186,7 +217,6 @@ export default function Login({ onLogin }) {
                 <GoogleLogin
                   onSuccess={async (credentialResponse) => {
                     try {
-                      // Llamada al backend con el token de Google
                       const data = await api.loginGoogle(credentialResponse.credential);
                       if (data.token) {
                         localStorage.setItem("token", data.token);
@@ -207,8 +237,6 @@ export default function Login({ onLogin }) {
               </GoogleOAuthProvider>
             </div>
             {/* ----------------------------------- */}
-
-
 
             <div style={{ marginTop: '15px', textAlign: 'center', fontSize: '0.9rem' }}>
               <Link

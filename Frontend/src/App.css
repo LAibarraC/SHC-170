@@ -595,3 +595,56 @@ html.dark .pie-logo-siglos {
     justify-content: center !important;
   }
 }
+
+/* =========================================
+   ESTILOS PARA INVITADO (INICIAR SESIÓN Y TEMA)
+   ========================================= */
+
+/* .guest-header lo dejamos sin estilos de layout 
+   para no interferir con el menú cuando hay sesión iniciada */
+
+.guest-actions {
+  position: fixed; /* Lo fijamos a la pantalla */
+  top: 15px;
+  right: 15px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 50px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.login-link {
+  display: inline-block;
+  padding: 8px 20px;
+  color: #ffffff;
+  background-color: var(--accent-color);
+  border-radius: 30px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  text-decoration: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.login-link:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+/* Responsividad para móviles */
+@media (max-width: 768px) {
+  .guest-actions {
+    top: 10px;
+    right: 10px;
+    padding: 4px 6px;
+  }
+  .login-link {
+    padding: 6px 14px;
+    font-size: 0.85rem;
+  }
+}
