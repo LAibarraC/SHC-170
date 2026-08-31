@@ -40,6 +40,16 @@ async def matricular_por_qr(
     return await qr_controller.matricular_por_qr_db(db, datos, current_user)
 
 
+@router.patch("/api/qr/cerrar-matricula/{clase_id}")
+@router.post("/api/qr/cerrar-matricula/{clase_id}")
+async def cerrar_matricula(
+    clase_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.Usuario = Depends(require_role(["Docente", "Administrador"])),
+):
+    return await qr_controller.cerrar_matricula_db(db, clase_id, current_user)
+
+
 @router.post("/api/qr/desactivar/{qr_id}")
 async def desactivar_qr(
     qr_id: int,

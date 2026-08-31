@@ -18,14 +18,9 @@ const handle = async (res) => {
 };
 
 export const qrApi = {
-  /**
-   * Genera un nuevo QR para la clase indicada.
-   * @param {number} claseId
-   * @param {number} [duracionMinutos]
-   */
-  generarQR: async (claseId, duracionMinutos = null) => {
+  /** Genera un QR cuya vigencia es la fecha límite de su clase. */
+  generarQR: async (claseId) => {
     const body = { clase_id: claseId };
-    if (duracionMinutos) body.duracion_minutos = duracionMinutos;
     const res = await fetch(`${BASE_URL}/api/qr/generar`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...tokenHeader() },
@@ -56,8 +51,16 @@ export const qrApi = {
     return handle(res);
   },
 
+  cerrarMatricula: async (claseId) => {
+    const res = await fetch(`${BASE_URL}/api/qr/cerrar-matricula/${claseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...tokenHeader() },
+    });
+    return handle(res);
+  },
+
   /**
-   * Desactiva un QR.
+   * Desactiva un QR histórico (se conserva por compatibilidad).
    * @param {number} qrId
    */
   desactivarQR: async (qrId) => {

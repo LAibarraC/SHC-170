@@ -5,7 +5,6 @@ from typing import Optional
 class GenerarQRRequest(BaseModel):
     """Body para POST /api/qr/generar"""
     clase_id: int
-    duracion_minutos: Optional[int] = None  # Si no se envía, se usa QR_DURATION_MINUTES
 
 
 class GenerarQRResponse(BaseModel):

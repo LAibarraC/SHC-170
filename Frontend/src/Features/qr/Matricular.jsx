@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "../../components/Gestion_Datos/DataContext";
 import { alerta } from "../../utils/Notificaciones";
@@ -76,15 +76,6 @@ export default function Matricular() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargandoInfo, usuario, info]);
-
-  // 3. Calcular minutos restantes en el cliente SOLO para mostrar al usuario.
-  const minutosRestantes = useMemo(() => {
-    if (!info?.fecha_expiracion) return null;
-    const exp = new Date(info.fecha_expiracion.replace(" ", "T") + "Z");
-    if (Number.isNaN(exp.getTime())) return null;
-    const diffMin = Math.floor((exp.getTime() - Date.now()) / 60000);
-    return diffMin > 0 ? diffMin : 0;
-  }, [info?.fecha_expiracion]);
 
   const handleMatricular = async () => {
     if (!token) return;
@@ -413,19 +404,9 @@ export default function Matricular() {
           </p>
         )}
 
-        {minutosRestantes !== null && (
-          <p
-            style={{
-              color: minutosRestantes < 5 ? "#dc2626" : "var(--text-muted)",
-              margin: "5px 0",
-              fontSize: "0.9rem",
-            }}
-          >
-            Este QR expira en{" "}
-            <strong>
-              {minutosRestantes} {minutosRestantes === 1 ? "minuto" : "minutos"}
-            </strong>
-            .
+        {info.fecha_expiracion && (
+          <p style={{ color: "var(--text-muted)", margin: "5px 0", fontSize: "0.9rem" }}>
+            Válido hasta: <strong>{info.fecha_expiracion}</strong>
           </p>
         )}
 

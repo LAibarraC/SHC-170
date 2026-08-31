@@ -35,6 +35,20 @@ export const api = {
     return await res.json();
   },
 
+  actualizarClase: async (id, nombre, fechaLimite, resetearCodigo = false) => {
+    const res = await fetch(`${BASE_URL}/actualizar_clase`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(localStorage.getItem("token") ? { Authorization: `Bearer ${localStorage.getItem("token")}` } : {}),
+      },
+      body: JSON.stringify({ id, nombre, fecha_limite_matriculacion: fechaLimite || null, resetear_codigo: resetearCodigo }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.detail || "No se pudo actualizar la clase");
+    return data;
+  },
+
   // --- OBTENER ESTUDIANTES DE UNA CLASE ---
   obtenerEstudiantesClase: async (claseId, userEmail) => {
     const res = await fetch(`${BASE_URL}/clases/${claseId}/estudiantes?user_email=${encodeURIComponent(userEmail)}`);

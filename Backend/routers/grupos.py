@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.database import get_db
 from models import Usuario
-from routers.auth import get_current_user
+from middlewares.auth import get_current_user, require_role
 
 # Importamos los validadores y el controlador
 from validators.grupos import NuevaClase, UnirseClase, CambiarClase, AbandonarClase, ActualizarClase
@@ -19,8 +19,12 @@ async def abandonar_clase(datos: AbandonarClase, db: AsyncSession = Depends(get_
     return await grupos_controller.abandonar_clase_db(db, datos.clase_id, datos.estudiante_email)
 
 @router.put("/actualizar_clase")
-async def actualizar_clase(datos: ActualizarClase, db: AsyncSession = Depends(get_db)):
-    return await grupos_controller.actualizar_clase_db(db, datos)
+async def actualizar_clase(
+    datos: ActualizarClase,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(require_role(["Docente", "Administrador"])),
+):
+    return await grupos_controller.actualizar_clase_db(db, datos, current_user)
 
 @router.post("/unirse_clase")
 async def unirse_clase(datos: UnirseClase, db: AsyncSession = Depends(get_db)):

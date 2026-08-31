@@ -13,7 +13,7 @@ const formatearFecha = (iso) => {
   if (!iso) return "-";
   try {
     const [fecha, hora] = iso.split(" ");
-    return `${fecha} ${hora}`;
+    return hora ? `${fecha} ${hora}` : fecha;
   } catch {
     return iso;
   }
@@ -23,18 +23,6 @@ const formatearFecha = (iso) => {
  * Calcula los minutos y segundos restantes a partir de la fecha de expiración.
  * Devuelve { expirado, minutos, segundos, totalSegundos }.
  */
-const calcularRestante = (fechaExpiracion) => {
-  if (!fechaExpiracion) return { expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 };
-  const exp = new Date(fechaExpiracion.replace(" ", "T") + "Z"); // formato SQL en UTC
-  if (Number.isNaN(exp.getTime())) return { expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 };
-  const diffMs = exp.getTime() - Date.now();
-  if (diffMs <= 0) return { expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 };
-  const totalSegundos = Math.floor(diffMs / 1000);
-  const minutos = Math.floor(totalSegundos / 60);
-  const segundos = totalSegundos % 60;
-  return { expirado: false, minutos, segundos, totalSegundos };
-};
-
 export default function GenerarQR() {
   const { usuario } = useData();
   const navigate = useNavigate();
@@ -52,9 +40,6 @@ export default function GenerarQR() {
   const [qr, setQr] = useState(null);
   const [generando, setGenerando] = useState(false);
   const [desactivando, setDesactivando] = useState(false);
-
-  // Contador regresivo (visual)
-  const [restante, setRestante] = useState({ expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 });
 
   const qrContainerRef = useRef(null);
 
@@ -81,15 +66,6 @@ export default function GenerarQR() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claseId, cargandoCursos]);
 
-  // 3. Contador regresivo
-  useEffect(() => {
-    if (!qr?.fecha_expiracion) return;
-    const actualizar = () => setRestante(calcularRestante(qr.fecha_expiracion));
-    actualizar();
-    const id = setInterval(actualizar, 1000);
-    return () => clearInterval(id);
-  }, [qr]);
-
   const claseSeleccionada = useMemo(
     () => misCursos.find((c) => c.id === claseId) || null,
     [misCursos, claseId]
@@ -114,10 +90,10 @@ export default function GenerarQR() {
 
   const handleDesactivar = async () => {
     if (!qr?.id) return;
-    if (!window.confirm("¿Desactivar este QR? Las matrículas ya realizadas NO se eliminarán.")) return;
+    if (!window.confirm("¿Cerrar la matrícula? El código y el QR dejarán de permitir nuevas matrículas.")) return;
     setDesactivando(true);
     try {
-      await qrApi.desactivarQR(qr.id);
+      await qrApi.cerrarMatricula(qr.clase_id);
       setQr({ ...qr, activo: false });
       alerta.success("QR desactivado", "El código ya no permitirá nuevas matrículas.");
     } catch (e) {
@@ -224,12 +200,6 @@ export default function GenerarQR() {
     );
   }
 
-  const estadoTimer = restante.expirado
-    ? { texto: "Expirado", color: "#dc2626" }
-    : restante.totalSegundos < 60
-      ? { texto: "Por expirar", color: "#f59e0b" }
-      : { texto: "Vigente", color: "#10b981" };
-
   return (
     <div className="page-container" style={{ maxWidth: "900px", margin: "0 auto" }}>
       <div style={{ marginBottom: "20px", borderBottom: "2px solid var(--border-color)", paddingBottom: "10px" }}>
@@ -237,7 +207,7 @@ export default function GenerarQR() {
           Generar QR de Matriculación
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", margin: "5px 0 0 0" }}>
-          Crea un código QR temporal para que tus estudiantes se matriculen escaneándolo con su celular.
+          Genera un código QR usando la misma fecha límite de matrícula del curso.
         </p>
       </div>
 
@@ -308,34 +278,10 @@ export default function GenerarQR() {
               <QRCodeSVG value={qr.url} size={260} level="H" includeMargin={true} />
             </div>
 
-            {/* Estado del QR + Contador */}
             <div style={{ marginTop: "15px" }}>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "5px 12px",
-                  borderRadius: "20px",
-                  background: qr.activo ? estadoTimer.color : "#6b7280",
-                  color: "white",
-                  fontWeight: "bold",
-                  fontSize: "0.85rem",
-                }}
-              >
-                {qr.activo ? estadoTimer.texto : "Desactivado"}
+              <span style={{ display: "inline-block", padding: "5px 12px", borderRadius: "20px", background: qr.activo ? "#10b981" : "#6b7280", color: "white", fontWeight: "bold", fontSize: "0.85rem" }}>
+                {qr.activo ? "Matrícula habilitada" : "Matrícula cerrada"}
               </span>
-              {qr.activo && !restante.expirado && (
-                <p style={{ color: "var(--text-muted)", marginTop: "10px", fontSize: "0.95rem" }}>
-                  Tiempo restante:{" "}
-                  <strong>
-                    {String(restante.minutos).padStart(2, "0")}:{String(restante.segundos).padStart(2, "0")}
-                  </strong>
-                </p>
-              )}
-              {restante.expirado && qr.activo && (
-                <p style={{ color: "#dc2626", marginTop: "10px", fontSize: "0.95rem" }}>
-                  Este QR ya expiró. Genera uno nuevo para permitir más matrículas.
-                </p>
-              )}
             </div>
 
             {/* Información del QR */}
@@ -344,7 +290,7 @@ export default function GenerarQR() {
                 <strong style={{ color: "var(--text-main)" }}>Creado:</strong> {formatearFecha(qr.fecha_creacion)}
               </p>
               <p style={{ margin: "4px 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                <strong style={{ color: "var(--text-main)" }}>Expira:</strong> {formatearFecha(qr.fecha_expiracion)}
+                <strong style={{ color: "var(--text-main)" }}>Válido hasta:</strong> {formatearFecha(qr.fecha_expiracion)}
               </p>
               <p style={{ margin: "4px 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
                 <strong style={{ color: "var(--text-main)" }}>Alumnos matriculados:</strong> {qr.alumnos_inscritos}
@@ -380,7 +326,7 @@ export default function GenerarQR() {
                   disabled={desactivando}
                   style={{ padding: "10px 15px", background: desactivando ? "#9ca3af" : "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.3)", borderRadius: "5px", cursor: desactivando ? "not-allowed" : "pointer", fontWeight: "bold" }}
                 >
-                  {desactivando ? "Desactivando…" : "⛔ Desactivar QR"}
+                  {desactivando ? "Cerrando…" : "⛔ Cerrar matrícula"}
                 </button>
               )}
             </div>

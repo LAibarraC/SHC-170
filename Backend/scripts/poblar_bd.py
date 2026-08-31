@@ -27,13 +27,69 @@ usuarios_iniciales = [
         institucion="USFX"
     ),
     Usuario(
-        email="juan@usfx.bo", 
-        nombre="Juan Coa", 
-        password="123", 
-        rol="Estudiante", 
-        perfil="Estudiante", 
-        institucion="USFX"
-    )
+    email="ulises@usfx.bo",
+    nombre="Ulises Mancilla",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="jesus@usfx.bo",
+    nombre="Jesus Avila",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="diego@usfx.bo",
+    nombre="Diego Flores",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="luis@usfx.bo",
+    nombre="Luis Vargas",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="carlos@usfx.bo",
+    nombre="Carlos Perez",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="miguel@usfx.bo",
+    nombre="Miguel Rojas",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="ana@usfx.bo",
+    nombre="Ana Lopez",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
+Usuario(
+    email="maria@usfx.bo",
+    nombre="Maria Garcia",
+    password="123",
+    rol="Estudiante",
+    perfil="Estudiante",
+    institucion="USFX"
+),
 ]
 
 # Recorremos la lista y los guardamos

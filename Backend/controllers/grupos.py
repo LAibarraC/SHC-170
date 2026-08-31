@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, func
-from models import Clase, Inscripcion, Usuario, Archivo, HistorialCalculo, Notificacion
+from models import Clase, ClaseQR, Inscripcion, Usuario, Archivo, HistorialCalculo, Notificacion
 from validators.grupos import NuevaClase, UnirseClase, CambiarClase, ActualizarClase
 
 async def crear_clase_db(db: AsyncSession, datos: NuevaClase):
@@ -32,11 +32,16 @@ async def crear_clase_db(db: AsyncSession, datos: NuevaClase):
     await db.refresh(nueva_clase)
     return {"message": "Clase creada exitosamente", "codigo_acceso": codigo}
 
-async def actualizar_clase_db(db: AsyncSession, datos: ActualizarClase):
+async def actualizar_clase_db(db: AsyncSession, datos: ActualizarClase, current_user: Usuario):
+    if current_user.rol not in ("Docente", "Administrador"):
+        return JSONResponse(status_code=403, content={"error": "No tienes autorización para actualizar clases"})
+
     result = await db.execute(select(Clase).filter(Clase.id == datos.id))
     clase = result.scalars().first()
     if not clase:
         return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
+    if current_user.rol != "Administrador" and clase.docente_id != current_user.id:
+        return JSONResponse(status_code=403, content={"error": "No tienes permisos sobre esta clase"})
     
     clase.nombre = datos.nombre
     clase.fecha_limite_matriculacion = datos.fecha_limite_matriculacion
@@ -53,6 +58,10 @@ async def actualizar_clase_db(db: AsyncSession, datos: ActualizarClase):
             codigo_nuevo = f"MAT-{clase.id}-{caracteres_aleatorios}"
             
         clase.codigo_acceso = codigo_nuevo
+        # Un código nuevo invalida los enlaces QR anteriores de la misma clase.
+        qrs = (await db.execute(select(ClaseQR).filter(ClaseQR.clase_id == clase.id))).scalars().all()
+        for qr in qrs:
+            qr.activo = False
         
     await db.commit()
     await db.refresh(clase)

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { alerta } from "../../utils/Notificaciones";
 import qrApi from "../../services/qrApi";
+import api from "../../services/api";
 import { Descargar, Copiar, Compartir, Desactivar, Regenerar, Graduacion, CierreX } from "../../ui/iconos";
 
 /**
@@ -14,32 +15,22 @@ import { Descargar, Copiar, Compartir, Desactivar, Regenerar, Graduacion, Cierre
  *  - onDesactivar: (qrId) => void (opcional, callback cuando se desactiva un QR)
  *
  * Estados internos:
- *   1) Si qrActivo viene en props: muestra el QR + estado + contador + acciones.
- *   2) Si no hay qrActivo: Configuración -> muestra nombre + periodo y selector de duración.
+ *   1) Si qrActivo viene en props: muestra el QR y su estado actual.
+ *   2) Si no existe QR: lo genera automáticamente al abrir el modal.
  */
-export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesactivar }) {
+export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesactivar, onCursoActualizado }) {
   // ────────────── Estados ──────────────
-  const DURACIONES = [
-    { label: "5 minutos", valor: 5 },
-    { label: "15 minutos", valor: 15 },
-    { label: "30 minutos", valor: 30 },
-    { label: "1 hora (60 min)", valor: 60 },
-    { label: "24 horas (1440 min)", valor: 1440 },
-  ];
-
-  const [duracionMinutos, setDuracionMinutos] = useState(15);
   const [generando, setGenerando] = useState(false);
   const [desactivando, setDesactivando] = useState(false);
+  const [fechaLimite, setFechaLimite] = useState(curso?.fecha_limite_matriculacion || "");
+  const [codigoAcceso, setCodigoAcceso] = useState(curso?.codigo || null);
+  const [actualizandoFecha, setActualizandoFecha] = useState(false);
+  const [matriculaCerrada, setMatriculaCerrada] = useState(
+    !curso?.codigo || qrActivoProp?.activo === false
+  );
 
   // Datos del QR generado (o mostrado si viene en props)
   const [qr, setQr] = useState(qrActivoProp || null);
-  const [restante, setRestante] = useState({
-    expirado: true,
-    minutos: 0,
-    segundos: 0,
-    totalSegundos: 0,
-  });
-
   const qrContainerRef = useRef(null);
 
   // ────────────── Helpers ──────────────
@@ -48,37 +39,26 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
     if (!iso) return "-";
     try {
       const [fecha, hora] = iso.split(" ");
-      return `${fecha} ${hora}`;
+      return hora ? `${fecha} ${hora}` : fecha;
     } catch {
       return iso;
     }
   };
 
-  const calcularRestante = (fechaExpiracion) => {
-    if (!fechaExpiracion)
-      return { expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 };
-    const exp = new Date(fechaExpiracion.replace(" ", "T") + "Z");
-    if (Number.isNaN(exp.getTime()))
-      return { expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 };
-    const diffMs = exp.getTime() - Date.now();
-    if (diffMs <= 0)
-      return { expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 };
-    const totalSegundos = Math.floor(diffMs / 1000);
-    const minutos = Math.floor(totalSegundos / 60);
-    const segundos = totalSegundos % 60;
-    return { expirado: false, minutos, segundos, totalSegundos };
-  };
+  const fechaVencida = Boolean(
+    fechaLimite && fechaLimite < new Date().toISOString().slice(0, 10)
+  );
 
   // ────────────── Efectos ──────────────
 
-  // Contador regresivo
+  // El botón de la tarjeta abre directamente este modal y genera el QR si aún no existe.
   useEffect(() => {
-    if (!qr?.fecha_expiracion) return;
-    const actualizar = () => setRestante(calcularRestante(qr.fecha_expiracion));
-    actualizar();
-    const id = setInterval(actualizar, 1000);
-    return () => clearInterval(id);
-  }, [qr]);
+    if (curso?.id && !matriculaCerrada && !fechaVencida && !qrActivoProp && !qr && !generando) {
+      handleGenerar();
+    }
+    // La generación inicial solo debe ejecutarse al abrir el modal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cerrar con tecla Escape
   useEffect(() => {
@@ -98,7 +78,7 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
     }
     setGenerando(true);
     try {
-      const data = await qrApi.generarQR(curso.id, duracionMinutos);
+      const data = await qrApi.generarQR(curso.id);
       setQr(data);
       alerta.success("QR generado", "Tu código QR está listo para compartir.");
     } catch (e) {
@@ -108,27 +88,55 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
     }
   };
 
-  const handleDesactivar = async () => {
-    if (!qr?.id) return;
+  const handleCambiarEstado = async () => {
+    const cerrada = matriculaCerrada || fechaVencida;
+    if (cerrada) {
+      if (!fechaLimite) {
+        alerta.error("Fecha requerida", "Selecciona una fecha límite para habilitar la matrícula.");
+        return;
+      }
+      setDesactivando(true);
+      try {
+        // PUT persistente: genera un código de acceso nuevo y reabre la clase.
+        const actualizado = await api.actualizarClase(curso.id, curso.nombre, fechaLimite, true);
+        const nuevoQr = await qrApi.generarQR(curso.id);
+        setCodigoAcceso(actualizado.codigo_acceso ?? null);
+        setQr(nuevoQr);
+        setMatriculaCerrada(false);
+        onCursoActualizado?.(actualizado);
+        onDesactivar?.();
+        alerta.success("Matrícula habilitada", "La matrícula volvió a estar disponible.");
+      } catch (e) {
+        alerta.error("No se pudo habilitar la matrícula", e.message || "Intenta nuevamente.");
+      } finally {
+        setDesactivando(false);
+      }
+      return;
+    }
+
+    // El cierre pertenece a la clase, no al QR histórico. Puede existir un QR
+    // sin `id` en el estado local, pero el endpoint solo necesita curso.id.
     const confirmado = await alerta.confirmar({
-      titulo: "Desactivar QR",
-      mensaje: "¿Desactivar este QR? Las matrículas ya realizadas NO se eliminarán.",
-      textoConfirmar: "Sí, desactivar",
+      titulo: "Cerrar matrícula",
+      mensaje: "¿Cerrar la matrícula? El código y el QR dejarán de permitir nuevas matrículas. Las ya realizadas no se eliminarán.",
+      textoConfirmar: "Sí, cerrar matrícula",
       textoCancelar: "Cancelar",
       variant: "danger",
     });
     if (!confirmado) return;
     setDesactivando(true);
     try {
-      await qrApi.desactivarQR(qr.id);
-      setQr({ ...qr, activo: false });
-      // Llamar al callback si existe
-      if (onDesactivar) {
-        onDesactivar(qr.id);
-      }
-      alerta.success("QR desactivado", "El código ya no permitirá nuevas matrículas.");
+      const actualizado = await qrApi.cerrarMatricula(curso.id);
+      setCodigoAcceso(actualizado.codigo_acceso ?? null);
+      setMatriculaCerrada(true);
+      // Reflejar también el estado del QR mostrado; de lo contrario el objeto
+      // conserva `activo: true` aunque la matrícula ya se cerró en la BD.
+      setQr((qrActual) => qrActual ? { ...qrActual, activo: false } : qrActual);
+      onCursoActualizado?.(actualizado);
+      onDesactivar?.();
+      alerta.success("Matrícula cerrada", "El estado se guardó correctamente en el servidor.");
     } catch (e) {
-      alerta.error("No se pudo desactivar", e.message || "Intenta nuevamente.");
+      alerta.error("No se pudo cerrar la matrícula", e.message || "Intenta nuevamente.");
     } finally {
       setDesactivando(false);
     }
@@ -203,53 +211,65 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
       };
       img.onerror = () => alerta.error("No se pudo descargar", "Error al procesar la imagen.");
       img.src = `data:image/svg+xml;base64,${svg64}`;
-    } catch (e) {
+    } catch {
       alerta.error("No se pudo descargar", "Tu navegador no soporta la descarga directa.");
     }
   };
 
   const handleGenerarNuevo = async () => {
-    // Si el QR vino activo desde props (persistido en backend), desactivarlo
-    // antes de volver a la configuración; si se generó en esta sesión, basta
-    // con limpiar el estado local.
-    if (qrActivoProp && qr?.id) {
-      const confirmado = await alerta.confirmar({
-        titulo: "Reemplazar QR activo",
-        mensaje: "¿Desactivar el QR actual y generar uno nuevo?",
-        textoConfirmar: "Sí, reemplazar",
-        textoCancelar: "Cancelar",
-        variant: "danger",
-      });
-      if (!confirmado) return;
+    const confirmado = await alerta.confirmar({
+      titulo: "Generar nuevo código",
+      mensaje: "El código actual dejará de funcionar. ¿Deseas generar uno nuevo?",
+      textoConfirmar: "Sí, generar",
+      textoCancelar: "Cancelar",
+      variant: "danger",
+    });
+    if (!confirmado) return;
+    setDesactivando(true);
+    try {
+      const actualizado = await api.actualizarClase(curso.id, curso.nombre, fechaLimite, true);
+      const nuevoQr = await qrApi.generarQR(curso.id);
+      setCodigoAcceso(actualizado.codigo_acceso ?? null);
+      setQr(nuevoQr);
+      setMatriculaCerrada(false);
+      onCursoActualizado?.(actualizado);
+      alerta.success("Código actualizado", "El código anterior quedó inválido.");
+    } catch (e) {
+      alerta.error("No se pudo generar el código", e.message || "Intenta nuevamente.");
+    } finally {
+      setDesactivando(false);
+    }
+  };
 
-      setDesactivando(true);
-      try {
-        await qrApi.desactivarQR(qr.id);
-        if (onDesactivar) {
-          onDesactivar(qr.id);
-        }
-        setQr(null);
-        setRestante({ expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 });
-        alerta.success("QR Anterior Desactivado", "Ahora puedes generar un nuevo código QR.");
-      } catch (e) {
-        alerta.error("No se pudo desactivar", e.message || "Intenta nuevamente.");
-      } finally {
-        setDesactivando(false);
+  const handleCambiarFecha = async () => {
+    if (!fechaLimite) {
+      alerta.error("Fecha requerida", "Selecciona una fecha límite.");
+      return;
+    }
+    setActualizandoFecha(true);
+    try {
+      const actualizado = await api.actualizarClase(
+        curso.id,
+        curso.nombre,
+        fechaLimite,
+        matriculaCerrada
+      );
+      let qrActualizado = qr;
+      if (!qrActualizado) {
+        qrActualizado = await qrApi.generarQR(curso.id);
       }
-    } else {
-      setQr(null);
-      setRestante({ expirado: true, minutos: 0, segundos: 0, totalSegundos: 0 });
+      setQr({ ...qrActualizado, activo: true, fecha_expiracion: `${fechaLimite} 23:59:59` });
+      setMatriculaCerrada(false);
+      onCursoActualizado?.(actualizado);
+      alerta.success("Fecha actualizada", "La misma fecha límite se actualizó para el curso y el QR.");
+    } catch (e) {
+      alerta.error("No se pudo actualizar la fecha", e.message || "Intenta nuevamente.");
+    } finally {
+      setActualizandoFecha(false);
     }
   };
 
   // ────────────── Render helpers ──────────────
-
-  const estadoTimer = useMemo(() => {
-    if (!qr?.activo) return { texto: "Desactivado", color: "#6b7280" };
-    if (restante.expirado) return { texto: "Expirado", color: "#dc2626" };
-    if (restante.totalSegundos < 60) return { texto: "Por expirar", color: "#f59e0b" };
-    return { texto: "Vigente", color: "#10b981" };
-  }, [restante, qr]);
 
   if (!curso) return null;
 
@@ -356,67 +376,23 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 Periodo: {curso.periodo}
               </p>
             )}
-            {curso.codigo && (
+            {codigoAcceso && (
               <p style={{ margin: "3px 0", color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                Código de acceso: <strong>{curso.codigo}</strong>
+                Código de acceso: <strong>{codigoAcceso}</strong>
               </p>
             )}
           </div>
 
           {!qr ? (
-            /* ── ESTADO: CONFIGURACIÓN ── */
-            <div>
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  marginBottom: "8px",
-                  fontWeight: "bold",
-                  color: "var(--text-main)",
-                }}
-              >
-                <Regenerar width="16" height="16" /> Duración del QR:
-              </label>
-              <select
-                value={duracionMinutos}
-                onChange={(e) => setDuracionMinutos(Number(e.target.value))}
-                disabled={generando}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border-color)",
-                  background: "var(--bg-input)",
-                  color: "var(--text-main)",
-                  fontSize: "0.95rem",
-                  marginBottom: "16px",
-                  cursor: generando ? "not-allowed" : "pointer",
-                }}
-              >
-                {DURACIONES.map((d) => (
-                  <option key={d.valor} value={d.valor}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={handleGenerar}
-                disabled={generando}
-                style={{
-                  width: "100%",
-                  padding: "12px 18px",
-                  background: generando ? "#9ca3af" : "var(--accent-color)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: generando ? "not-allowed" : "pointer",
-                  fontWeight: "bold",
-                  fontSize: "1rem",
-                }}
-              >
-                {generando ? "Generando…" : "Generar Código QR"}
+            <div style={{ textAlign: "center" }}>
+              <p style={{ color: "var(--text-muted)" }}>
+                El QR utilizará la fecha límite de matrícula del curso.
+              </p>
+              <p style={{ color: "var(--text-main)", fontWeight: "bold" }}>
+                Válido hasta: {formatearFecha(fechaLimite) }
+              </p>
+              <button onClick={matriculaCerrada || fechaVencida ? handleCambiarEstado : handleGenerar} disabled={generando || desactivando} style={{ width: "100%", padding: "12px 18px", background: generando || desactivando ? "#9ca3af" : "var(--accent-color)", color: "white", border: "none", borderRadius: "6px", cursor: generando || desactivando ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "1rem" }}>
+                {generando ? "Generando…" : desactivando ? "Habilitando…" : matriculaCerrada || fechaVencida ? "Habilitar matrícula" : "Generar Código QR"}
               </button>
             </div>
           ) : (
@@ -446,35 +422,10 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 <QRCodeSVG value={qr.url} size={240} level="H" includeMargin={true} />
               </div>
 
-              {/* Estado + contador */}
               <div style={{ marginTop: "10px" }}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "5px 12px",
-                    borderRadius: "20px",
-                    background: estadoTimer.color,
-                    color: "white",
-                    fontWeight: "bold",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  {estadoTimer.texto}
+                <span style={{ display: "inline-block", padding: "5px 12px", borderRadius: "20px", background: matriculaCerrada || fechaVencida ? "#dc2626" : "#10b981", color: "white", fontWeight: "bold", fontSize: "0.85rem" }}>
+                  {matriculaCerrada ? "🔴 Matrícula cerrada" : fechaVencida ? "Fecha vencida" : "Matrícula habilitada"}
                 </span>
-                {qr.activo && !restante.expirado && (
-                  <p style={{ color: "var(--text-muted)", marginTop: "10px", fontSize: "0.95rem" }}>
-                    Tiempo restante:{" "}
-                    <strong>
-                      {String(restante.minutos).padStart(2, "0")}:
-                      {String(restante.segundos).padStart(2, "0")}
-                    </strong>
-                  </p>
-                )}
-                {restante.expirado && qr.activo && (
-                  <p style={{ color: "#dc2626", marginTop: "10px", fontSize: "0.9rem" }}>
-                    Este QR ya expiró. Genera uno nuevo para permitir más matrículas.
-                  </p>
-                )}
               </div>
 
               {/* Info */}
@@ -493,16 +444,16 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                   {formatearFecha(qr.fecha_creacion)}
                 </p>
                 <p style={{ margin: "3px 0", color: "var(--text-muted)" }}>
-                  <strong style={{ color: "var(--text-main)" }}>Expira:</strong>{" "}
-                  {formatearFecha(qr.fecha_expiracion)}
+                  <strong style={{ color: "var(--text-main)" }}>Válido hasta:</strong>{" "}
+                  {formatearFecha(fechaLimite)}
                 </p>
-                <p style={{ margin: "3px 0", color: "var(--text-muted)" }}>
+                {/* <p style={{ margin: "3px 0", color: "var(--text-muted)" }}>
                   <strong style={{ color: "var(--text-main)" }}>
                     Alumnos matriculados:
                   </strong>{" "}
                   {qr.alumnos_inscritos ?? 0}
-                </p>
-                <p
+                </p> */}
+                {/* <p
                   style={{
                     margin: "3px 0",
                     color: "var(--text-muted)",
@@ -511,7 +462,17 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 >
                   <strong style={{ color: "var(--text-main)" }}>Enlace:</strong>{" "}
                   {qr.url}
-                </p>
+                </p> */}
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "12px", flexWrap: "wrap" }}>
+                <label style={{ color: "var(--text-main)", fontWeight: "bold" }}>
+                  {fechaVencida ? "Ampliar fecha:" : "Cambiar fecha:"}
+                </label>
+                <input type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)} disabled={actualizandoFecha} />
+                <button onClick={handleCambiarFecha} disabled={actualizandoFecha} style={{ padding: "7px 10px", border: "1px solid var(--border-color)", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}>
+                  {actualizandoFecha ? "Guardando…" : "Guardar fecha"}
+                </button>
               </div>
 
               {/* Acciones */}
@@ -561,7 +522,7 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 >
                   <Copiar width="16" height="16" /> Copiar enlace
                 </button>
-                <button
+                {/* <button
                   onClick={handleCompartir}
                   style={{
                     padding: "10px 12px",
@@ -579,10 +540,9 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                   }}
                 >
                   <Compartir width="16" height="16" /> Compartir
-                </button>
-                {qr.activo && (
-                  <button
-                    onClick={handleDesactivar}
+                </button> */}
+                <button
+                    onClick={handleCambiarEstado}
                     disabled={desactivando}
                     style={{
                       padding: "10px 12px",
@@ -599,9 +559,12 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                       gap: "6px",
                     }}
                   >
-                    {desactivando ? "Desactivando…" : <><Desactivar width="16" height="16" /> Desactivar QR</>}
+                    {desactivando
+                      ? matriculaCerrada || fechaVencida ? "Habilitando…" : "Cerrando…"
+                      : matriculaCerrada || fechaVencida
+                        ? "Habilitar matrícula"
+                        : <><Desactivar width="16" height="16" /> Cerrar matrícula</>}
                   </button>
-                )}
               </div>
 
               {/* Generar nuevo / cerrar */}
@@ -631,7 +594,7 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                     gap: "6px",
                   }}
                 >
-                  {desactivando ? "Reemplazando…" : <><Regenerar width="16" height="16" /> Generar nuevo QR</>}
+                  {desactivando ? "Generando…" : <><Regenerar width="16" height="16" /> Generar nuevo código</>}
                 </button>
                 <button
                   onClick={onClose}

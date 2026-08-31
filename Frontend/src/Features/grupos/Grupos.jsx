@@ -224,12 +224,10 @@ export default function Grupos() {
       const listaQRs = await qrApi.listarMisQRs();
       const qrsPorClase = {};
       (listaQRs || []).forEach((qr) => {
-        // Verificar si el QR está activo y no expirado
-        if (qr.activo) {
-          const exp = new Date((qr.fecha_expiracion || "").replace(" ", "T") + "Z");
-          if (!Number.isNaN(exp.getTime()) && exp.getTime() >= Date.now()) {
-            qrsPorClase[qr.clase_id] = qr;
-          }
+        // Conservar también QR vencidos/cerrados para que el docente pueda gestionarlos.
+        const anterior = qrsPorClase[qr.clase_id];
+        if (!anterior || new Date(qr.fecha_creacion) > new Date(anterior.fecha_creacion)) {
+          qrsPorClase[qr.clase_id] = qr;
         }
       });
       setQrsActivos(qrsPorClase);
@@ -245,18 +243,10 @@ export default function Grupos() {
     return qrsActivos[claseId] || null;
   };
 
-  // 🆕 CALLBACK: Al desactivar un QR, actualizar el estado local
-  const handleQRDesactivado = (qrId) => {
-    setQrsActivos((prev) => {
-      const newState = { ...prev };
-      // Buscar y eliminar el QR desactivado
-      for (const claseId in newState) {
-        if (newState[claseId]?.id === qrId) {
-          delete newState[claseId];
-        }
-      }
-      return newState;
-    });
+  // CALLBACK: sincronizar el estado persistido después de cerrar o habilitar.
+  const handleQRDesactivado = async () => {
+    await cargarCursos();
+    await cargarQRsActivos();
   };
 
   useEffect(() => {
@@ -741,20 +731,30 @@ export default function Grupos() {
                         </button>
                       </div>
 
-                      {/* Botón Dinámico de QR (solo para Docente/Administrador que gestionan el curso).
-                          - Si hay QR activo: muestra "Ver QR Activo" en verde con ícono QR verde + indicador
-                          - Si no hay QR activo: muestra "Generar QR" como botón principal con ícono QR blanco */}
+                      {/* Botón dinámico de QR: verde si está habilitado; azul sólido si está inactivo. */}
                       {puedeGestionar && (() => {
                         const qrActivo = obtenerQRActivoDeClase(curso.id);
-                        const esQRActivo = qrActivo !== null;
-                        const bgColor = esQRActivo
-                          ? "rgba(16, 185, 129, 0.1)"
-                          : "#4f46e5";
-                        const borderColor = esQRActivo
-                          ? "rgba(16, 185, 129, 0.4)"
-                          : "#4f46e5";
-                        const textColor = esQRActivo ? "#10b981" : "#ffffff";
-                        const hoverBg = esQRActivo ? "#10b981" : "#4338ca";
+                        const fechaVencida = Boolean(
+                          curso.fecha_limite_matriculacion &&
+                          curso.fecha_limite_matriculacion < new Date().toISOString().slice(0, 10)
+                        );
+                        const matriculaInactiva = !curso.codigo || fechaVencida;
+                        const esQRActivo = !matriculaInactiva && qrActivo !== null;
+                        const bgColor = matriculaInactiva
+                          ? "var(--primary-color)"
+                          : "rgba(16, 185, 129, 0.1)";
+                        const borderColor = matriculaInactiva
+                          ? "var(--primary-color)"
+                          : "rgba(16, 185, 129, 0.4)";
+                        const textColor = matriculaInactiva ? "#ffffff" : "#10b981";
+                        const hoverBg = matriculaInactiva
+                          ? "var(--primary-color-dark, #1d4ed8)"
+                          : "#10b981";
+                        const textoQR = matriculaInactiva
+                          ? "Generar QR"
+                          : esQRActivo
+                            ? "Ver QR Activo"
+                            : "Generar QR";
 
                         return (
                           <button
@@ -763,13 +763,13 @@ export default function Grupos() {
                               setMostrarModalQR(true);
                             }}
                             className="tour-curso-qr"
-                            title={esQRActivo ? `Ver código QR activo para ${curso.nombre}` : `Generar código QR para ${curso.nombre}`}
+                            title={`${textoQR} para ${curso.nombre}`}
                             style={{
                               width: "100%",
                               padding: "8px",
                               marginTop: "10px",
                               background: bgColor,
-                              border: `1px solid ${borderColor}`,
+                              border: matriculaInactiva ? "none" : `1px solid ${borderColor}`,
                               borderRadius: "4px",
                               cursor: "pointer",
                               fontWeight: "bold",
@@ -795,7 +795,7 @@ export default function Grupos() {
                               <IconoQr width="16" height="16" />
                             )}
                             <span>
-                              {esQRActivo ? "Ver QR Activo" : "Generar QR"}
+                              {textoQR}
                             </span>
                           </button>
                         );
@@ -1327,6 +1327,7 @@ export default function Grupos() {
             await cargarQRsActivos();
           }}
           onDesactivar={handleQRDesactivado}
+          onCursoActualizado={() => cargarCursos()}
         />
       )}
     </div>

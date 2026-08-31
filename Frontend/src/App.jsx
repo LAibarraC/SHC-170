@@ -76,6 +76,8 @@ function App() {
               <div style={{ position: 'fixed', zIndex: 99999, inset: 0, pointerEvents: 'none' }}>
                 <Toaster position="bottom-right" />
               </div>
+              
+              <ConfirmHost />
 
               {/* 🆕 CONTROLES FLOTANTES MODERNOS PARA INVITADOS */}
               <header className="guest-header">
