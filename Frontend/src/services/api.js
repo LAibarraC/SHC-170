@@ -449,11 +449,27 @@ export const api = {
   },
 
   eliminarUsuario: async (email) => {
+    const token = localStorage.getItem("token");
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const res = await fetch(`${BASE_URL}/eliminar_usuario/${encodeURIComponent(email)}`, {
       method: "DELETE",
+      headers,
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al eliminar el usuario");
+    return data;
+  },
+
+  obtenerEstadisticasAdmin: async () => {
+    const token = localStorage.getItem("token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE_URL}/admin/estadisticas`, { headers });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al obtener estadísticas del sistema");
     return data;
   },
 

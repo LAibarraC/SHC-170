@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { alerta } from '../../utils/Notificaciones';
 import { IconoBuscar, IconoEscudo, IconoAlerta } from '../../ui/iconos';
 import Skeleton from '../../ui/Skeleton';
+import ReportesEstadisticas from './ReportesEstadisticas';
 
 // Importaciones para el Tour (Guía Rápida)
 import { driver } from "driver.js";
@@ -34,6 +35,7 @@ const IconoAjustes = ({ width = 14, height = 14, style = {} }) => (
 );
 
 export default function Admin() {
+  const [pestanaActiva, setPestanaActiva] = useState('usuarios'); // 'usuarios' | 'reportes'
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
@@ -367,32 +369,95 @@ export default function Admin() {
       </button>
 
       {/* CABECERA */}
-      <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'clamp(15px, 4vw, 30px)', flexWrap: 'wrap', gap: 'clamp(10px, 3vw, 20px)' }}>
+      <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'clamp(15px, 4vw, 25px)', flexWrap: 'wrap', gap: 'clamp(10px, 3vw, 20px)' }}>
         <div className="admin-title-container" id="tour-admin-titulo">
           <h2 style={{ fontSize: 'clamp(1.4rem, 5vw, 2rem)', margin: '0 0 5px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
             Panel de Administración
           </h2>
           <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 'clamp(0.85rem, 3vw, 0.95rem)' }}>
-            Administra roles, suspende cuentas y elimina registros de forma centralizada.
+            {pestanaActiva === 'usuarios' 
+              ? 'Administra roles, suspende cuentas y elimina registros de forma centralizada.'
+              : 'Visualiza métricas clave, gráficos de actividad y reportes generales del sistema.'}
           </p>
         </div>
 
-        {/* Buscador */}
-        <div id="tour-admin-buscador" className="admin-search-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-card)', padding: '6px 15px', borderRadius: '30px', border: '1px solid var(--border-color)', minWidth: '280px', flex: '1', maxWidth: '380px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}><IconoBuscar width="18" height="18" /></span>
-          <input
-            type="text"
-            placeholder="Buscar por nombre o correo..."
-            value={busqueda}
-            onChange={handleBusqueda}
-            style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', width: '100%', fontSize: '0.9rem' }}
-          />
-        </div>
+        {/* Buscador (Solo en pestaña de usuarios) */}
+        {pestanaActiva === 'usuarios' && (
+          <div id="tour-admin-buscador" className="admin-search-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-card)', padding: '6px 15px', borderRadius: '30px', border: '1px solid var(--border-color)', minWidth: '280px', flex: '1', maxWidth: '380px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}><IconoBuscar width="18" height="18" /></span>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o correo..."
+              value={busqueda}
+              onChange={handleBusqueda}
+              style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-main)', width: '100%', fontSize: '0.9rem' }}
+            />
+          </div>
+        )}
       </div>
 
-      {/* CONTENIDO PRINCIPAL */}
-      <div
-        className="grafico-card"
+      {/* TABS DE NAVEGACIÓN */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+        <button
+          onClick={() => setPestanaActiva('usuarios')}
+          style={{
+            padding: '10px 18px',
+            backgroundColor: pestanaActiva === 'usuarios' ? 'var(--accent-color)' : 'transparent',
+            color: pestanaActiva === 'usuarios' ? 'white' : 'var(--text-muted)',
+            border: 'none',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          Gestión de Usuarios
+        </button>
+
+        <button
+          onClick={() => setPestanaActiva('reportes')}
+          style={{
+            padding: '10px 18px',
+            backgroundColor: pestanaActiva === 'reportes' ? 'var(--accent-color)' : 'transparent',
+            color: pestanaActiva === 'reportes' ? 'white' : 'var(--text-muted)',
+            border: 'none',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            fontSize: '0.95rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          Reportes y Estadísticas
+        </button>
+      </div>
+
+      {/* CONTENIDO SEGÚN LA PESTAÑA */}
+      {pestanaActiva === 'reportes' ? (
+        <ReportesEstadisticas />
+      ) : (
+        <>
+          {/* CONTENIDO PRINCIPAL */}
+          <div
+            className="grafico-card"
         style={{
           borderRadius: '12px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
@@ -724,6 +789,8 @@ export default function Admin() {
       </div>
 
       <ControlesPaginacion />
+    </>
+  )}
 
       {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
       {usuarioAEliminar && (
