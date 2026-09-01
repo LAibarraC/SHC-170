@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate, Link } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import Menu from "./ui/Menu";
 import Pie_pagina from "./ui/Pie_pagina";
 import { useState, useEffect } from "react";
@@ -32,6 +32,48 @@ import api from "./services/api";
 
 import "./App.css";
 import ConfirmHost from "./utils/ConfirmHost";
+
+const ConditionalFooter = () => {
+  const location = useLocation();
+  const hidePaths = ['/login', '/registro', '/forgot-password', '/reset-password'];
+  if (hidePaths.includes(location.pathname)) {
+    return null;
+  }
+  return <Pie_pagina />;
+};
+
+const ConditionalGuestHeader = ({ isAuth, usuario, setUsuario }) => {
+  const location = useLocation();
+  const hideLinkPaths = ['/registro', '/forgot-password', '/reset-password'];
+  const isHideLink = hideLinkPaths.includes(location.pathname);
+  const isLogin = location.pathname === '/login';
+  
+  if (isAuth) {
+    return (
+      <header className="guest-header">
+        <Menu usuario={usuario} setUsuario={setUsuario} />
+      </header>
+    );
+  }
+
+  return (
+    <header className="guest-header">
+      <div className="guest-actions">
+        <OscuroClaro />
+        {!isHideLink && (
+          <Link
+            to={isLogin ? "/" : "/login"}
+            className="login-link"
+            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+          >
+            {isLogin ? "Inicio" : "Iniciar Sesión"}
+          </Link>
+        )}
+      </div>
+    </header>
+  );
+};
 
 function App() {
   const [usuario, setUsuario] = useState(null);
@@ -88,24 +130,7 @@ function App() {
               <ConfirmHost />
 
               {/* 🆕 CONTROLES FLOTANTES MODERNOS PARA INVITADOS */}
-              <header className="guest-header">
-                {isAuth ? (
-                  <Menu usuario={usuario} setUsuario={setUsuario} />
-                ) : (
-                  <div className="guest-actions">
-                    <OscuroClaro />
-
-                    <Link
-                      to="/login"
-                      className="login-link"
-                      onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-                      onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-                    >
-                      Iniciar Sesión
-                    </Link>
-                  </div>
-                )}
-              </header>
+              <ConditionalGuestHeader isAuth={isAuth} usuario={usuario} setUsuario={setUsuario} />
 
               <div className="content" style={{ flex: 1 }}>
                 <Routes>
@@ -154,7 +179,7 @@ function App() {
                 </Routes>
               </div>
 
-              <Pie_pagina />
+              <ConditionalFooter />
 
             </div>
           </HashRouter>

@@ -5,8 +5,8 @@ export default function DiagramaFlujoSucesivo({ resultado, modReemplazo }) {
     if (!resultado) return null;
     const { pA, pB, pAandB, totalA, totalB, countA, countB, nameA, nameB } = resultado;
 
-    const strokeColor = "#3b82f6"; // blue
-    const boxBg = "#eff6ff";
+    const strokeColor = "var(--primary-color, #3b82f6)";
+    const boxBg = "var(--bg-input, #eff6ff)";
     const textColor = "var(--text-main, #1e293b)";
 
     return (
@@ -70,8 +70,8 @@ export default function DiagramaFlujoSucesivo({ resultado, modReemplazo }) {
                 </foreignObject>
 
                 {/* Resultado Final Intersección */}
-                <rect x="180" y="115" width="240" height="35" rx="17.5" fill="rgba(16, 185, 129, 0.1)" stroke="#10b981" strokeWidth="2" />
-                <text x="300" y="137" textAnchor="middle" fontSize="14" fill="#047857" fontWeight="bold">
+                <rect x="180" y="115" width="240" height="35" rx="17.5" fill="var(--bg-input, rgba(16, 185, 129, 0.1))" stroke="var(--border-color, #10b981)" strokeWidth="1.5" />
+                <text x="300" y="137" textAnchor="middle" fontSize="14" fill="var(--text-main, #047857)" fontWeight="bold">
                     P(A ∩ B) = {pAandB.toFixed(4)} ({(pAandB * 100).toFixed(1)}%)
                 </text>
 

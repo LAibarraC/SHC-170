@@ -77,43 +77,6 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="login-container" style={{ position: 'relative' }}>
-      
-      {/* 🆕 Ocultamos el pie de página Y el encabezado (header) global de App.jsx */}
-      <style>{`
-        .pie-top, footer, header {
-          display: none !important;
-        }
-      `}</style>
-
-      {/* Botones modernos en la esquina superior derecha solo para esta vista */}
-      <div className="guest-actions" style={{ 
-        position: 'absolute', 
-        top: '20px', 
-        right: '20px', 
-        zIndex: 1000, 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '15px' 
-      }}>
-        <OscuroClaro />
-        <Link 
-          to="/" 
-          className="login-link"
-          style={{ 
-            padding: '10px 24px', 
-            backgroundColor: 'var(--accent-color, #007bff)', 
-            color: 'white', 
-            textDecoration: 'none', 
-            borderRadius: '30px', 
-            fontWeight: 'bold',
-            fontSize: '0.95rem',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
-            transition: 'transform 0.2s, box-shadow 0.2s'
-          }}
-        >
-          Inicio
-        </Link>
-      </div>
 
       <div className="login-card">
         <div style={{ textAlign: 'center', marginBottom: '35px', marginTop: '5px' }}>

@@ -613,3 +613,90 @@
     height: 100% !important;
     border: none !important;
 }
+
+/* =========================================
+   ESTILOS DARK MODE PARA BOTONES (Tema 1)
+   Borde de color #ff6e00 igual al tema 3
+========================================= */
+[data-theme='dark'] .btn-tema1-borde, .dark .btn-tema1-borde, [data-bs-theme='dark'] .btn-tema1-borde {
+    border: 1px solid #ff6e00 !important;
+}
+
+[data-theme='dark'] .btn-tema1-borde, .dark .btn-tema1-borde, [data-bs-theme='dark'] .btn-tema1-borde {
+    border: 1px solid transparent !important;
+    background-color: transparent !important;
+}
+
+[data-theme='dark'] .btn-tema1-borde.active, .dark .btn-tema1-borde.active, [data-bs-theme='dark'] .btn-tema1-borde.active {
+    border: 1px solid #ff6e00 !important;
+    background-color: transparent !important;
+    color: white !important;
+}
+
+[data-theme='dark'] .border-tema1, .dark .border-tema1, [data-bs-theme='dark'] .border-tema1 {
+    border-color: #ff6e00 !important;
+}
+
+[data-theme='dark'] .text-tema1, .dark .text-tema1, [data-bs-theme='dark'] .text-tema1 {
+    color: #ff6e00 !important;
+}
+
+[data-theme='dark'] .button_calcular, .dark .button_calcular, [data-bs-theme='dark'] .button_calcular,
+[data-theme='dark'] .btn-icon, .dark .btn-icon, [data-bs-theme='dark'] .btn-icon,
+[data-theme='dark'] .btn-abrir-modal, .dark .btn-abrir-modal, [data-bs-theme='dark'] .btn-abrir-modal,
+[data-theme='dark'] .btn-abrir-excel, .dark .btn-abrir-excel, [data-bs-theme='dark'] .btn-abrir-excel,
+[data-theme='dark'] .btn-guardar-excel, .dark .btn-guardar-excel, [data-bs-theme='dark'] .btn-guardar-excel,
+[data-theme='dark'] .btn-tema1-active, .dark .btn-tema1-active, [data-bs-theme='dark'] .btn-tema1-active {
+    background: #2c2c2c !important;
+    border: 1px solid #ff6e00 !important;
+    color: white !important;
+    box-shadow: none !important;
+}
+
+[data-theme='dark'] .button_calcular:hover, .dark .button_calcular:hover, [data-bs-theme='dark'] .button_calcular:hover,
+[data-theme='dark'] .btn-icon:hover, .dark .btn-icon:hover, [data-bs-theme='dark'] .btn-icon:hover {
+    background: #3a3a3a !important;
+}
+
+/* --- CUSTOM SELECT TEMA 1 --- */
+.custom-select-tema1 {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-input);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23666666%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat, repeat;
+    background-position: right .7em top 50%, 0 0;
+    background-size: .65em auto, 100%;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.custom-select-tema1:hover {
+    border-color: #ff6e00;
+}
+
+.custom-select-tema1:focus {
+    border-color: #ff6e00;
+    box-shadow: 0 0 0 2px rgba(255, 110, 0, 0.2);
+}
+
+[data-theme='dark'] .custom-select-tema1, .dark .custom-select-tema1, [data-bs-theme='dark'] .custom-select-tema1 {
+    background-color: #2c2c2c;
+    border-color: #4a4a4a;
+    color: white;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23cccccc%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+}
+
+[data-theme='dark'] .custom-select-tema1:hover, .dark .custom-select-tema1:hover, [data-theme='dark'] .custom-select-tema1:focus, .dark .custom-select-tema1:focus, [data-bs-theme='dark'] .custom-select-tema1:hover, [data-bs-theme='dark'] .custom-select-tema1:focus {
+    border-color: #ff6e00;
+    box-shadow: 0 0 0 2px rgba(255, 110, 0, 0.2);
+}

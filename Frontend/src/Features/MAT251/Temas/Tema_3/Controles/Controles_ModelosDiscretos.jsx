@@ -37,6 +37,8 @@ export default function Controles_ModelosDiscretos({
     const [columnaSeleccionada, setColumnaSeleccionada] = useState(0);
     const [valorExito, setValorExito] = useState('');
     const [statsEstimados, setStatsEstimados] = useState(null);
+    const [nArriba, setNArriba] = useState('');
+    const [muestraN, setMuestraN] = useState('');
 
     const [error, setError] = useState('');
 
@@ -131,7 +133,64 @@ export default function Controles_ModelosDiscretos({
         let K = 0;
         let media = 0;
 
-        if (modelo === 'Binomial' || modelo === 'Hipergeometrica' || modelo === 'Bernoulli') {
+        if (modelo === 'Binomial') {
+            const esTexto = isNaN(parseFloat(datosColumna[0]));
+
+            if (!esTexto) {
+                // ESCENARIO B: Datos Cuantitativos
+                const n_lote = parseInt(nArriba);
+                if (isNaN(n_lote) || n_lote <= 0) {
+                    setError('Por favor, ingresa el Tamaño del ensayo (n) mayor a 0 antes de estimar.');
+                    return;
+                }
+
+                const numeros = datosColumna.map(v => parseFloat(v)).filter(v => !isNaN(v));
+                const sumaTotal = numeros.reduce((acc, curr) => acc + curr, 0);
+                const promedio = sumaTotal / numeros.length;
+                p = promedio / n_lote;
+
+                if (p > 1) {
+                    setError('Error: La probabilidad calculada es mayor a 1. El Tamaño del ensayo (n) ingresado es demasiado pequeño para estos datos.');
+                    return;
+                }
+
+                setStatsEstimados({
+                    total: numeros.length * n_lote,
+                    exitos: sumaTotal,
+                    p: p
+                });
+
+                setParamN_bin(n_lote.toString());
+            } else {
+                // ESCENARIO A: Datos Cualitativos
+                if (!valorExito) {
+                    setError('Debe seleccionar qué valor representa el "Éxito".');
+                    return;
+                }
+                const conteoExito = datosColumna.filter(v => v === valorExito).length;
+                p = conteoExito / totalDatos;
+
+                setStatsEstimados({
+                    total: totalDatos,
+                    exitos: conteoExito,
+                    p: p
+                });
+            }
+
+            setParamP_bin(p.toFixed(4));
+        } else if (modelo === 'Hipergeometrica' || modelo === 'Bernoulli') {
+            if (modelo === 'Hipergeometrica') {
+                const n_muestra = parseInt(muestraN);
+                if (isNaN(n_muestra) || n_muestra <= 0) {
+                    setError('Por favor, ingresa la Muestra a extraer (n) mayor a 0 antes de estimar.');
+                    return;
+                }
+                if (n_muestra > totalDatos) {
+                    setError(`La muestra "n" (${n_muestra}) no puede ser mayor que la población total "N" (${totalDatos}).`);
+                    return;
+                }
+            }
+
             if (!valorExito) {
                 setError('Debe seleccionar qué valor representa el "Éxito".');
                 return;
@@ -147,14 +206,12 @@ export default function Controles_ModelosDiscretos({
                 K: K
             });
 
-            if (modelo === 'Binomial') {
-                setParamP_bin(p.toFixed(2));
-                setParamN_bin(totalDatos.toString());
-            } else if (modelo === 'Bernoulli') {
-                setParamP_ber(p.toFixed(2));
+            if (modelo === 'Bernoulli') {
+                setParamP_ber(p.toFixed(4));
             } else {
                 setParamN_hip(totalDatos.toString());
                 setParamK_hip(K.toString());
+                setParamn_hip(muestraN.toString());
             }
         } else if (modelo === 'Poisson') {
             const numeros = datosColumna.map(v => parseFloat(v)).filter(v => !isNaN(v));
@@ -264,9 +321,9 @@ export default function Controles_ModelosDiscretos({
         const readOnlyParams = isMatriz;
 
         const disabledStyle = {
-            backgroundColor: '#f1f5f9',
-            color: '#475569',
-            border: '1px dashed #94a3b8',
+            backgroundColor: 'var(--bg-input, #f1f5f9)',
+            color: 'var(--text-muted, #475569)',
+            border: '1px dashed var(--border-color, #94a3b8)',
             cursor: 'not-allowed',
             fontWeight: 600
         };
@@ -285,7 +342,7 @@ export default function Controles_ModelosDiscretos({
                                 style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', width: '200px', textAlign: 'center' }}
                             />
                         </div>
-                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '12px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', width: '100%', boxSizing: 'border-box' }}>
                             {renderLatex(`P(X=x) = ${paramP_ber || 'p'}^x (1 - ${paramP_ber || 'p'})^{1-x}`)}
                         </div>
                     </>
@@ -297,9 +354,9 @@ export default function Controles_ModelosDiscretos({
                             <input
                                 type="number" className="tema3-input" min="1"
                                 value={paramN_bin} onChange={e => setParamN_bin(e.target.value)}
-                                placeholder="0"
-                                disabled={readOnlyParams}
-                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                                placeholder="Ej. 10"
+                                disabled={readOnlyParams && !(datosColumna.length > 0 && isNaN(parseFloat(datosColumna[0])))}
+                                style={{ ...(readOnlyParams && !(datosColumna.length > 0 && isNaN(parseFloat(datosColumna[0])))) ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
                         </div>
                         <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -312,7 +369,7 @@ export default function Controles_ModelosDiscretos({
                                 style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
                         </div>
-                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '12px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', width: '100%', boxSizing: 'border-box' }}>
                             {renderLatex(`P(X=x) = \\binom{${paramN_bin || 'n'}}{x} ${paramP_bin || 'p'}^x (1 - ${paramP_bin || 'p'})^{${paramN_bin || 'n'}-x}`)}
                         </div>
                     </>
@@ -329,7 +386,7 @@ export default function Controles_ModelosDiscretos({
                                 style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', width: '200px', textAlign: 'center' }}
                             />
                         </div>
-                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '12px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', width: '100%', boxSizing: 'border-box' }}>
                             {renderLatex(`P(X=x) = \\frac{${paramLambda || '\\lambda'}^x e^{-${paramLambda || '\\lambda'}}}{x!}`)}
                         </div>
                     </>
@@ -364,7 +421,7 @@ export default function Controles_ModelosDiscretos({
                                 readOnly
                                 disabled
                                 placeholder="N - N₁"
-                                style={{ ...disabledStyle, padding: '6px 10px', fontSize: '0.85rem', flex: 1, backgroundColor: '#e2e8f0', color: '#64748b' }}
+                                style={{ ...disabledStyle, padding: '6px 10px', fontSize: '0.85rem', flex: 1, backgroundColor: 'var(--bg-input, #e2e8f0)', color: 'var(--text-muted, #64748b)' }}
                             />
                         </div>
                         <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -376,7 +433,7 @@ export default function Controles_ModelosDiscretos({
                                 style={{ padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
                             />
                         </div>
-                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '12px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', width: '100%', boxSizing: 'border-box' }}>
                             {renderLatex(`P(X=x) = \\frac{\\binom{${paramK_hip || 'N_1'}}{x} \\binom{${(paramN_hip !== '' && paramK_hip !== '') ? Math.max(0, parseInt(paramN_hip) - parseInt(paramK_hip)) : 'N_2'}}{${paramn_hip || 'n'}-x}}{\\binom{${paramN_hip || 'N'}}{${paramn_hip || 'n'}}}`)}
                         </div>
                     </>
@@ -402,6 +459,7 @@ export default function Controles_ModelosDiscretos({
                         <button
                             key={tipo.id}
                             type="button"
+                            className={modelo === tipo.id ? 'btn-tema3-active' : ''}
                             onClick={() => handleCambiarModelo(tipo.id)}
                             style={{
                                 flex: 1,
@@ -411,9 +469,10 @@ export default function Controles_ModelosDiscretos({
                                 fontWeight: 600,
                                 border: 'none',
                                 cursor: 'pointer',
-                                background: modelo === tipo.id ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                                background: modelo === tipo.id ? '#3b82f6' : 'transparent',
                                 color: modelo === tipo.id ? '#fff' : 'var(--text-muted, #64748b)',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s ease',
+                                boxShadow: modelo === tipo.id ? '0 2px 4px rgba(13, 110, 253, 0.3)' : 'none'
                             }}
                         >
                             {tipo.label}
@@ -424,6 +483,7 @@ export default function Controles_ModelosDiscretos({
                 <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                     <button
                         type="button"
+                        className={modo === 'matriz' ? 'btn-tema3-active' : ''}
                         onClick={() => { setModo('matriz'); setError(''); }}
                         style={{
                             padding: '6px 16px',
@@ -432,15 +492,17 @@ export default function Controles_ModelosDiscretos({
                             fontWeight: 600,
                             border: 'none',
                             cursor: 'pointer',
-                            background: modo === 'matriz' ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                            background: modo === 'matriz' ? '#3b82f6' : 'transparent',
                             color: modo === 'matriz' ? '#fff' : 'var(--text-muted, #64748b)',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s ease',
+                            boxShadow: modo === 'matriz' ? '0 2px 4px rgba(13, 110, 253, 0.3)' : 'none'
                         }}
                     >
                         Análisis de Matriz
                     </button>
                     <button
                         type="button"
+                        className={modo === 'manual' ? 'btn-tema3-active' : ''}
                         onClick={() => { setModo('manual'); setError(''); }}
                         style={{
                             padding: '6px 16px',
@@ -449,9 +511,10 @@ export default function Controles_ModelosDiscretos({
                             fontWeight: 600,
                             border: 'none',
                             cursor: 'pointer',
-                            background: modo === 'manual' ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                            background: modo === 'manual' ? '#3b82f6' : 'transparent',
                             color: modo === 'manual' ? '#fff' : 'var(--text-muted, #64748b)',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s ease',
+                            boxShadow: modo === 'manual' ? '0 2px 4px rgba(13, 110, 253, 0.3)' : 'none'
                         }}
                     >
                         Modo Manual
@@ -471,24 +534,24 @@ export default function Controles_ModelosDiscretos({
                     <div style={{ marginBottom: '20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card, #fff)', padding: '12px 15px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', marginBottom: '20px' }}>
                             <div>
-                                <div style={{ color: 'var(--primary-color, #0d6efd)', fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Conjunto de Datos:</div>
+                                <div style={{ color: 'var(--text-main, #334155)', fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Conjunto de Datos:</div>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
-                                    Cargados: <strong style={{ color: 'var(--primary-color, #0d6efd)' }}>{statsDatos ? statsDatos.cargados : 0}</strong> &nbsp;
-                                    Agregados: <strong style={{ color: 'var(--primary-color, #0d6efd)' }}>{statsDatos ? statsDatos.agregados : 0}</strong> &nbsp;
-                                    Total: <strong style={{ color: 'var(--text-color, #334155)' }}>{statsDatos ? statsDatos.total : 0}</strong>
+                                    Cargados: <strong style={{ color: 'var(--text-main, #334155)' }}>{statsDatos ? statsDatos.cargados : 0}</strong> &nbsp;
+                                    Agregados: <strong style={{ color: 'var(--text-main, #334155)' }}>{statsDatos ? statsDatos.agregados : 0}</strong> &nbsp;
+                                    Total: <strong style={{ color: 'var(--text-main, #334155)' }}>{statsDatos ? statsDatos.total : 0}</strong>
                                 </div>
                             </div>
                             <button
                                 type="button"
                                 onClick={abrirEditor}
-                                className="btn-icon"
+                                className="btn-tema3-active"
                                 style={{
                                     borderRadius: '6px',
                                     fontSize: '0.85rem',
                                     padding: '6px 12px',
-                                    background: 'var(--primary-color, #0d6efd)',
+                                    background: '#3b82f6',
                                     color: 'white',
-                                    border: 'none',
+                                    border: '1px solid transparent',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -516,24 +579,71 @@ export default function Controles_ModelosDiscretos({
                                         </select>
                                     </div>
 
-                                    {(modelo === 'Binomial' || modelo === 'Hipergeometrica' || modelo === 'Bernoulli') && (
-                                        <div className="tema3-form-group" style={{ flex: 1 }}>
-                                            <label className="tema3-label">Valor a evaluar (x):</label>
-                                            <select
-                                                className="tema3-select"
-                                                value={valorExito}
-                                                onChange={e => setValorExito(e.target.value)}
-                                            >
-                                                <option value="">Seleccione un valor...</option>
-                                                {valoresUnicos.map((val, idx) => (
-                                                    <option key={idx} value={val}>{val}</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                    {(modelo === 'Hipergeometrica' || modelo === 'Bernoulli') && (
+                                        <>
+                                            <div className="tema3-form-group" style={{ flex: 1 }}>
+                                                <label className="tema3-label">Valor a evaluar (x):</label>
+                                                <select
+                                                    className="tema3-select"
+                                                    value={valorExito}
+                                                    onChange={e => setValorExito(e.target.value)}
+                                                >
+                                                    <option value="">Seleccione un valor...</option>
+                                                    {valoresUnicos.map((val, idx) => (
+                                                        <option key={idx} value={val}>{val}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {modelo === 'Hipergeometrica' && (
+                                                <div className="tema3-form-group" style={{ flex: 1 }}>
+                                                    <label className="tema3-label">Muestra a extraer {renderLatex('(n)')}:</label>
+                                                    <input
+                                                        type="number"
+                                                        className="tema3-input"
+                                                        value={muestraN}
+                                                        onChange={e => { setMuestraN(e.target.value); setStatsEstimados(null); }}
+                                                        placeholder="Ej. 5"
+                                                        min="1"
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {modelo === 'Binomial' && (
+                                        <>
+                                            {datosColumna.length > 0 && isNaN(parseFloat(datosColumna[0])) ? (
+                                                <div className="tema3-form-group" style={{ flex: 1 }}>
+                                                    <label className="tema3-label">Valor a evaluar (x):</label>
+                                                    <select
+                                                        className="tema3-select"
+                                                        value={valorExito}
+                                                        onChange={e => setValorExito(e.target.value)}
+                                                    >
+                                                        <option value="">Seleccione un valor...</option>
+                                                        {valoresUnicos.map((val, idx) => (
+                                                            <option key={idx} value={val}>{val}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <div className="tema3-form-group" style={{ flex: 1 }}>
+                                                    <label className="tema3-label">Tamaño del ensayo / Lote {renderLatex('(n)')}:</label>
+                                                    <input
+                                                        type="number"
+                                                        className="tema3-input"
+                                                        value={nArriba}
+                                                        onChange={e => { setNArriba(e.target.value); setStatsEstimados(null); }}
+                                                        placeholder="Ej. 10"
+                                                        min="1"
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
 
-                                <button className="tema3-btn" onClick={estimarDesdeDatos} style={{ background: '#10b981', marginBottom: '10px', width: 'auto', margin: '0 auto', display: 'block', padding: '8px 16px' }}>
+                                <button className="tema3-btn btn-tema3-active" onClick={estimarDesdeDatos} style={{ marginBottom: '10px', width: 'auto', margin: '0 auto', display: 'block', padding: '8px 16px' }}>
                                     Estimar Parámetros
                                 </button>
 
@@ -541,25 +651,27 @@ export default function Controles_ModelosDiscretos({
                                     <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '5px', color: 'var(--text-muted, #475569)', marginTop: '10px', backgroundColor: 'var(--bg-card, #ffffff)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color, #cbd5e1)', textAlign: 'center' }}>
                                         <div style={{ flex: 1 }}>
                                             <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Total Registros</span>
-                                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.total}</strong>
+                                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.total}</strong>
                                         </div>
                                         {modelo !== 'Poisson' ? (
                                             <>
                                                 <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Ocurrencias (Éxito)</span>
-                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.exitos}</strong>
+                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.exitos}</strong>
                                                 </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Probabilidad {renderLatex('p')}</span>
-                                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)', marginTop: '2px' }}>
-                                                        {renderLatex(`\\frac{${statsEstimados.exitos}}{${statsEstimados.total}} = ${statsEstimados.p?.toFixed(2)}`)}
+                                                {modelo !== 'Hipergeometrica' && (
+                                                    <div style={{ flex: 1 }}>
+                                                        <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Probabilidad {renderLatex('p')}</span>
+                                                        <div style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)', marginTop: '2px' }}>
+                                                            {renderLatex(`\\frac{${statsEstimados.exitos}}{${statsEstimados.total}} = ${statsEstimados.p?.toFixed(2)}`)}
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </>
                                         ) : (
                                             <div style={{ flex: 1 }}>
                                                 <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Media {renderLatex('\\lambda')}</span>
-                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)', marginTop: '2px' }}>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)', marginTop: '2px' }}>
                                                     {renderLatex(`\\frac{${statsEstimados.suma}}{${statsEstimados.total}} = ${statsEstimados.media?.toFixed(2)}`)}
                                                 </div>
                                             </div>
@@ -573,19 +685,23 @@ export default function Controles_ModelosDiscretos({
                     </div>
                 )}
 
-                {renderParametrosManuales()}
+                {(modo === 'manual' || (modo === 'matriz' && statsEstimados)) && (
+                    <>
+                        {renderParametrosManuales()}
 
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-                    <button className="tema3-btn" onClick={manejarCalculo} style={{ padding: '8px 16px', fontSize: '0.9rem', width: 'auto' }}>
-                        Graficar
-                    </button>
-                </div>
+                        <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                            <button className="tema3-btn btn-tema3-active" onClick={manejarCalculo} style={{ width: 'auto', padding: '6px 30px', fontSize: '0.95rem' }}>
+                                Graficar
+                            </button>
+                        </div>
+                    </>
+                )}
 
-                {children && (
+                {children && (modo === 'manual' || (modo === 'matriz' && statsEstimados)) && (
                     <>
                         <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)', margin: '15px 0' }}></div>
 
-                <h4 style={{ color: 'var(--text-color, #334155)', fontSize: '0.85rem', margin: '0 0 10px 0' }}>Condición de Búsqueda</h4>
+                <h4 style={{ color: 'var(--text-main, #334155)', fontSize: '0.85rem', margin: '0 0 10px 0' }}>Condición de Búsqueda</h4>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', marginBottom: '25px' }}>
                     <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column' }}>
@@ -633,13 +749,16 @@ export default function Controles_ModelosDiscretos({
                             />
                         </div>
                     )}
-                    
-                    <button className="tema3-btn" onClick={manejarCalculo} style={{ flex: '0 0 auto', padding: '0 16px', fontSize: '0.9rem', height: '36px', width: 'auto' }}>
+                </div>
+                
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                    <button className="tema3-btn btn-tema3-active" onClick={manejarCalculo} style={{ width: 'auto', padding: '6px 30px', fontSize: '0.95rem' }}>
                         Calcular
                     </button>
                 </div>
                 </>
                 )}
+
 
                     {/* SECCIÓN DE GRAFICADO Y RESULTADOS */}
                     <div style={{ margin: '20px 0' }}>
@@ -680,7 +799,7 @@ function CustomSelect({ value, onChange, options }) {
                     borderRadius: '8px', cursor: 'pointer',
                     boxShadow: isOpen ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
                     transition: 'all 0.2s ease',
-                    color: 'var(--text-color, #1e293b)',
+                    color: 'var(--text-main, #1e293b)',
                     userSelect: 'none',
                 }}
             >
@@ -695,7 +814,7 @@ function CustomSelect({ value, onChange, options }) {
             {isOpen && (
                 <div style={{
                     position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-                    background: 'var(--bg-panel, white)',
+                    background: 'var(--bg-card, white)',
                     border: '1px solid var(--border-color, #cbd5e1)',
                     borderRadius: '8px',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
@@ -720,13 +839,13 @@ function CustomSelect({ value, onChange, options }) {
                                 onMouseLeave={e => {
                                     if (!active) {
                                         e.currentTarget.style.background = 'transparent';
-                                        e.currentTarget.style.color = 'var(--text-color, #1e293b)';
+                                        e.currentTarget.style.color = 'var(--text-main, #1e293b)';
                                     }
                                 }}
                                 style={{
                                     padding: '8px 12px',
                                     fontSize: '0.85rem',
-                                    color: active ? '#fff' : 'var(--text-color, #1e293b)',
+                                    color: active ? '#fff' : 'var(--text-main, #1e293b)',
                                     background: active ? 'var(--primary-color, #3b82f6)' : 'transparent',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',

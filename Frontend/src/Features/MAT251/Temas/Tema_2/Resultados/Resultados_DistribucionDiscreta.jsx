@@ -1,177 +1,147 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import GraficoBastonesDiscreta from '../../../Graficas/Tema_2/GraficoBastonesDiscreta';
-import GraficoAcumuladaDiscreta from '../../../Graficas/Tema_2/GraficoAcumuladaDiscreta';
-import GraficaCentroDispersion from '../../../Graficas/Tema_2/GraficaCentroDispersion';
-import MarcoWidgetMAT251 from '../../../ui/MarcoWidgetMAT251';
-import { cardStyle, FONT, FS, RADIUS } from '../../../Principal/Constantes';
-import ModalProcedimientoDiscreta from '../Modales/ModalProcedimientoDiscreta';
-import { IconoProcedimiento } from '../../../ui/Iconos';
-
-// Componente helper para renderizar KaTeX sin depender de react-katex
-const FormulaKaTeX = ({ latex, inline = false }) => {
-    const formulaRef = useRef(null);
-
-    useEffect(() => {
-        if (formulaRef.current && latex) {
-            katex.render(latex, formulaRef.current, { throwOnError: false, displayMode: !inline });
-        }
-    }, [latex, inline]);
-
-    if (inline) {
-        return <span ref={formulaRef} style={{ margin: '0 4px' }}></span>;
-    }
-    return <div ref={formulaRef} style={{ margin: '15px 0', fontSize: '1.1em', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '8px' }}></div>;
-};
-
 
 export default function Resultados_DistribucionDiscreta({ resultados }) {
-    const [momentoActivo, setMomentoActivo] = useState(null);
+    const renderLatex = (str) => {
+        return <span dangerouslySetInnerHTML={{ __html: katex.renderToString(str, { throwOnError: false }) }} />;
+    };
+
+    const cardStyle = {
+        background: 'transparent',
+        color: 'var(--text-main, #1e293b)',
+        padding: '10px 0',
+        height: '100%',
+        boxSizing: 'border-box'
+    };
 
     if (!resultados) return null;
 
     if (resultados.error) {
         return (
-            <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #f87171', padding: '15px', borderRadius: RADIUS, fontFamily: FONT }}>
-                <strong>Error de Validación:</strong>
-                <p style={{ margin: '5px 0 0 0', fontSize: FS.sm }}>{resultados.error}</p>
+            <div style={cardStyle}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.8, color: '#ef4444' }}>
+                    <p>{resultados.error}</p>
+                </div>
             </div>
         );
     }
 
-    const { datos, esperanza, varianza, desviacion, asimetria, curtosis } = resultados;
+    // Desgloses visuales a partir de resultados.datos
+    const desgloseEX = resultados.datos.map(d => `(${d.x} \\times ${parseFloat(d.p.toFixed(4))})`).join(' + ');
+    const esperanzaX2 = resultados.datos.reduce((acc, d) => acc + (d.x ** 2) * d.p, 0);
+    const desgloseVar = `${esperanzaX2.toFixed(4)} - (${resultados.esperanza.toFixed(4)})^2`;
 
     return (
-        <div style={{ fontFamily: FONT, display: 'flex', flexDirection: 'column', gap: '20px', position: 'relative' }}>
+        <div style={cardStyle}>
+            <h3 style={{ color: '#3b82f6', fontSize: '1rem', fontWeight: 600, margin: '0 0 15px 0' }}>
+                Resultados y Desarrollo
+            </h3>
 
-            {/* Desarrollo Matemático con KaTeX */}
-            <div style={{ ...cardStyle }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-                    <h3 style={{ color: 'var(--primary-color)', fontSize: FS.md, margin: 0, fontWeight: 600 }}>
-                        MOMENTOS DE LA DISTRIBUCIÓN
-                    </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', overflowY: 'auto', paddingRight: '10px' }}>
+
+                {/* Tabla de Distribución (Solo si viene de Datos Brutos con Frecuencias) */}
+                {resultados.datos.some(d => d.f !== undefined) && (
+                    <div style={{ padding: '15px', background: 'var(--bg-input, #f8fafc)', borderRadius: '8px' }}>
+                        <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-main, #1e293b)' }}>Distribución de Probabilidad</h4>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.9rem', backgroundColor: 'var(--bg-card, #fff)' }}>
+                                <thead style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)' }}>
+                                    <tr>
+                                        <th style={{ padding: '8px', color: 'var(--text-main, #0f172a)', fontWeight: 600, border: '1px solid var(--border-color, #cbd5e1)' }}>{renderLatex('x_i')}</th>
+                                        <th style={{ padding: '8px', color: 'var(--text-main, #0f172a)', fontWeight: 600, border: '1px solid var(--border-color, #cbd5e1)' }}>Frec.</th>
+                                        <th style={{ padding: '8px', color: 'var(--text-main, #0f172a)', fontWeight: 600, border: '1px solid var(--border-color, #cbd5e1)' }}>{renderLatex('P(X = x_i)')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {resultados.datos.map((d, i) => (
+                                        <tr key={i}>
+                                            <td style={{ padding: '8px', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-main)' }}>{d.x}</td>
+                                            <td style={{ padding: '8px', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-main)' }}>{d.f}</td>
+                                            <td style={{ padding: '8px', border: '1px solid var(--border-color, #e2e8f0)', color: 'var(--text-main)' }}>{parseFloat(d.p.toFixed(4))}</td>
+                                        </tr>
+                                    ))}
+                                    <tr style={{ fontWeight: 'bold', backgroundColor: 'rgba(148, 163, 184, 0.15)', color: 'var(--text-main, #0f172a)' }}>
+                                        <td style={{ padding: '8px', border: '1px solid var(--border-color, #cbd5e1)' }}>Total</td>
+                                        <td style={{ padding: '8px', border: '1px solid var(--border-color, #cbd5e1)' }}>{resultados.datos.reduce((acc, d) => acc + d.f, 0)}</td>
+                                        <td style={{ padding: '8px', border: '1px solid var(--border-color, #cbd5e1)' }}>{parseFloat(resultados.datos.reduce((acc, d) => acc + d.p, 0).toFixed(4))}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Esperanza Matemática */}
+                <div style={{ padding: '15px', background: 'var(--bg-input, #f8fafc)', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-main, #1e293b)' }}>Esperanza Matemática E(X)</h4>
+                    <div style={{ fontSize: '0.9rem', marginBottom: '8px' }}>
+                        {renderLatex(`E(X) = \\sum x_i \\cdot P(X = x_i)`)}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginBottom: '10px' }}>
+                        {renderLatex(`E(X) = ${desgloseEX}`)}
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main, #1e293b)' }}>
+                        {renderLatex(`E(X) = ${resultados.esperanza.toFixed(4)}`)}
+                    </div>
                 </div>
 
-                <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '1fr 1fr', 
-                    gridTemplateRows: '1fr 1fr 1fr',
-                    gridAutoFlow: 'column',
-                    gap: '20px' 
-                }}>
-                    {/* 1. Esperanza Matemática */}
-                    <div style={{ background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: FS.sm, fontWeight: 600, color: 'var(--text-color)' }}>
-                                1. Esperanza Matemática <FormulaKaTeX latex="\mu = E(X)" inline={true} />
-                            </span>
-                            <button onClick={() => setMomentoActivo('esperanza')} title="Ver procedimiento de Esperanza Matemática" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
-                                <IconoProcedimiento />
-                            </button>
+                {/* Varianza y Desviación */}
+                <div style={{ padding: '15px', background: 'var(--bg-input, #f8fafc)', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-main, #1e293b)' }}>Varianza</h4>
+                            <div style={{ fontSize: '0.9rem', marginBottom: '8px' }}>
+                                {renderLatex(`Var(X) = E(X^2) - [E(X)]^2`)}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginBottom: '10px' }}>
+                                {renderLatex(`Var(X) = ${desgloseVar}`)}
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main, #1e293b)' }}>
+                                {renderLatex(`Var(X) = ${resultados.varianza.toFixed(4)}`)}
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '10px' }}>
-                            <FormulaKaTeX latex={`\\displaystyle E(X) = \\sum_{i=1}^{n} x_i P(x_i)`} inline={true} />
-                            <FormulaKaTeX latex={`= ${esperanza.toFixed(4)}`} inline={true} />
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-main, #1e293b)' }}>Desviación Estándar</h4>
+                            <div style={{ fontSize: '0.9rem', marginBottom: '8px' }}>
+                                {renderLatex(`\\sigma = \\sqrt{Var(X)}`)}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginBottom: '10px' }}>
+                                {renderLatex(`\\sigma = \\sqrt{${resultados.varianza.toFixed(4)}}`)}
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main, #1e293b)' }}>
+                                {renderLatex(`\\sigma = ${resultados.desviacion.toFixed(4)}`)}
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* 2. Varianza */}
-                    <div style={{ background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: FS.sm, fontWeight: 600, color: 'var(--text-color)' }}>
-                                2. Varianza <FormulaKaTeX latex="Var(X)" inline={true} />
-                            </span>
-                            <button onClick={() => setMomentoActivo('varianza')} title="Ver procedimiento de Varianza" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
-                                <IconoProcedimiento />
-                            </button>
+                {/* Asimetría y Curtosis */}
+                <div style={{ padding: '15px', background: 'var(--bg-input, #f8fafc)', borderRadius: '8px' }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-main, #1e293b)' }}>Forma de la Distribución</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginBottom: '8px' }}>Asimetría (Sesgo)</div>
+                            <div style={{ fontSize: '0.9rem', marginBottom: '10px' }}>
+                                {renderLatex(`\\gamma_1 = \\frac{\\sum (x_i - \\mu)^3 \\cdot P(x_i)}{\\sigma^3}`)}
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main, #1e293b)' }}>
+                                {renderLatex(`\\gamma_1 = ${resultados.asimetria.toFixed(4)}`)}
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '10px' }}>
-                            <FormulaKaTeX latex={`\\displaystyle Var(X) = \\sum_{i=1}^{n} (x_i - \\mu)^2 P(x_i)`} inline={true} />
-                            <FormulaKaTeX latex={`= ${varianza.toFixed(4)}`} inline={true} />
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginBottom: '8px' }}>Curtosis</div>
+                            <div style={{ fontSize: '0.9rem', marginBottom: '10px' }}>
+                                {renderLatex(`\\gamma_2 = \\frac{\\sum(x_i-\\mu)^4 \\cdot P(x_i)}{\\sigma^4} - 3`)}
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main, #1e293b)' }}>
+                                {renderLatex(`\\gamma_2 = ${resultados.curtosis.toFixed(4)}`)}
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* 3. Desviación Estándar */}
-                    <div style={{ background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: FS.sm, fontWeight: 600, color: 'var(--text-color)' }}>
-                                3. Desviación Estándar <FormulaKaTeX latex="\sigma" inline={true} />
-                            </span>
-                            <button onClick={() => setMomentoActivo('desviacion')} title="Ver procedimiento de Desviación Estándar" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
-                                <IconoProcedimiento />
-                            </button>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '10px' }}>
-                            <FormulaKaTeX latex={`\\displaystyle \\sigma = \\sqrt{Var(X)}`} inline={true} />
-                            <FormulaKaTeX latex={`= ${desviacion.toFixed(4)}`} inline={true} />
-                        </div>
-                    </div>
-
-                    {/* 4. Asimetría */}
-                    <div style={{ background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: FS.sm, fontWeight: 600, color: 'var(--text-color)' }}>
-                                4. Asimetría <FormulaKaTeX latex="\gamma_1" inline={true} /> (Sesgo)
-                            </span>
-                            <button onClick={() => setMomentoActivo('asimetria')} title="Ver procedimiento de Asimetría" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
-                                <IconoProcedimiento />
-                            </button>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '10px' }}>
-                            <FormulaKaTeX latex={`\\displaystyle \\gamma_1 = \\frac{E[(X-\\mu)^3]}{\\sigma^3}`} inline={true} />
-                            <FormulaKaTeX latex={`= ${asimetria.toFixed(4)}`} inline={true} />
-                        </div>
-                    </div>
-
-                    {/* 5. Curtosis */}
-                    <div style={{ background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <span style={{ fontSize: FS.sm, fontWeight: 600, color: 'var(--text-color)' }}>
-                                5. Curtosis <FormulaKaTeX latex="\gamma_2" inline={true} />
-                            </span>
-                            <button onClick={() => setMomentoActivo('curtosis')} title="Ver procedimiento de Curtosis" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', color: '#475569' }}>
-                                <IconoProcedimiento />
-                            </button>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', columnGap: '8px', rowGap: '4px', marginTop: '10px' }}>
-                            <FormulaKaTeX latex={`\\displaystyle \\gamma_2 = \\frac{E[(X-\\mu)^4]}{\\sigma^4} - 3`} inline={true} />
-                            <FormulaKaTeX latex={`= ${curtosis.toFixed(4)}`} inline={true} />
-                        </div>
-                    </div>
-                </div> 
             </div>
-
-            {/* Gráfica: Centro y Dispersión */}
-            <MarcoWidgetMAT251 id="widget-momentos" titulo="Visualización de Centro y Dispersión" anchoCompleto={true} alto="450px">
-                <div style={{ background: '#f8fafc', padding: '10px 10px', borderRadius: RADIUS, height: '100%' }}>
-                    <GraficaCentroDispersion datos={datos} esperanza={esperanza} varianza={varianza} desviacion={desviacion} asimetria={asimetria} curtosis={curtosis} />
-                </div>
-            </MarcoWidgetMAT251>
-
-            {/* Gráfica de Bastones */}
-            <MarcoWidgetMAT251 id="widget-bastones" titulo="Función de Probabilidad — P(X = x)" anchoCompleto={true} alto="400px">
-                <div style={{ background: '#f8fafc', padding: '20px 10px', borderRadius: RADIUS, height: '100%' }}>
-                    <GraficoBastonesDiscreta datos={datos} />
-                </div>
-            </MarcoWidgetMAT251>
-
-            {/* Gráfica Acumulada */}
-            <div style={{ marginTop: '20px' }}>
-                <MarcoWidgetMAT251 id="widget-acumulada" titulo="Función de Distribución Acumulada — F(x)" anchoCompleto={true} alto="400px">
-                    <div style={{ background: '#f8fafc', padding: '20px 10px', borderRadius: RADIUS, height: '100%' }}>
-                        <GraficoAcumuladaDiscreta datos={datos} />
-                    </div>
-                </MarcoWidgetMAT251>
-            </div>
-
-            {/* Modal Dinámico por Momento */}
-            <ModalProcedimientoDiscreta 
-                momentoActivo={momentoActivo} 
-                setMomentoActivo={setMomentoActivo} 
-                resultados={resultados} 
-            />
-
         </div>
     );
 }

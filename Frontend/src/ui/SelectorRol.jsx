@@ -42,9 +42,9 @@ export default function SelectorRol() {
   };
 
   // Rutas que sabemos que tienen el botón de "Guía Rápida" en la esquina inferior izquierda
-  const rutasConGuia = ['/archivos', '/historial', '/grupos', '/calculadora'];
+  const rutasConGuia = ['/archivos', '/historial', '/grupos','/gestion-docente', '/calculadora','/admin'];
   const tieneGuia = rutasConGuia.some(ruta => location.pathname.startsWith(ruta));
-  const bottomPosition = tieneGuia ? '90px' : '20px';
+  const bottomPosition = tieneGuia ? '70px' : '20px';
 
   return (
     <div
@@ -52,7 +52,7 @@ export default function SelectorRol() {
       onMouseLeave={() => setExpandido(false)}
       style={{
         position: 'fixed',
-        bottom: '80px',
+        bottom: bottomPosition,
         left: '20px',
         zIndex: 999999,
         background: 'var(--bg-card)', // Ajustado para modo oscuro

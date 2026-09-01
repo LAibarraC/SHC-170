@@ -1,406 +1,487 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FONT, FS, RADIUS, cardStyle, labelStyle } from '../../../Principal/Constantes';
-import { IconoCalculadora, EditarDatos } from '../../../../../ui/iconos';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import '../../../styles/Temas/Tema3.css';
+import { IconoBasura, IconoMas } from '../../../../../ui/iconos';
 
-export default function Controles_DistribucionDiscreta({ 
-    varSeleccionada, 
-    filas, 
-    statsDatos, 
-    abrirEditor, 
-    onCalcular 
-}) {
-    const [inputMode, setInputMode] = useState('matriz'); // 'matriz' o 'manual'
+export default function Controles_DistribucionDiscreta({ onCalcular, varSeleccionada, filas, statsDatos, abrirEditor }) {
+    const [modo, setModo] = useState('matriz'); // 'manual' | 'matriz'
+    const [tipoMatriz, setTipoMatriz] = useState('brutos'); // 'brutos' | 'probabilidades'
+    const [columnaSeleccionada, setColumnaSeleccionada] = useState('');
+    const [columnaProbabilidad, setColumnaProbabilidad] = useState('');
     const [error, setError] = useState('');
-    const [columnaSeleccionada, setColumnaSeleccionada] = useState(0);
 
-    const [filasManuales, setFilasManuales] = useState([
-        { x: '', p: '' },
-        { x: '', p: '' },
-        { x: '', p: '' }
+    const [tabla, setTabla] = useState([
+        { id: 1, x: '', p: '' },
+        { id: 2, x: '', p: '' }
     ]);
 
-    const [mostrarTablaMatriz, setMostrarTablaMatriz] = useState(false);
-
-    // Reseteamos columna al cambiar de variable cargada
-    useEffect(() => {
-        setColumnaSeleccionada(0);
-        setError('');
-        setMostrarTablaMatriz(false);
+    // Lógica para Gestión de Datos
+    const columnasDisponibles = useMemo(() => {
+        return (varSeleccionada?.nombresColumnas && varSeleccionada.nombresColumnas.length > 0)
+            ? varSeleccionada.nombresColumnas
+            : (varSeleccionada ? [varSeleccionada.nombre || 'Datos'] : []);
     }, [varSeleccionada]);
 
-    // Ocultar tabla si se cambia la columna seleccionada o el modo
     useEffect(() => {
-        setMostrarTablaMatriz(false);
-    }, [columnaSeleccionada, inputMode]);
+        setColumnaSeleccionada('');
+        setColumnaProbabilidad('');
+    }, [columnasDisponibles]);
 
-    // Calcular tabla agrupada para Modo Matriz
-    const datosMatrizAgrupados = useMemo(() => {
-        if (!varSeleccionada || !filas || filas.length === 0) return null;
+    // Reseteos al cambiar de modo
+    useEffect(() => {
+        setError('');
+        onCalcular(null);
+    }, [modo, tipoMatriz]);
 
+    const agregarFila = () => {
+        setTabla([...tabla, { id: Date.now(), x: '', p: '' }]);
+    };
+
+    const eliminarFila = (id) => {
+        if (tabla.length <= 1) return;
+        setTabla(tabla.filter(fila => fila.id !== id));
+        onCalcular(null);
+    };
+
+    const actualizarFila = (id, campo, valor) => {
+        setTabla(tabla.map(fila => fila.id === id ? { ...fila, [campo]: valor } : fila));
+        onCalcular(null);
+    };
+
+    const sumaProbabilidades = useMemo(() => {
+        return tabla.reduce((acc, curr) => {
+            const val = parseFloat(curr.p);
+            return acc + (isNaN(val) ? 0 : val);
+        }, 0);
+    }, [tabla]);
+
+    const esSumaValida = Math.abs(sumaProbabilidades - 1) < 0.0001;
+    const hayCamposVacios = tabla.some(fila => fila.x === '' || fila.p === '');
+
+    const handleCalcular = () => {
+        if (!esSumaValida || hayCamposVacios) return;
+        const datos = tabla.map(fila => ({
+            x: parseFloat(fila.x),
+            p: parseFloat(fila.p)
+        }));
+        onCalcular(datos); 
+    };
+
+    const renderLatex = (str) => {
+        return <span dangerouslySetInnerHTML={{ __html: katex.renderToString(str, { throwOnError: false }) }} />;
+    };
+
+    const datosColumna = useMemo(() => {
+        if (!varSeleccionada || !filas || filas.length === 0 || columnaSeleccionada === '') return [];
         const validas = filas.filter(f => (f.valor || '').toString().trim() !== '');
-        if (validas.length === 0) return null;
 
-        const nombresColumnas = (varSeleccionada.nombresColumnas && varSeleccionada.nombresColumnas.length > 0) ? varSeleccionada.nombresColumnas : [varSeleccionada.nombre || 'Datos'];
-        
-        const counts = {};
-        let totalValidos = 0;
-
-        validas.forEach(f => {
-            let val = '';
-            if (nombresColumnas.length > 1) {
+        return validas.map(f => {
+            if (varSeleccionada.nombresColumnas && varSeleccionada.nombresColumnas.length > 1) {
                 const partes = (f.valor || '').toString().split(' | ');
-                val = partes[columnaSeleccionada] ? partes[columnaSeleccionada].trim() : '';
-            } else {
-                val = (f.valor || '').toString().trim();
+                return partes[columnaSeleccionada] ? partes[columnaSeleccionada].trim() : '';
             }
-
-            if (val !== '') {
-                const numVal = parseFloat(val);
-                if (!isNaN(numVal)) {
-                    counts[numVal] = (counts[numVal] || 0) + 1;
-                    totalValidos++;
-                }
-            }
-        });
-
-        if (totalValidos === 0) return null;
-
-        let acumulado = 0;
-        const agrupados = Object.entries(counts).map(([xVal, f]) => {
-            const p = f / totalValidos;
-            acumulado += p;
-            return {
-                x: parseFloat(xVal),
-                f: f,
-                p: p,
-                F: acumulado
-            };
-        }).sort((a, b) => a.x - b.x);
-
-        return agrupados;
-
+            return (f.valor || '').toString().trim();
+        }).map(v => parseFloat(v)).filter(v => !isNaN(v));
     }, [varSeleccionada, filas, columnaSeleccionada]);
 
-    // Funciones Modo Manual
-    const agregarFila = () => setFilasManuales([...filasManuales, { x: '', p: '' }]);
-    const eliminarFila = (index) => {
-        if (filasManuales.length > 1) {
-            setFilasManuales(filasManuales.filter((_, i) => i !== index));
-        }
-    };
-    const actualizarFila = (index, campo, valor) => {
-        const nuevas = [...filasManuales];
-        if (campo === 'p' && valor !== '') {
-            const num = parseFloat(valor);
-            if (num < 0) valor = '0';
-            else if (num > 1) valor = '1';
-        }
-        nuevas[index][campo] = valor;
-        setFilasManuales(nuevas);
-        setError('');
-    };
-
-    // Calcular suma de probabilidades en tiempo real para modo manual
-    const sumaProbabilidades = filasManuales.reduce((acc, f) => {
-        const val = parseFloat(f.p);
-        return acc + (isNaN(val) ? 0 : val);
-    }, 0);
-    const isSumaValida = Math.abs(sumaProbabilidades - 1.0) < 0.0001;
-
-    // Botón Calcular (Unifica ambas lógicas)
-    const manejarCalculo = () => {
-        if (inputMode === 'matriz') {
-            if (!datosMatrizAgrupados || datosMatrizAgrupados.length === 0) {
+    const procesarMatriz = () => {
+        if (tipoMatriz === 'brutos') {
+            if (columnaSeleccionada === '') {
+                setError('Por favor selecciona la columna a evaluar.');
+                return;
+            }
+            if (datosColumna.length === 0) {
                 setError('No hay datos numéricos válidos en la columna seleccionada.');
                 return;
             }
+
+            const counts = {};
+            datosColumna.forEach(val => {
+                counts[val] = (counts[val] || 0) + 1;
+            });
+
+            const totalDatos = datosColumna.length;
+            const datosGenerados = Object.keys(counts).map(key => {
+                const val = parseFloat(key);
+                const freq = counts[key];
+                return {
+                    x: val,
+                    p: freq / totalDatos,
+                    f: freq
+                };
+            }).sort((a, b) => a.x - b.x); // Ordenar por X de menor a mayor
+
             setError('');
-            setMostrarTablaMatriz(true);
-            // Formatear para que el motor matemático (logica_Tema2) lo entienda
-            const datosParaLogica = datosMatrizAgrupados.map(d => ({ x: d.x, p: d.p }));
-            onCalcular(datosParaLogica);
-
+            onCalcular(datosGenerados);
         } else {
-            let validos = [];
-
-            for (let i = 0; i < filasManuales.length; i++) {
-                const xVal = parseFloat(filasManuales[i].x);
-                const pVal = parseFloat(filasManuales[i].p);
-
-                if (isNaN(xVal) || isNaN(pVal)) {
-                    setError(`La fila ${i + 1} contiene valores vacíos o no numéricos.`);
-                    return;
-                }
-                validos.push({ x: xVal, p: pVal });
-            }
-
-            if (!isSumaValida) {
-                setError(`La suma de P(X) debe ser exactamente 1. Suma actual: ${sumaProbabilidades.toFixed(4)}`);
+            // Modo Tabla de Probabilidades (2 columnas)
+            if (columnaSeleccionada === '' || columnaProbabilidad === '') {
+                setError('Por favor selecciona las columnas para X y P(X).');
                 return;
             }
 
+            const validas = filas.filter(f => (f.valor || '').toString().trim() !== '');
+            let sumaP = 0;
+            const datosGenerados = [];
+
+            for (let f of validas) {
+                let valX = '';
+                let valP = '';
+                if (varSeleccionada.nombresColumnas && varSeleccionada.nombresColumnas.length > 1) {
+                    const partes = (f.valor || '').toString().split(' | ');
+                    valX = partes[columnaSeleccionada] ? partes[columnaSeleccionada].trim() : '';
+                    valP = partes[columnaProbabilidad] ? partes[columnaProbabilidad].trim() : '';
+                } else {
+                    valX = (f.valor || '').toString().trim();
+                    valP = valX; // Fallback, though likely to sum > 1
+                }
+
+                const numX = parseFloat(valX);
+                const numP = parseFloat(valP);
+
+                if (!isNaN(numX) && !isNaN(numP)) {
+                    datosGenerados.push({ x: numX, p: numP });
+                    sumaP += numP;
+                }
+            }
+
+            if (datosGenerados.length === 0) {
+                setError('No hay filas con valores numéricos válidos en ambas columnas.');
+                return;
+            }
+
+            if (Math.abs(sumaP - 1) > 0.001) {
+                setError(`Las probabilidades seleccionadas suman ${sumaP.toFixed(4)}. Deben sumar 1.0.`);
+                return;
+            }
+
+            datosGenerados.sort((a, b) => a.x - b.x);
             setError('');
-            onCalcular(validos);
+            onCalcular(datosGenerados);
         }
     };
 
-    const columnasDisponibles = (varSeleccionada?.nombresColumnas && varSeleccionada.nombresColumnas.length > 0) ? varSeleccionada.nombresColumnas : (varSeleccionada ? [varSeleccionada.nombre || 'Datos'] : []);
+    const cardStyle = {
+        background: 'transparent',
+        color: 'var(--text-main, #1e293b)',
+        padding: '5px 0',
+        height: '100%',
+        boxSizing: 'border-box'
+    };
 
-    // Estilos comunes en línea (reemplazo de CSS)
-    const commonTableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '15px', marginBottom: '15px', fontSize: FS.sm };
-    const commonThStyle = { border: '1px solid var(--border-color)', padding: '8px 12px', textAlign: 'center', backgroundColor: 'var(--bg-input)', fontWeight: 600, color: 'var(--primary-color)' };
-    const commonTdStyle = { border: '1px solid var(--border-color)', padding: '8px 12px', textAlign: 'center' };
+    const inputStyle = {
+        width: '100%',
+        padding: '8px 12px',
+        border: '1px solid var(--border-color, #cbd5e1)',
+        borderRadius: '6px',
+        outline: 'none',
+        fontSize: '0.85rem',
+        backgroundColor: 'var(--bg-input, #fff)',
+        color: 'var(--text-main, #0f172a)',
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+    };
 
     return (
-        <div style={{ fontFamily: FONT, display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <div style={{ marginBottom: '20px' }}>
-                {/* --- TOGGLE MATRIZ / MANUAL --- */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}>
-                    <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
-                        <button 
-                            style={{
-                                padding: '6px 16px', borderRadius: '6px', fontSize: FS.sm, fontWeight: 600, border: 'none', cursor: 'pointer',
-                                background: inputMode === 'matriz' ? 'var(--primary-color)' : 'transparent',
-                                color: inputMode === 'matriz' ? '#fff' : 'var(--text-muted)',
-                                transition: 'all 0.2s ease'
-                            }}
-                            onClick={() => { setInputMode('matriz'); setError(''); }}
-                        >
-                            Análisis de Matriz
-                        </button>
-                        <button 
-                            style={{
-                                padding: '6px 16px', borderRadius: '6px', fontSize: FS.sm, fontWeight: 600, border: 'none', cursor: 'pointer',
-                                background: inputMode === 'manual' ? 'var(--primary-color)' : 'transparent',
-                                color: inputMode === 'manual' ? '#fff' : 'var(--text-muted)',
-                                transition: 'all 0.2s ease'
-                            }}
-                            onClick={() => { setInputMode('manual'); setError(''); }}
-                        >
-                            Modo Manual
-                        </button>
-                    </div>
+        <div style={cardStyle}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+                <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                    <button
+                        type="button"
+                        className={modo === 'matriz' ? 'btn-tema3-active' : ''}
+                        onClick={() => setModo('matriz')}
+                        style={{
+                            padding: '6px 16px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: modo === 'matriz' ? '#3b82f6' : 'transparent',
+                            color: modo === 'matriz' ? '#fff' : 'var(--text-muted, #64748b)',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        Análisis de Matriz
+                    </button>
+                    <button
+                        type="button"
+                        className={modo === 'manual' ? 'btn-tema3-active' : ''}
+                        onClick={() => setModo('manual')}
+                        style={{
+                            padding: '6px 16px',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: modo === 'manual' ? '#3b82f6' : 'transparent',
+                            color: modo === 'manual' ? '#fff' : 'var(--text-muted, #64748b)',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        Modo Manual
+                    </button>
                 </div>
+            </div>
 
-                {error && (
-                    <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #f87171', padding: '10px 15px', borderRadius: RADIUS, fontSize: FS.sm, marginBottom: '15px' }}>
-                        <strong>Error: </strong> {error}
-                    </div>
-                )}
+            <h3 style={{ marginTop: 0, color: '#3b82f6', fontSize: '1rem', fontWeight: 600, marginBottom: '10px' }}>
+                Datos
+            </h3>
 
-                {/* --- MODO MATRIZ --- */}
-                {inputMode === 'matriz' && (
-                    <div>
-                        {/* ── BARRA DE DATOS Y EDITOR ── */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-                            <div>
-                                <span style={{ ...labelStyle, margin: 0, color: 'var(--primary-color)', fontSize: '0.95rem', fontWeight: 600 }}>Matriz Detectada (Datos Históricos):</span>
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '2px' }}>
-                                    <small title="Datos provenientes de variables externas" style={{ color: 'var(--text-muted)', fontSize: FS.xs, cursor: 'help' }}>
-                                        Cargados: <strong style={{ color: 'var(--primary-color)' }}>{statsDatos?.cargados || 0}</strong>
-                                    </small>
-                                    <small title="Datos ingresados manualmente" style={{ color: 'var(--text-muted)', fontSize: FS.xs, cursor: 'help' }}>
-                                        Agregados: <strong style={{ color: '#3b82f6' }}>{statsDatos?.agregados || 0}</strong>
-                                    </small>
-                                    <small title="Total de datos válidos" style={{ color: 'var(--text-muted)', fontSize: FS.xs, cursor: 'help' }}>
-                                        Total: <strong style={{ color: 'var(--text-color)' }}>{statsDatos?.total || 0}</strong>
-                                    </small>
-                                </div>
+            {error && (
+                <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #f87171', padding: '10px', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '15px' }}>
+                    <strong>Error: </strong> {error}
+                </div>
+            )}
+
+            {modo === 'matriz' && (
+                <div style={{ marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card, #fff)', padding: '12px 15px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', marginBottom: '20px' }}>
+                        <div>
+                            <div style={{ color: '#3b82f6', fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Conjunto de Datos:</div>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
+                                Cargados: <strong style={{ color: '#3b82f6' }}>{statsDatos ? statsDatos.cargados : 0}</strong> &nbsp;
+                                Agregados: <strong style={{ color: '#3b82f6' }}>{statsDatos ? statsDatos.agregados : 0}</strong> &nbsp;
+                                Total: <strong style={{ color: '#3b82f6' }}>{statsDatos ? statsDatos.total : 0}</strong>
                             </div>
-                            <button
-                                onClick={abrirEditor}
-                                className="btn-icon"
-                                style={{
-                                    borderRadius: RADIUS,
-                                    fontSize: FS.sm,
-                                    padding: '6px 14px',
-                                    background: 'var(--primary-color)',
-                                    color: 'white',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    fontWeight: 600
-                                }}
-                            >
-                                <EditarDatos />
-                                Editar Datos
-                            </button>
                         </div>
-
-                        {varSeleccionada && columnasDisponibles.length > 0 ? (
-                            <>
-                                <label style={{ ...labelStyle, marginBottom: '5px', color: 'var(--primary-color)', fontWeight: 600 }}>
-                                    Variable discreta numérica:
-                                </label>
-                                <select 
-                                    style={{ width: '100%', padding: '8px 12px', border: '2px solid var(--primary-color)', borderRadius: RADIUS, background: 'white', color: 'var(--primary-color)', fontSize: FS.sm, marginBottom: '15px', fontWeight: 600, outline: 'none' }}
-                                    value={columnaSeleccionada}
-                                    onChange={(e) => setColumnaSeleccionada(Number(e.target.value))}
-                                >
-                                    {columnasDisponibles.map((col, idx) => (
-                                        <option key={idx} value={idx}>{col}</option>
-                                    ))}
-                                </select>
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-                                    <button 
-                                        onClick={manejarCalculo}
-                                        disabled={!datosMatrizAgrupados}
-                                        style={{ background: 'var(--primary-color)', color: 'white', borderRadius: RADIUS, border: 'none', padding: '10px 20px', fontSize: FS.sm, fontWeight: 600, cursor: (!datosMatrizAgrupados) ? 'not-allowed' : 'pointer', opacity: (!datosMatrizAgrupados) ? 0.6 : 1 }}
+                        <button
+                            className="btn-tema3-active"
+                            onClick={abrirEditor}
+                            style={{ padding: '8px 16px', background: '#3b82f6', border: 'none', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)' }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            Editar Datos
+                        </button>
+                    </div>
+                    {columnasDisponibles.length > 0 ? (
+                        <>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                                <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTipoMatriz('brutos')}
+                                        style={{
+                                            padding: '6px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.85rem',
+                                            fontWeight: 600,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            background: tipoMatriz === 'brutos' ? '#3b82f6' : 'transparent',
+                                            color: tipoMatriz === 'brutos' ? '#fff' : 'var(--text-muted, #64748b)',
+                                            transition: 'all 0.2s',
+                                            boxShadow: tipoMatriz === 'brutos' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                        }}
                                     >
-                                        Calcular Distribución
+                                        Datos Brutos (1 columna)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTipoMatriz('probabilidades')}
+                                        style={{
+                                            padding: '6px 16px',
+                                            borderRadius: '6px',
+                                            fontSize: '0.85rem',
+                                            fontWeight: 600,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            background: tipoMatriz === 'probabilidades' ? '#3b82f6' : 'transparent',
+                                            color: tipoMatriz === 'probabilidades' ? '#fff' : 'var(--text-muted, #64748b)',
+                                            transition: 'all 0.2s',
+                                            boxShadow: tipoMatriz === 'probabilidades' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                                        }}
+                                    >
+                                        Tabla Probabilidades (2 columnas)
                                     </button>
                                 </div>
-
-                                {datosMatrizAgrupados && mostrarTablaMatriz ? (
-                                    <div style={{ background: 'white', borderTop: '3px solid var(--primary-color)', padding: '20px', borderRadius: RADIUS, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-                                        <h4 style={{ textAlign: 'center', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 5px 0', fontSize: FS.sm }}>TABLA DE DISTRIBUCIÓN DE PROBABILIDAD</h4>
-                                        <p style={{ textAlign: 'center', color: '#374151', fontSize: FS.xs, margin: '0 0 15px 0' }}>Tamaño de muestra: <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>n = {statsDatos?.total || 0}</span></p>
-                                        
-                                        <div style={{ width: '100%' }}>
-                                            <table style={commonTableStyle}>
-                                                <thead>
-                                                    <tr>
-                                                        <th style={{...commonThStyle, background: 'transparent', color: 'var(--primary-color)'}}>Valor <i style={{ fontFamily: 'serif' }}>x</i></th>
-                                                        <th style={{...commonThStyle, background: 'transparent', color: 'var(--primary-color)'}}>Frecuencia <i style={{ fontFamily: 'serif' }}>f</i></th>
-                                                        <th style={{...commonThStyle, background: 'transparent', color: 'var(--primary-color)'}}><i style={{ fontFamily: 'serif' }}>P(X = x)</i></th>
-                                                        <th style={{...commonThStyle, background: 'transparent', color: 'var(--primary-color)'}}><i style={{ fontFamily: 'serif' }}>F(x)</i></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {datosMatrizAgrupados.map((d, i) => (
-                                                        <tr key={i} style={{ background: i % 2 !== 0 ? '#f8fafc' : 'white' }}>
-                                                            <td style={{...commonTdStyle, fontWeight: 600, color: '#1e293b'}}>{d.x}</td>
-                                                            <td style={{...commonTdStyle, color: '#1e293b'}}>{d.f}</td>
-                                                            <td style={{...commonTdStyle, color: 'var(--primary-color)'}}>{d.p.toFixed(4)}</td>
-                                                            <td style={{...commonTdStyle, color: 'var(--primary-color)'}}>{d.F.toFixed(4)}</td>
-                                                        </tr>
-                                                    ))}
-                                                    <tr style={{ background: '#eff6ff', fontWeight: 700 }}>
-                                                        <td style={{...commonTdStyle, color: '#1e293b'}}>Total</td>
-                                                        <td style={{...commonTdStyle, color: '#1e293b'}}>{statsDatos?.total || 0}</td>
-                                                        <td style={{...commonTdStyle, color: 'var(--primary-color)'}}>1.0000</td>
-                                                        <td style={{...commonTdStyle, color: 'var(--primary-color)'}}>1.0000</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                ) : !datosMatrizAgrupados ? (
-                                    <p style={{ fontSize: FS.sm, color: 'var(--text-muted)' }}>
-                                        La columna seleccionada no contiene datos numéricos válidos.
-                                    </p>
-                                ) : null}
-                            </>
-                        ) : (
-                            <p style={{ fontSize: FS.sm, color: 'var(--text-muted)', textAlign: 'center', margin: '20px 0' }}>
-                                Ve a "Gestión de Datos" en el menú para cargar tu matriz de Excel.
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/* --- MODO MANUAL --- */}
-                {inputMode === 'manual' && (
-                    <div style={{ background: 'white', border: '1px solid var(--border-color)', borderRadius: RADIUS, padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                        <div style={{ overflow: 'hidden', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: FS.sm }}>
-                                <thead>
-                                    <tr style={{ background: '#f8fafc' }}>
-                                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#334155', borderBottom: '1px solid #e2e8f0' }}>Escenario (X)</th>
-                                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#334155', borderBottom: '1px solid #e2e8f0' }}>Probabilidad P(x)</th>
-                                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: '#334155', borderBottom: '1px solid #e2e8f0', width: '50px' }}>Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filasManuales.map((fila, i) => (
-                                        <tr key={i} style={{ borderBottom: i === filasManuales.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
-                                            <td style={{ padding: '8px 12px' }}>
-                                                <input 
-                                                    type="number" 
-                                                    value={fila.x} 
-                                                    onChange={(e) => actualizarFila(i, 'x', e.target.value)}
-                                                    placeholder="Ej: 0"
-                                                    style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '8px 10px', background: '#fff', color: '#1e293b', textAlign: 'center', fontSize: FS.sm, outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
-                                                    onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
-                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                                                />
-                                            </td>
-                                            <td style={{ padding: '8px 12px' }}>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.01" 
-                                                    min="0"
-                                                    max="1"
-                                                    value={fila.p} 
-                                                    onChange={(e) => actualizarFila(i, 'p', e.target.value)}
-                                                    placeholder="Ej: 0.25"
-                                                    style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '8px 10px', background: '#fff', color: '#1e293b', textAlign: 'center', fontSize: FS.sm, outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box' }}
-                                                    onFocus={(e) => e.target.style.borderColor = 'var(--primary-color)'}
-                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                                                />
-                                            </td>
-                                            <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                                                <button 
-                                                    onClick={() => eliminarFila(i)}
-                                                    disabled={filasManuales.length <= 1}
-                                                    title="Eliminar fila"
-                                                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: filasManuales.length > 1 ? 'pointer' : 'not-allowed', fontSize: FS.md, padding: '4px', opacity: filasManuales.length > 1 ? 1 : 0.4, transition: 'transform 0.1s' }}
-                                                    onMouseOver={(e) => { if(filasManuales.length > 1) e.target.style.transform = 'scale(1.1)'; }}
-                                                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                                                >
-                                                    ✖
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <button 
-                            onClick={agregarFila}
-                            style={{ background: 'transparent', border: '1px solid var(--primary-color)', color: 'var(--primary-color)', borderRadius: RADIUS, padding: '8px 16px', fontSize: FS.sm, fontWeight: 600, cursor: 'pointer', display: 'block', width: '100%', transition: 'all 0.2s', marginBottom: '20px' }}
-                            onMouseOver={(e) => { e.target.style.background = 'var(--primary-color)'; e.target.style.color = 'white'; }}
-                            onMouseOut={(e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--primary-color)'; }}
-                        >
-                            + Añadir Fila
-                        </button>
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #e2e8f0' }}>
-                            <div style={{ fontSize: FS.sm, fontWeight: 600 }}>
-                                <span style={{ color: '#64748b', marginRight: '8px' }}>Suma total P(x):</span>
-                                <span style={{ color: isSumaValida ? '#10b981' : '#ef4444', fontSize: '1.1em' }}>
-                                    {sumaProbabilidades.toFixed(4)}
-                                </span>
                             </div>
-                            
-                            <button 
-                                onClick={manejarCalculo}
-                                disabled={!isSumaValida}
-                                style={{ 
-                                    background: 'var(--primary-color)', 
-                                    color: 'white', 
-                                    borderRadius: RADIUS, 
-                                    border: 'none', 
-                                    padding: '10px 24px', 
-                                    fontSize: FS.sm, 
-                                    fontWeight: 600, 
-                                    cursor: isSumaValida ? 'pointer' : 'not-allowed',
-                                    opacity: isSumaValida ? 1 : 0.6,
-                                    boxShadow: isSumaValida ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' : 'none',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                Calcular Distribución
-                            </button>
-                        </div>
-                    </div>
-                )}
 
-            </div>
+                            <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
+                                <div className="tema3-form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                    <label className="tema3-label">
+                                        {tipoMatriz === 'probabilidades' ? 
+                                            <>Columna de Valor {renderLatex('(X)')}:</> : 
+                                            'Columna a evaluar:'}
+                                    </label>
+                                    <select
+                                        className="tema3-select"
+                                        value={columnaSeleccionada}
+                                        onChange={e => { setColumnaSeleccionada(e.target.value === '' ? '' : Number(e.target.value)); setError(''); }}
+                                    >
+                                        <option value="" disabled>Selecciona una columna...</option>
+                                        {columnasDisponibles.map((col, idx) => (
+                                            <option key={idx} value={idx}>{col}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {tipoMatriz === 'probabilidades' && (
+                                    <div className="tema3-form-group" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label className="tema3-label">Columna Probabilidad {renderLatex('P(X)')}:</label>
+                                        <select
+                                            className="tema3-select"
+                                            value={columnaProbabilidad}
+                                            onChange={e => { setColumnaProbabilidad(e.target.value === '' ? '' : Number(e.target.value)); setError(''); }}
+                                        >
+                                            <option value="" disabled>Selecciona una columna...</option>
+                                            {columnasDisponibles.map((col, idx) => (
+                                                <option key={idx} value={idx}>{col}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                <button
+                                    className="tema3-btn btn-tema3-active"
+                                    onClick={procesarMatriz}
+                                    style={{ width: 'auto', padding: '8px 24px' }}
+                                >
+                                    CALCULAR
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>No hay datos cargados en el estado global. Ve a Gestión de Datos para importar.</p>
+                    )}
+                </div>
+            )}
+
+            {modo === 'manual' && (
+                <>
+                    <div style={{ overflowX: 'auto', marginBottom: '20px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 6px', textAlign: 'left', tableLayout: 'fixed' }}>
+                            <thead>
+                                <tr>
+                                    <th style={{ padding: '0px', color: 'var(--text-muted, #475569)', fontWeight: 600, fontSize: '0.9rem', width: '45%' }}>Valor {renderLatex('(X)')}</th>
+                                    <th style={{ padding: '0 10px', color: 'var(--text-muted, #475569)', fontWeight: 600, fontSize: '0.9rem', width: '45%' }}>Probabilidad {renderLatex('P(X)')}</th>
+                                    <th style={{ padding: '0 0px', width: '10%' }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tabla.map((fila) => (
+                                    <tr key={fila.id}>
+                                        <td style={{ padding: '0 8px 0 0' }}>
+                                            <input
+                                                type="number"
+                                                style={inputStyle}
+                                                value={fila.x}
+                                                placeholder="Ej. 0"
+                                                onChange={(e) => actualizarFila(fila.id, 'x', e.target.value)}
+                                            />
+                                        </td>
+                                        <td style={{ padding: '0 8px' }}>
+                                            <input
+                                                type="number"
+                                                style={inputStyle}
+                                                step="0.01"
+                                                min="0"
+                                                max="1"
+                                                value={fila.p}
+                                                placeholder="Ej. 0.25"
+                                                onChange={(e) => actualizarFila(fila.id, 'p', e.target.value)}
+                                            />
+                                        </td>
+                                        <td style={{ padding: '0 0 0 8px', textAlign: 'right' }}>
+                                            <button
+                                                onClick={() => eliminarFila(fila.id)}
+                                                style={{
+                                                    background: 'transparent',
+                                                    color: 'var(--text-error, #ef4444)',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    padding: '8px',
+                                                    cursor: tabla.length > 1 ? 'pointer' : 'not-allowed',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    opacity: tabla.length > 1 ? 0.7 : 0.3,
+                                                    transition: 'opacity 0.2s ease, transform 0.1s ease',
+                                                }}
+                                                onMouseEnter={(e) => { if(tabla.length > 1) { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1.1)'; } }}
+                                                onMouseLeave={(e) => { if(tabla.length > 1) { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.transform = 'scale(1)'; } }}
+                                                disabled={tabla.length <= 1}
+                                                title="Eliminar fila"
+                                            >
+                                                <IconoBasura width="18" height="18" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colSpan="2" style={{ padding: '0px', textAlign: 'center' }}>
+                                        <button
+                                            onClick={agregarFila}
+                                            style={{
+                                                background: 'transparent',
+                                                color: 'var(--primary-color, #3b82f6)',
+                                                border: '1px dashed var(--primary-color, #3b82f6)',
+                                                borderRadius: '10px',
+                                                padding: '5px 10px',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'var(--bg-input, rgba(59, 130, 246, 0.05))'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.background = 'transparent'; }}
+                                            title="Agregar valor"
+                                        >
+                                            <IconoMas width="15" height="15" />
+                                        </button>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td></td>
+                                    <td style={{ padding: '4px 8px 0 8px' }}>
+                                        <div style={{
+                                            padding: '4px 8px',
+                                            borderRadius: '6px',
+                                            backgroundColor: esSumaValida ? 'var(--bg-success, #dcfce7)' : 'var(--bg-error, #fee2e2)',
+                                            color: esSumaValida ? 'var(--text-success, #166534)' : 'var(--text-error, #991b1b)',
+                                            border: `1px solid ${esSumaValida ? '#bbf7d0' : '#fecaca'}`,
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            fontWeight: 600,
+                                            fontSize: '0.8rem',
+                                            width: '100%',
+                                            boxSizing: 'border-box'
+                                        }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <span>Suma:</span> {sumaProbabilidades.toFixed(4)}
+                                            </span>
+                                            {!esSumaValida && (
+                                                <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                                                    Debe sumar 1.0
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '10px' }}>
+                        <button
+                            className="tema3-btn btn-tema3-active"
+                            onClick={handleCalcular}
+                            disabled={!esSumaValida || hayCamposVacios}
+                            style={{ width: 'auto' }}
+                        >
+                            CALCULAR
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

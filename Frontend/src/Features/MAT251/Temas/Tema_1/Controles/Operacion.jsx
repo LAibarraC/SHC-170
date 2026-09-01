@@ -39,10 +39,16 @@ const getIcon = (val) => {
             <svg {...props}><line x1="4" y1="20" x2="4" y2="4" /><line x1="4" y1="20" x2="20" y2="20" /><rect x="6" y="14" width="3" height="6" /><rect x="11" y="9" width="3" height="11" /><rect x="16" y="5" width="3" height="15" /></svg>
         );
         case 'modelos_discretos': return (
-            <svg {...props}><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><path d="M3 15h6"/><path d="M3 18h6"/></svg>
+            <svg {...props}><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4" /><path d="M14 2v6h6" /><path d="M3 15h6" /><path d="M3 18h6" /></svg>
         );
         case 'modelos_continuos': return (
-            <svg {...props}><path d="M3 20h18"/><path d="M4 20c1.5-7 3-14 8-14s6.5 7 8 14"/></svg>
+            <svg {...props}><path d="M3 20h18" /><path d="M4 20c1.5-7 3-14 8-14s6.5 7 8 14" /></svg>
+        );
+        case 'probabilidad_muestral': return (
+            <svg {...props}><rect x="4" y="4" width="16" height="16" rx="2" ry="2" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="16" x2="16" y2="16" /><line x1="8" y1="8" x2="8.01" y2="8" /><line x1="12" y1="8" x2="12.01" y2="8" /><line x1="16" y1="8" x2="16.01" y2="8" /></svg>
+        );
+        case 'tamanio_muestra': return (
+            <svg {...props}><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
         );
         default: return null;
     }

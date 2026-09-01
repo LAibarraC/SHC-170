@@ -22,7 +22,7 @@ const FormulaAdicion = ({ resultado }) => {
     }, [resultado]);
 
     return (
-        <div style={{ overflowX: 'auto', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS }}>
+        <div style={{ overflowX: 'auto', background: 'var(--bg-input)', border: '1px solid var(--border-color)', padding: '10px', borderRadius: RADIUS }}>
             <div ref={formulaRef}></div>
         </div>
     );
@@ -155,6 +155,7 @@ export default function ResultadosReglaAdicion({
                 <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                     <button
                         type="button"
+                        className={`btn-tema1-borde ${inputMode === 'matriz' ? 'active' : ''}`}
                         onClick={() => setInputMode('matriz')}
                         style={{
                             padding: '6px 16px',
@@ -172,6 +173,7 @@ export default function ResultadosReglaAdicion({
                     </button>
                     <button
                         type="button"
+                        className={`btn-tema1-borde ${inputMode === 'manual' ? 'active' : ''}`}
                         onClick={() => setInputMode('manual')}
                         style={{
                             padding: '6px 16px',
@@ -191,14 +193,14 @@ export default function ResultadosReglaAdicion({
             </div>
 
             {/* ── PARÁMETROS DE LOS EVENTOS ── */}
-            <div style={{ ...cardStyle, marginBottom: '20px' }}>
+            <div style={{ marginBottom: '20px' }}>
 
                 {inputMode === 'matriz' ? (
                     <>
                         {/* ── BARRA DE DATOS Y EDITOR (Solo en Matriz) ── */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                        <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
                             <div>
-                                <span style={{ ...labelStyle, margin: 0 }}>Matriz Detectada (Datos Históricos):</span>
+                                <span style={{ ...labelStyle, margin: 0 }}>Datos:</span>
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '2px' }}>
                                     <small title="Datos provenientes de variables externas" style={{ color: 'var(--text-muted)', fontSize: FS.xs, cursor: 'help' }}>
                                         Cargados: <strong style={{ color: 'var(--primary-color)' }}>{statsDatos?.cargados || 0}</strong>
@@ -241,7 +243,7 @@ export default function ResultadosReglaAdicion({
                                 {/* EVENTO A */}
                                 <div style={{ flex: 1, minWidth: '200px' }}>
                                     <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontWeight: 600 }}>
-                                        Variable Evento A:
+                                        Variable Evento <span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />:
                                     </label>
                                     <select
                                         value={colA}
@@ -250,12 +252,12 @@ export default function ResultadosReglaAdicion({
                                         style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)', marginBottom: '8px' }}
                                     >
                                         <option value="">-- Seleccionar Variable --</option>
-                                        {varSeleccionada.nombresColumnas.map(col => <option key={col} value={col}>{col}</option>)}
+                                        {varSeleccionada.nombresColumnas.filter(col => col !== colB).map(col => <option key={col} value={col}>{col}</option>)}
                                     </select>
 
                                     {colA && valoresUnicosA.length > 0 && (
                                         <>
-                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de A:</label>
+                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de <span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />:</label>
                                             <select
                                                 value={valA}
                                                 onChange={(e) => setValA(e.target.value)}
@@ -272,7 +274,7 @@ export default function ResultadosReglaAdicion({
                                 {/* EVENTO B */}
                                 <div style={{ flex: 1, minWidth: '200px' }}>
                                     <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontWeight: 600 }}>
-                                        Variable Evento B:
+                                        Variable Evento <span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />:
                                     </label>
                                     <select
                                         value={colB}
@@ -281,12 +283,12 @@ export default function ResultadosReglaAdicion({
                                         style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)', marginBottom: '8px' }}
                                     >
                                         <option value="">-- Seleccionar Variable --</option>
-                                        {varSeleccionada.nombresColumnas.map(col => <option key={col} value={col}>{col}</option>)}
+                                        {varSeleccionada.nombresColumnas.filter(col => col !== colA).map(col => <option key={col} value={col}>{col}</option>)}
                                     </select>
 
                                     {colB && valoresUnicosB.length > 0 && (
                                         <>
-                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de B:</label>
+                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de <span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />:</label>
                                             <select
                                                 value={valB}
                                                 onChange={(e) => setValB(e.target.value)}
@@ -300,15 +302,17 @@ export default function ResultadosReglaAdicion({
                                     )}
                                 </div>
 
-                                <button
-                                    onClick={calcular}
-                                    className="button_calcular btn-icon"
-                                    style={{ padding: '8px 25px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '36px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer' }}
-                                    disabled={!varSeleccionada || !colA || !valA || !colB || !valB}
-                                >
-                                    <IconoCalculadora />
-                                    CALCULAR
-                                </button>
+                                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                                    <button
+                                        onClick={calcular}
+                                        className="button_calcular btn-icon"
+                                        style={{ padding: '8px 25px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '36px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', width: 'fit-content' }}
+                                        disabled={!varSeleccionada || !colA || !valA || !colB || !valB}
+                                    >
+                                        <IconoCalculadora />
+                                        CALCULAR
+                                    </button>
+                                </div>
                             </div>
                         ) : varSeleccionada ? (
                             <div style={{ padding: '10px', background: '#fee2e2', color: '#b91c1c', borderRadius: RADIUS, fontSize: FS.sm, marginBottom: '15px' }}>
@@ -330,7 +334,7 @@ export default function ResultadosReglaAdicion({
                                 {/* EVENTO A */}
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
                                     <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={labelStyle}>Nombre del Evento A:</label>
+                                        <label style={labelStyle}>Evento <span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />:</label>
                                         <input
                                             type="text"
                                             value={manualNameA}
@@ -349,7 +353,7 @@ export default function ResultadosReglaAdicion({
                                         />
                                     </div>
                                     <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={labelStyle}>Probabilidad P(A):</label>
+                                        <label style={labelStyle}>Probabilidad <span dangerouslySetInnerHTML={{ __html: katex.renderToString('P(A)') }} />:</label>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -375,7 +379,7 @@ export default function ResultadosReglaAdicion({
                                 {/* EVENTO B */}
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
                                     <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={labelStyle}>Nombre del Evento B:</label>
+                                        <label style={labelStyle}>Evento <span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />:</label>
                                         <input
                                             type="text"
                                             value={manualNameB}
@@ -394,7 +398,7 @@ export default function ResultadosReglaAdicion({
                                         />
                                     </div>
                                     <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={labelStyle}>Probabilidad P(B):</label>
+                                        <label style={labelStyle}>Probabilidad <span dangerouslySetInnerHTML={{ __html: katex.renderToString('P(B)') }} />:</label>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -420,7 +424,7 @@ export default function ResultadosReglaAdicion({
                                 {/* INTERSECCIÓN */}
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
                                     <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                        <label style={labelStyle}>Probabilidad de la Intersección P(A ∩ B):</label>
+                                        <label style={labelStyle}>Probabilidad de la Intersección <span dangerouslySetInnerHTML={{ __html: katex.renderToString('P(A \\cap B)') }} />:</label>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -444,11 +448,11 @@ export default function ResultadosReglaAdicion({
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px', width: '100%' }}>
                                 <button
                                     onClick={calcular}
                                     className="button_calcular btn-icon"
-                                    style={{ padding: '8px 25px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '36px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer' }}
+                                    style={{ padding: '8px 25px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '36px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', width: 'fit-content' }}
                                     disabled={manualPA === '' || manualPB === '' || manualPAndB === ''}
                                 >
                                     <IconoCalculadora />
@@ -468,38 +472,38 @@ export default function ResultadosReglaAdicion({
 
             {resultado && (
                 <>
-                    <div style={{ ...cardStyle, marginBottom: '20px' }}>
+                    <div style={{ marginBottom: '20px' }}>
                         <h4 style={{ color: 'var(--primary-color)', margin: '0 0 10px 0', fontSize: FS.sm }}>
                             Desglose de {inputMode === 'matriz' ? 'Frecuencias' : 'Probabilidades'}:
                         </h4>
-                        <div style={{ overflowX: 'auto' }}>
+                        <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: RADIUS }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: FS.sm }}>
                                 <thead>
                                     <tr style={{ background: 'var(--bg-input)', borderBottom: '2px solid var(--border-color)' }}>
                                         <th style={{ padding: '8px 6px' }}>Evento</th>
                                         {inputMode === 'matriz' && (
-                                            <th style={{ padding: '8px 6px', color: 'var(--text-muted)', fontWeight: 500 }}>Frecuencia (n)</th>
+                                            <th style={{ padding: '8px 6px', color: 'var(--text-muted)', fontWeight: 500 }}>Frecuencia <span dangerouslySetInnerHTML={{ __html: katex.renderToString('(n)') }} /></th>
                                         )}
-                                        <th style={{ padding: '8px 6px' }}>Probabilidad (P)</th>
+                                        <th style={{ padding: '8px 6px' }}>Probabilidad <span dangerouslySetInnerHTML={{ __html: katex.renderToString('(P)') }} /></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}>A: {resultado.nameA}</td>
+                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}><span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />: {resultado.nameA}</td>
                                         {inputMode === 'matriz' && (
                                             <td style={{ padding: '8px 6px', color: 'var(--text-muted)' }}>{resultado.countA} / {resultado.total}</td>
                                         )}
                                         <td style={{ padding: '8px 6px', fontWeight: 'bold' }}>{resultado.pA.toFixed(4)}</td>
                                     </tr>
-                                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}>B: {resultado.nameB}</td>
+                                    <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(128, 128, 128, 0.05)' }}>
+                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}><span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />: {resultado.nameB}</td>
                                         {inputMode === 'matriz' && (
                                             <td style={{ padding: '8px 6px', color: 'var(--text-muted)' }}>{resultado.countB} / {resultado.total}</td>
                                         )}
                                         <td style={{ padding: '8px 6px', fontWeight: 'bold' }}>{resultado.pB.toFixed(4)}</td>
                                     </tr>
-                                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}>A ∩ B (Intersección)</td>
+                                    <tr style={{ borderBottom: 'none' }}>
+                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}><span dangerouslySetInnerHTML={{ __html: katex.renderToString('A \\cap B') }} /> (Intersección)</td>
                                         {inputMode === 'matriz' && (
                                             <td style={{ padding: '8px 6px', color: 'var(--text-muted)' }}>{resultado.countAandB} / {resultado.total}</td>
                                         )}
@@ -510,14 +514,14 @@ export default function ResultadosReglaAdicion({
                         </div>
                     </div>
 
-                    <div style={{ ...cardStyle, marginBottom: '20px' }}>
-                        <h3 style={{ color: 'var(--primary-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', fontSize: FS.md, margin: '0 0 15px 0' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ color: 'var(--primary-color)', fontSize: FS.sm, margin: '0 0 10px 0' }}>
                             Desarrollo Matemático: Axiomas y Propiedades (Unión de Eventos)
-                        </h3>
+                        </h4>
                         <FormulaAdicion resultado={resultado} />
-                        <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(16, 185, 129, 0.05)', border: '1.5px solid #10b981', borderRadius: RADIUS, textAlign: 'center' }}>
-                            <div style={{ fontSize: FS.lg, fontWeight: 'bold', color: '#047857' }}>
-                                P(A ∪ B) = {resultado.pAorB.toFixed(4)}
+                        <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
+                            <div style={{ fontSize: FS.lg, fontWeight: 'bold' }}>
+                                <span dangerouslySetInnerHTML={{ __html: katex.renderToString(`P(A \\cup B) = ${resultado.pAorB.toFixed(4)}`) }} />
                             </div>
                             <div style={{ fontSize: FS.sm, color: 'var(--text-main)', marginTop: '4px' }}>
                                 ({(resultado.pAorB * 100).toFixed(2)}% probabilidad conjunta)

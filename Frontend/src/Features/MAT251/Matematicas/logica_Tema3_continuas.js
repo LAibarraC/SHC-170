@@ -25,6 +25,40 @@ export const densidadNormal = (mu, sigma, x) => {
     return jStat.normal.pdf(x, mu, sigma);
 };
 
+// --- Distribución Chi-cuadrado ---
+
+export const acumuladaChiCuadrado = (k, x) => {
+    if (x <= 0) return 0;
+    return jStat.chisquare.cdf(x, k);
+};
+
+export const densidadChiCuadrado = (k, x) => {
+    if (x <= 0) return 0;
+    return jStat.chisquare.pdf(x, k);
+};
+
+// --- Distribución F de Fisher ---
+
+export const acumuladaFisher = (v1, v2, x) => {
+    if (x <= 0) return 0;
+    return jStat.centralF.cdf(x, v1, v2);
+};
+
+export const densidadFisher = (v1, v2, x) => {
+    if (x <= 0) return 0;
+    return jStat.centralF.pdf(x, v1, v2);
+};
+
+// --- Distribución T de Student ---
+
+export const acumuladaStudent = (n, x) => {
+    return jStat.studentt.cdf(x, n);
+};
+
+export const densidadStudent = (n, x) => {
+    return jStat.studentt.pdf(x, n);
+};
+
 // Función de bisección para encontrar inversas (usada cuando no hay inv directa o para mantener consistencia)
 const bisectionInverse = (targetProb, isRightTail, cdfFunc, minRange = -10000, maxRange = 10000) => {
     let low = minRange;
@@ -123,8 +157,9 @@ export const calcularDistribucionContinua = (modelo, params, condicion) => {
                     prob = 0;
             }
         }
-    } else if (modelo === 'Normal') {
-        const { mu, sigma } = params;
+    } else if (modelo === 'Normal' || modelo === 'NormalEstandar') {
+        const mu = modelo === 'NormalEstandar' ? 0 : params.mu;
+        const sigma = modelo === 'NormalEstandar' ? 1 : params.sigma;
         E = mu;
         V = Math.pow(sigma, 2);
 
@@ -188,8 +223,205 @@ export const calcularDistribucionContinua = (modelo, params, condicion) => {
                     prob = 0;
             }
         }
-    }
+    } else if (modelo === 'ChiCuadrado') {
+        const { k } = params;
+        E = k;
+        V = 2 * k;
 
+        if (condicion) {
+            const { tipo, valX, valX2, valP, intervals } = condicion;
+            const x = Number(valX);
+            const x2 = Number(valX2);
+            const pInput = Number(valP);
+
+            const cdf = (v) => acumuladaChiCuadrado(k, v);
+
+            switch (tipo) {
+                case 'menor':
+                case 'menor_igual':
+                    prob = cdf(x);
+                    break;
+                case 'mayor':
+                case 'mayor_igual':
+                    prob = 1 - cdf(x);
+                    break;
+                case 'entre':
+                case 'intervalo':
+                    prob = cdf(Math.max(x, x2)) - cdf(Math.min(x, x2));
+                    break;
+                case 'exterior':
+                    prob = cdf(Math.min(x, x2)) + (1 - cdf(Math.max(x, x2)));
+                    break;
+                case 'suma_intervalos':
+                    if (intervals && intervals.length > 0) {
+                        prob = intervals.reduce((acc, intv) => {
+                            const minVal = parseFloat(intv.min);
+                            const maxVal = parseFloat(intv.max);
+                            if (!isNaN(minVal) && !isNaN(maxVal)) {
+                                return acc + (cdf(Math.max(minVal, maxVal)) - cdf(Math.min(minVal, maxVal)));
+                            }
+                            return acc;
+                        }, 0);
+                    }
+                    break;
+                case 'inversa_menor':
+                    resultExtra.c = jStat.chisquare.inv(pInput, k);
+                    prob = pInput;
+                    break;
+                case 'inversa_mayor':
+                    resultExtra.c = jStat.chisquare.inv(1 - pInput, k);
+                    prob = pInput;
+                    break;
+                case 'inversa_entre':
+                    const tailProb = (1 - pInput) / 2;
+                    resultExtra.c1 = jStat.chisquare.inv(tailProb, k);
+                    resultExtra.c2 = jStat.chisquare.inv(1 - tailProb, k);
+                    prob = pInput;
+                    break;
+                case 'inversa_exterior':
+                    const halfP = pInput / 2;
+                    resultExtra.c1 = jStat.chisquare.inv(halfP, k);
+                    resultExtra.c2 = jStat.chisquare.inv(1 - halfP, k);
+                    prob = pInput;
+                    break;
+                default:
+                    prob = 0;
+            }
+        }
+    } else if (modelo === 'FFisher') {
+        const { v1, v2 } = params;
+        
+        // E y V matemáticamente están indefinidas para ciertos v2
+        E = v2 > 2 ? (v2 / (v2 - 2)) : undefined;
+        V = v2 > 4 ? (2 * Math.pow(v2, 2) * (v1 + v2 - 2)) / (v1 * Math.pow(v2 - 2, 2) * (v2 - 4)) : undefined;
+
+        if (condicion) {
+            const { tipo, valX, valX2, valP, intervals } = condicion;
+            const x = Number(valX);
+            const x2 = Number(valX2);
+            const pInput = Number(valP);
+
+            const cdf = (v) => acumuladaFisher(v1, v2, v);
+
+            switch (tipo) {
+                case 'menor':
+                case 'menor_igual':
+                    prob = cdf(x);
+                    break;
+                case 'mayor':
+                case 'mayor_igual':
+                    prob = 1 - cdf(x);
+                    break;
+                case 'entre':
+                case 'intervalo':
+                    prob = cdf(Math.max(x, x2)) - cdf(Math.min(x, x2));
+                    break;
+                case 'exterior':
+                    prob = cdf(Math.min(x, x2)) + (1 - cdf(Math.max(x, x2)));
+                    break;
+                case 'suma_intervalos':
+                    if (intervals && intervals.length > 0) {
+                        prob = intervals.reduce((acc, intv) => {
+                            const minVal = parseFloat(intv.min);
+                            const maxVal = parseFloat(intv.max);
+                            if (!isNaN(minVal) && !isNaN(maxVal)) {
+                                return acc + (cdf(Math.max(minVal, maxVal)) - cdf(Math.min(minVal, maxVal)));
+                            }
+                            return acc;
+                        }, 0);
+                    }
+                    break;
+                case 'inversa_menor':
+                    resultExtra.c = jStat.centralF.inv(pInput, v1, v2);
+                    prob = pInput;
+                    break;
+                case 'inversa_mayor':
+                    resultExtra.c = jStat.centralF.inv(1 - pInput, v1, v2);
+                    prob = pInput;
+                    break;
+                case 'inversa_entre':
+                    const tailProb = (1 - pInput) / 2;
+                    resultExtra.c1 = jStat.centralF.inv(tailProb, v1, v2);
+                    resultExtra.c2 = jStat.centralF.inv(1 - tailProb, v1, v2);
+                    prob = pInput;
+                    break;
+                case 'inversa_exterior':
+                    const halfP = pInput / 2;
+                    resultExtra.c1 = jStat.centralF.inv(halfP, v1, v2);
+                    resultExtra.c2 = jStat.centralF.inv(1 - halfP, v1, v2);
+                    prob = pInput;
+                    break;
+                default:
+                    prob = 0;
+            }
+        }
+    } else if (modelo === 'TStudent') {
+        const { n } = params;
+        
+        E = n > 1 ? 0 : undefined;
+        V = n > 2 ? (n / (n - 2)) : undefined;
+
+        if (condicion) {
+            const { tipo, valX, valX2, valP, intervals } = condicion;
+            const x = Number(valX);
+            const x2 = Number(valX2);
+            const pInput = Number(valP);
+
+            const cdf = (v) => acumuladaStudent(n, v);
+
+            switch (tipo) {
+                case 'menor':
+                case 'menor_igual':
+                    prob = cdf(x);
+                    break;
+                case 'mayor':
+                case 'mayor_igual':
+                    prob = 1 - cdf(x);
+                    break;
+                case 'entre':
+                case 'intervalo':
+                    prob = cdf(Math.max(x, x2)) - cdf(Math.min(x, x2));
+                    break;
+                case 'exterior':
+                    prob = cdf(Math.min(x, x2)) + (1 - cdf(Math.max(x, x2)));
+                    break;
+                case 'suma_intervalos':
+                    if (intervals && intervals.length > 0) {
+                        prob = intervals.reduce((acc, intv) => {
+                            const minVal = parseFloat(intv.min);
+                            const maxVal = parseFloat(intv.max);
+                            if (!isNaN(minVal) && !isNaN(maxVal)) {
+                                return acc + (cdf(Math.max(minVal, maxVal)) - cdf(Math.min(minVal, maxVal)));
+                            }
+                            return acc;
+                        }, 0);
+                    }
+                    break;
+                case 'inversa_menor':
+                    resultExtra.c = jStat.studentt.inv(pInput, n);
+                    prob = pInput;
+                    break;
+                case 'inversa_mayor':
+                    resultExtra.c = jStat.studentt.inv(1 - pInput, n);
+                    prob = pInput;
+                    break;
+                case 'inversa_entre':
+                    const tailProb = (1 - pInput) / 2;
+                    resultExtra.c1 = jStat.studentt.inv(tailProb, n);
+                    resultExtra.c2 = jStat.studentt.inv(1 - tailProb, n);
+                    prob = pInput;
+                    break;
+                case 'inversa_exterior':
+                    const halfP = pInput / 2;
+                    resultExtra.c1 = jStat.studentt.inv(halfP, n);
+                    resultExtra.c2 = jStat.studentt.inv(1 - halfP, n);
+                    prob = pInput;
+                    break;
+                default:
+                    prob = 0;
+            }
+        }
+    }
     return {
         probabilidadFinal: condicion ? prob : null,
         esperanza: E,
@@ -246,16 +478,17 @@ export const generarDatosGraficoContinua = (modelo, params, condicion, resultado
         const fin = b + padding;
         const step = (fin - inicio) / puntos;
 
-        for (let i = 0; i <= puntos; i++) {
-            const x = inicio + i * step;
+        const agregarPunto = (x) => {
             const y = densidadUniforme(a, b, x);
-            
             let fillY = null;
             if (y > 0 && isInsideCondition(x)) {
                 fillY = y;
             }
-
             datos.push({ x, y, fillY });
+        };
+
+        for (let i = 0; i <= puntos; i++) {
+            agregarPunto(inicio + i * step);
         }
         
         // Puntos exactos en a y b para que la línea caiga recta
@@ -264,10 +497,35 @@ export const generarDatosGraficoContinua = (modelo, params, condicion, resultado
         datos.push({ x: b, y: 1 / (b - a), fillY: isInsideCondition(b) ? 1 / (b - a) : null });
         datos.push({ x: b + 0.0001, y: 0, fillY: 0 });
 
+        // Inyectar puntos frontera exactos para eliminar huecos visuales
+        const inyectarFrontera = (frontera) => {
+            if (frontera === undefined || isNaN(frontera)) return;
+            agregarPunto(frontera - 0.00001);
+            agregarPunto(frontera);
+            agregarPunto(frontera + 0.00001);
+        };
+
+        if (condicion) {
+            if (condicion.valX !== undefined) inyectarFrontera(Number(condicion.valX));
+            if (condicion.valorX !== undefined) inyectarFrontera(Number(condicion.valorX));
+            if (condicion.valX2 !== undefined) inyectarFrontera(Number(condicion.valX2));
+            if (condicion.valorB !== undefined) inyectarFrontera(Number(condicion.valorB));
+            if (resultados && resultados.c !== undefined) inyectarFrontera(resultados.c);
+            if (resultados && resultados.c1 !== undefined) inyectarFrontera(resultados.c1);
+            if (resultados && resultados.c2 !== undefined) inyectarFrontera(resultados.c2);
+            if (condicion.intervals) {
+                condicion.intervals.forEach(intv => {
+                    inyectarFrontera(parseFloat(intv.min));
+                    inyectarFrontera(parseFloat(intv.max));
+                });
+            }
+        }
+
         // Ordenar datos por x
         datos.sort((p1, p2) => p1.x - p2.x);
-    } else if (modelo === 'Normal') {
-        const { mu, sigma } = params;
+    } else if (modelo === 'Normal' || modelo === 'NormalEstandar') {
+        const mu = modelo === 'NormalEstandar' ? 0 : params.mu;
+        const sigma = modelo === 'NormalEstandar' ? 1 : params.sigma;
         const desviaciones = 4; 
         const inicio = mu - desviaciones * sigma;
         const fin = mu + desviaciones * sigma;
@@ -314,6 +572,165 @@ export const generarDatosGraficoContinua = (modelo, params, condicion, resultado
         }
 
         // Ordenar datos por x para que Recharts dibuje el path de izquierda a derecha correctamente
+        datos.sort((p1, p2) => p1.x - p2.x);
+    } else if (modelo === 'ChiCuadrado') {
+        const { k } = params;
+        const inicio = 0;
+        // La cola derecha de chi-cuadrado puede ser larga. Encontramos el valor donde cdf = 0.999
+        let fin = jStat.chisquare.inv(0.999, k);
+        // Si el valor máximo es muy pequeño (ej. k=1), damos un poco más de margen
+        if (fin < 10) fin = 10;
+        
+        const puntosAumentados = 200;
+        const step = (fin - inicio) / puntosAumentados;
+
+        const agregarPunto = (x) => {
+            const y = densidadChiCuadrado(k, x);
+            let fillY = null;
+            if (y > 0 && isInsideCondition(x)) {
+                fillY = y;
+            }
+            // Para x muy cercano a 0 con k=1, la PDF tiende a infinito. Lo limitamos visualmente
+            const cappedY = y > 2 ? 2 : y;
+            datos.push({ x, y: cappedY, fillY: fillY !== null ? (fillY > 2 ? 2 : fillY) : null });
+        };
+
+        // 1. Puntos regulares de la curva
+        // Si k=1, evitamos evaluar exactamente en 0 para no tener infinito
+        for (let i = 0; i <= puntosAumentados; i++) {
+            let x = inicio + i * step;
+            if (x === 0 && k === 1) x = 0.001; 
+            agregarPunto(x);
+        }
+
+        // 2. Inyectar puntos frontera exactos
+        const inyectarFrontera = (frontera) => {
+            if (frontera === undefined || isNaN(frontera) || frontera < 0) return;
+            agregarPunto(Math.max(0.001, frontera - 0.00001));
+            agregarPunto(frontera);
+            agregarPunto(frontera + 0.00001);
+        };
+
+        if (condicion) {
+            if (condicion.valX !== undefined) inyectarFrontera(Number(condicion.valX));
+            if (condicion.valorX !== undefined) inyectarFrontera(Number(condicion.valorX));
+            if (condicion.valX2 !== undefined) inyectarFrontera(Number(condicion.valX2));
+            if (condicion.valorB !== undefined) inyectarFrontera(Number(condicion.valorB));
+            if (resultados && resultados.c !== undefined) inyectarFrontera(resultados.c);
+            if (resultados && resultados.c1 !== undefined) inyectarFrontera(resultados.c1);
+            if (resultados && resultados.c2 !== undefined) inyectarFrontera(resultados.c2);
+            if (condicion.intervals) {
+                condicion.intervals.forEach(intv => {
+                    inyectarFrontera(parseFloat(intv.min));
+                    inyectarFrontera(parseFloat(intv.max));
+                });
+            }
+        }
+
+        // Ordenar datos por x
+        datos.sort((p1, p2) => p1.x - p2.x);
+    } else if (modelo === 'FFisher') {
+        const { v1, v2 } = params;
+        const inicio = 0;
+        // La cola de Fisher puede ser extremadamente larga. Usamos el 99% para escalar.
+        let fin = jStat.centralF.inv(0.99, v1, v2);
+        if (fin < 5) fin = 5;
+        if (fin > 30) fin = 30; // Evitar gráficos ridículamente largos
+        
+        const puntosAumentados = 200;
+        const step = (fin - inicio) / puntosAumentados;
+
+        const agregarPunto = (x) => {
+            const y = densidadFisher(v1, v2, x);
+            let fillY = null;
+            if (y > 0 && isInsideCondition(x)) {
+                fillY = y;
+            }
+            // Limitar valores visualmente por si tiende a infinito en x=0 (e.g. v1=1)
+            const cappedY = y > 3 ? 3 : y;
+            datos.push({ x, y: cappedY, fillY: fillY !== null ? (fillY > 3 ? 3 : fillY) : null });
+        };
+
+        for (let i = 0; i <= puntosAumentados; i++) {
+            let x = inicio + i * step;
+            if (x === 0 && v1 <= 2) x = 0.001; 
+            agregarPunto(x);
+        }
+
+        const inyectarFrontera = (frontera) => {
+            if (frontera === undefined || isNaN(frontera) || frontera < 0) return;
+            agregarPunto(Math.max(0.001, frontera - 0.00001));
+            agregarPunto(frontera);
+            agregarPunto(frontera + 0.00001);
+        };
+
+        if (condicion) {
+            if (condicion.valX !== undefined) inyectarFrontera(Number(condicion.valX));
+            if (condicion.valorX !== undefined) inyectarFrontera(Number(condicion.valorX));
+            if (condicion.valX2 !== undefined) inyectarFrontera(Number(condicion.valX2));
+            if (condicion.valorB !== undefined) inyectarFrontera(Number(condicion.valorB));
+            if (resultados && resultados.c !== undefined) inyectarFrontera(resultados.c);
+            if (resultados && resultados.c1 !== undefined) inyectarFrontera(resultados.c1);
+            if (resultados && resultados.c2 !== undefined) inyectarFrontera(resultados.c2);
+            if (condicion.intervals) {
+                condicion.intervals.forEach(intv => {
+                    inyectarFrontera(parseFloat(intv.min));
+                    inyectarFrontera(parseFloat(intv.max));
+                });
+            }
+        }
+
+        datos.sort((p1, p2) => p1.x - p2.x);
+    } else if (modelo === 'TStudent') {
+        const { n } = params;
+        
+        let desviaciones = 4;
+        let sigma = Math.sqrt(n / (n - 2));
+        if (n <= 2) {
+            sigma = 2; // Arbitrario para mostrar la campana cuando varianza es indefinida
+        }
+
+        const inicio = -desviaciones * sigma;
+        const fin = desviaciones * sigma;
+        const puntosAumentados = 200;
+        const step = (fin - inicio) / puntosAumentados;
+
+        const agregarPunto = (x) => {
+            const y = densidadStudent(n, x);
+            let fillY = null;
+            if (y > 0 && isInsideCondition(x)) {
+                fillY = y;
+            }
+            datos.push({ x, y, fillY });
+        };
+
+        for (let i = 0; i <= puntosAumentados; i++) {
+            agregarPunto(inicio + i * step);
+        }
+
+        const inyectarFrontera = (frontera) => {
+            if (frontera === undefined || isNaN(frontera)) return;
+            agregarPunto(frontera - 0.00001);
+            agregarPunto(frontera);
+            agregarPunto(frontera + 0.00001);
+        };
+
+        if (condicion) {
+            if (condicion.valX !== undefined) inyectarFrontera(Number(condicion.valX));
+            if (condicion.valorX !== undefined) inyectarFrontera(Number(condicion.valorX));
+            if (condicion.valX2 !== undefined) inyectarFrontera(Number(condicion.valX2));
+            if (condicion.valorB !== undefined) inyectarFrontera(Number(condicion.valorB));
+            if (resultados && resultados.c !== undefined) inyectarFrontera(resultados.c);
+            if (resultados && resultados.c1 !== undefined) inyectarFrontera(resultados.c1);
+            if (resultados && resultados.c2 !== undefined) inyectarFrontera(resultados.c2);
+            if (condicion.intervals) {
+                condicion.intervals.forEach(intv => {
+                    inyectarFrontera(parseFloat(intv.min));
+                    inyectarFrontera(parseFloat(intv.max));
+                });
+            }
+        }
+
         datos.sort((p1, p2) => p1.x - p2.x);
     }
 

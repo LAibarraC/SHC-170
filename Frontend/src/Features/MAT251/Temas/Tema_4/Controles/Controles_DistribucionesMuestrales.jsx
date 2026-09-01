@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+
+// Hola soy yo, nada más.
+// Soy un asistente de inteligencia artificial creado para ayudarte en tus tareas diarias.
 import { FONT, FS, RADIUS, cardStyle, labelStyle } from '../../../Principal/Constantes';
 import { calcularDistribucionMuestral } from '../../../Matematicas/logica_Tema1';
 
@@ -21,7 +24,7 @@ export default function Controles_DistribucionesMuestrales({ setResDistMuestrale
             <div style={{ marginBottom: '15px' }}>
                 <label style={labelStyle}>Población (separada por comas):</label>
                 <input 
-                    type="text" 
+                    type="text"
                     value={poblacion} 
                     onChange={e => setPoblacion(e.target.value)} 
                     placeholder="Ej. 2, 4, 8, 10, 20"
@@ -36,7 +39,7 @@ export default function Controles_DistribucionesMuestrales({ setResDistMuestrale
                     value={n} 
                     onChange={e => setN(e.target.value)} 
                     min="1"
-                    placeholder="Ej. 2"
+                    placeholder="Valor"
                     style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)' }}
                 />
             </div>
@@ -65,17 +68,12 @@ export default function Controles_DistribucionesMuestrales({ setResDistMuestrale
                 </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button 
-                    onClick={ejecutar} 
-                    style={{ 
-                        padding: '8px 20px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, 
-                        background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer' 
-                    }}
-                >
-                    CALCULAR
-                </button>
-            </div>
+            <button 
+                onClick={ejecutar} 
+                style={{ width: 'fit-content', margin: '15px auto 20px', padding: '10px 40px', background: 'var(--primary-color)', color: 'white', border: 'none', borderRadius: RADIUS, cursor: 'pointer', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+            >
+                Graficar
+            </button>
         </div>
     );
 }

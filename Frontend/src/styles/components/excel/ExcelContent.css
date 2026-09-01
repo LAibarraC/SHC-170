@@ -174,3 +174,9 @@
   justify-content: center !important;
   text-align: center !important;
 }
+
+/* Agrega una línea izquierda a la primera columna para que no se vea feo */
+.personalizado .rdg-cell:first-child,
+.personalizado .rdg-header-cell:first-child {
+  border-left: 1px solid var(--border-color) !important;
+}

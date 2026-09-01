@@ -176,6 +176,7 @@ export default function Registro({ onLogin }) {
         }
       `}</style>
 
+      {/* Botón de tema removido, ahora se maneja globalmente en App.jsx */}
       <div className="login-card" style={{ maxWidth: '500px', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '50px' }}>
           <img src={logoCarrera} alt="Logo" style={{ width: '150px', height: 'auto' }} />

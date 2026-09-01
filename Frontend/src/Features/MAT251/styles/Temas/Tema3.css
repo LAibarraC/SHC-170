@@ -1,8 +1,8 @@
 /* src/components/MAT251/Temas/Tema_3/Tema3.css */
 .tema3-container {
-    padding: 20px;
+    padding: 0;
     font-family: system-ui, -apple-system, sans-serif;
-    color: var(--text-color, #334155);
+    color: var(--text-main, #334155);
     background: transparent;
     border-radius: 8px;
 }
@@ -46,13 +46,13 @@
     font-size: 0.95rem;
     box-sizing: border-box;
     background: var(--bg-input, #ffffff);
-    color: var(--text-color, #000000);
+    color: var(--text-main, #000000);
 }
 
 .tema3-input:focus, .tema3-select:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #f97316 !important;
+    box-shadow: none !important;
 }
 
 .tema3-btn {
@@ -112,6 +112,69 @@
 
 @media (max-width: 600px) {
     .tema3-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; 
     }
+}
+
+[data-theme='dark'] .btn-tema3-active, .dark .btn-tema3-active, [data-bs-theme='dark'] .btn-tema3-active {
+    background: #2c2c2c !important;
+    border: 1px solid #ff6e00 !important;
+    color: white !important;
+    box-shadow: none !important;
+}
+
+/* =========================================
+   TOOLTIP PARA FÓRMULA Z (Normal)
+========================================= */
+.t3-tooltip-wrap {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    padding-bottom: 1px;
+}
+
+.t3-tooltip-box {
+    position: absolute;
+    bottom: 140%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2c3e50;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    width: max-content;
+    max-width: 240px;
+    text-align: center;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    font-size: 0.88rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+}
+
+.t3-tooltip-box::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -6px;
+    border-width: 6px;
+    border-style: solid;
+    border-color: #2c3e50 transparent transparent transparent;
+}
+
+.t3-tooltip-wrap:hover .t3-tooltip-box {
+    opacity: 1;
+    visibility: visible;
+}
+
+.t3-tooltip-math {
+    color: #f1c40f;
+    font-size: 1rem;
 }

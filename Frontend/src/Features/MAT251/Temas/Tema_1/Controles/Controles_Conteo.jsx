@@ -13,12 +13,12 @@ export default function ControlesConteo({
             <div style={{ ...cardStyle, marginBottom: '15px' }}>
                 <label style={{ ...labelStyle }}>Valores:</label>
                 {[{ label: 'Total (n):', val: n, setVal: setN }, { label: 'Muestra (r):', val: r, setVal: setR }].map(({ label, val, setVal }) => (
-                    <div key={label} style={{ marginBottom: '10px' }}>
-                        <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px' }}>{label}</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <button onClick={() => ajustar(setVal, val, '-')} style={{ width: '32px', padding: '4px', borderRadius: RADIUS, fontSize: FS.md }}>−</button>
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', gap: '10px' }}>
+                        <label style={{ fontSize: FS.sm, fontFamily: FONT, width: '85px', flexShrink: 0, margin: 0 }}>{label}</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                            <button className="btn-icon" onClick={() => ajustar(setVal, val, '-')} style={{ width: '32px', padding: '4px', borderRadius: RADIUS, fontSize: FS.md }}>−</button>
                             <input type="number" value={val} onChange={(e) => setVal(e.target.value)} className="container_cal_input" style={{ textAlign: 'center', flex: 1, borderRadius: RADIUS, fontSize: FS.base }} />
-                            <button onClick={() => ajustar(setVal, val, '+')} style={{ width: '32px', padding: '4px', borderRadius: RADIUS, fontSize: FS.md }}>+</button>
+                            <button className="btn-icon" onClick={() => ajustar(setVal, val, '+')} style={{ width: '32px', padding: '4px', borderRadius: RADIUS, fontSize: FS.md }}>+</button>
                         </div>
                     </div>
                 ))}
@@ -40,8 +40,8 @@ export default function ControlesConteo({
                             marginBottom: '10px'
                         }}
                     >
-                        <option value="letras">Letras por defecto (A, B, C...)</option>
-                        <option value="numeros">Números por defecto (1, 2, 3...)</option>
+                        <option value="letras">A, B, C...</option>
+                        <option value="numeros">1, 2, 3...</option>
                         <option value="personalizado">Elementos personalizados</option>
                     </select>
 
@@ -75,7 +75,7 @@ export default function ControlesConteo({
                 </div>
             </div>
 
-            <button onClick={ejecutar} className="button_calcular btn-icon" style={{ width: 'fit-content', alignSelf: 'center', padding: '8px 35px', borderRadius: RADIUS, fontSize: FS.md, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button onClick={ejecutar} className="button_calcular btn-icon" style={{ width: 'fit-content', alignSelf: 'center', padding: '6px 20px', borderRadius: RADIUS, fontSize: FS.md, fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <IconoCalculadora />
                 CALCULAR
             </button>

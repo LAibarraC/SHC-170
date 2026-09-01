@@ -175,9 +175,9 @@ export default function ArbolProbabilidades({ resultado, filas, varSeleccionada,
                 </defs>
 
                 {/* Título y Raíz */}
-                <rect x={rootX - 40} y={rootY - 25} width="80" height="50" rx="8" fill="#f8fafc" stroke={inactiveColor} strokeWidth="2" />
-                <text x={rootX} y={rootY - 5} textAnchor="middle" fontSize="13" fill="#334155" fontWeight="bold">Total</text>
-                <text x={rootX} y={rootY + 12} textAnchor="middle" fontSize="14" fill="#0f172a" fontWeight="bold">N={N}</text>
+                <rect x={rootX - 40} y={rootY - 25} width="80" height="50" rx="8" fill="var(--bg-input, #f8fafc)" stroke={inactiveColor} strokeWidth="2" />
+                <text x={rootX} y={rootY - 5} textAnchor="middle" fontSize="13" fill="var(--text-main, #334155)" fontWeight="bold">Total</text>
+                <text x={rootX} y={rootY + 12} textAnchor="middle" fontSize="14" fill="var(--text-main, #0f172a)" fontWeight="bold">N={N}</text>
 
                 {/* Dibujar Ramas Nivel 1 */}
                 {ramasA.map((rama, i) => {
@@ -195,7 +195,7 @@ export default function ArbolProbabilidades({ resultado, filas, varSeleccionada,
                                 strokeLinecap="round"
                             />
                             {/* Probabilidad en flecha L1 */}
-                            <rect x={(rootX + l1X)/2 - 30} y={(rootY + rama.y)/2 - 15} width="60" height="20" fill="white" opacity="0.8" />
+                            <rect x={(rootX + l1X)/2 - 30} y={(rootY + rama.y)/2 - 15} width="60" height="20" fill="var(--bg-card, white)" opacity="0.9" />
                             <text x={(rootX + l1X)/2} y={(rootY + rama.y)/2} textAnchor="middle" fontSize="11" fill={colorL1} fontWeight="bold">
                                 {rama.count === '-' ? `P=${rama.pA.toFixed(4)}` : `${rama.count}/${N}`}
                             </text>
@@ -203,13 +203,13 @@ export default function ArbolProbabilidades({ resultado, filas, varSeleccionada,
                             {/* Caja Nivel 1 */}
                             <rect 
                                 x={l1X - 60} y={rama.y - 25} width="120" height="50" rx="6" 
-                                fill={rama.esActiva ? "rgba(16, 185, 129, 0.05)" : "#fff"} 
+                                fill={rama.esActiva ? "var(--bg-input, rgba(16, 185, 129, 0.05))" : "var(--bg-input, #fff)"} 
                                 stroke={colorL1} strokeWidth={rama.esActiva ? 2 : 1} 
                             />
-                            <text x={l1X} y={rama.y - 5} textAnchor="middle" fontSize="12" fill={rama.esActiva ? "#064e3b" : "#475569"} fontWeight={rama.esActiva ? "bold" : "normal"}>
+                            <text x={l1X} y={rama.y - 5} textAnchor="middle" fontSize="12" fill={rama.esActiva ? "var(--text-main, #064e3b)" : "var(--text-main, #475569)"} fontWeight={rama.esActiva ? "bold" : "normal"}>
                                 {rama.valor.length > 15 ? rama.valor.substring(0, 15) + '...' : rama.valor}
                             </text>
-                            <text x={l1X} y={rama.y + 12} textAnchor="middle" fontSize="12" fill={rama.esActiva ? activeColor : "#64748b"} fontWeight="bold">
+                            <text x={l1X} y={rama.y + 12} textAnchor="middle" fontSize="12" fill={rama.esActiva ? activeColor : "var(--text-muted, #64748b)"} fontWeight="bold">
                                 {rama.count === '-' ? `P=${rama.pA.toFixed(4)}` : `n=${rama.count}`}
                             </text>
 
@@ -229,7 +229,7 @@ export default function ArbolProbabilidades({ resultado, filas, varSeleccionada,
                                             strokeLinecap="round"
                                         />
                                         {/* Probabilidad en flecha L2 */}
-                                        <rect x={(l1X + l2X)/2 - 30} y={(rama.y + hijo.y)/2 - 15} width="60" height="20" fill="white" opacity="0.8" />
+                                        <rect x={(l1X + l2X)/2 - 30} y={(rama.y + hijo.y)/2 - 15} width="60" height="20" fill="var(--bg-card, white)" opacity="0.9" />
                                         <text x={(l1X + l2X)/2} y={(rama.y + hijo.y)/2} textAnchor="middle" fontSize="11" fill={colorL2} fontWeight="bold">
                                             {hijo.count === '-' ? `P=${hijo.pB.toFixed(4)}` : `${hijo.count}/${hijo.total}`}
                                         </text>
@@ -237,13 +237,13 @@ export default function ArbolProbabilidades({ resultado, filas, varSeleccionada,
                                         {/* Caja Nivel 2 */}
                                         <rect 
                                             x={l2X - 60} y={hijo.y - 25} width="120" height="50" rx="6" 
-                                            fill={hijo.esActiva ? "rgba(16, 185, 129, 0.1)" : "#fff"} 
+                                            fill={hijo.esActiva ? "var(--bg-input, rgba(16, 185, 129, 0.1))" : "var(--bg-input, #fff)"} 
                                             stroke={colorL2} strokeWidth={hijo.esActiva ? 2 : 1} 
                                         />
-                                        <text x={l2X} y={hijo.y - 5} textAnchor="middle" fontSize="12" fill={hijo.esActiva ? "#064e3b" : "#475569"} fontWeight={hijo.esActiva ? "bold" : "normal"}>
+                                        <text x={l2X} y={hijo.y - 5} textAnchor="middle" fontSize="12" fill={hijo.esActiva ? "var(--text-main, #064e3b)" : "var(--text-main, #475569)"} fontWeight={hijo.esActiva ? "bold" : "normal"}>
                                             {hijo.valor.length > 15 ? hijo.valor.substring(0, 15) + '...' : hijo.valor}
                                         </text>
-                                        <text x={l2X} y={hijo.y + 12} textAnchor="middle" fontSize="12" fill={hijo.esActiva ? activeColor : "#64748b"} fontWeight="bold">
+                                        <text x={l2X} y={hijo.y + 12} textAnchor="middle" fontSize="12" fill={hijo.esActiva ? activeColor : "var(--text-muted, #64748b)"} fontWeight="bold">
                                             P = {(hijo.pB).toFixed(4)}
                                         </text>
 

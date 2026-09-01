@@ -600,7 +600,7 @@ export const calcularDistribucionUniforme = (minVal, maxVal, inputMin, inputMax)
     };
 };
 
-export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo) => {
+export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo, parametroCalculo = 'media') => {
     if (!poblacionStr || poblacionStr.trim() === '') return { error: 'Ingresa la población.' };
     
     const rawItems = poblacionStr.split(',').map(v => v.trim()).filter(v => v !== '');
@@ -702,11 +702,12 @@ export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo) =
     }
 
     const calcularMedia = (arr) => arr.reduce((a, b) => a + b.valor, 0) / arr.length;
-    const calcularVarianza = (arr, media) => arr.reduce((acc, val) => acc + Math.pow(val.valor - media, 2), 0) / arr.length;
+    const calcularVarianzaPoblacional = (arr, media) => arr.reduce((acc, val) => acc + Math.pow(val.valor - media, 2), 0) / arr.length;
+    const calcularVarianzaMuestral = (arr, media) => arr.length > 1 ? arr.reduce((acc, val) => acc + Math.pow(val.valor - media, 2), 0) / (arr.length - 1) : 0;
 
     const datosTabla = muestras.map((muestra, index) => {
         const media = calcularMedia(muestra);
-        const varianza = calcularVarianza(muestra, media);
+        const varianza = calcularVarianzaMuestral(muestra, media);
         return {
             id: index + 1,
             elementos: muestra.map(x => x.id).join(', '),
@@ -716,41 +717,46 @@ export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo) =
         };
     });
 
-    const frecuenciasMedias = {};
+    const frecuencias = {};
     datosTabla.forEach(fila => {
-        const m = fila.media;
-        if (frecuenciasMedias[m]) {
-            frecuenciasMedias[m]++;
+        const val = parametroCalculo === 'varianza' ? fila.varianza : fila.media;
+        if (frecuencias[val]) {
+            frecuencias[val]++;
         } else {
-            frecuenciasMedias[m] = 1;
+            frecuencias[val] = 1;
         }
     });
 
-    const distribucionMedias = Object.keys(frecuenciasMedias)
-        .map(m => parseFloat(m))
+    const distribucion = Object.keys(frecuencias)
+        .map(v => parseFloat(v))
         .sort((a, b) => a - b)
-        .map(m => ({
-            media: m,
-            frecuencia: frecuenciasMedias[m],
+        .map(v => ({
+            valor: v, // puede ser media o varianza dependiendo de parametroCalculo
+            frecuencia: frecuencias[v],
             total: datosTabla.length
         }));
 
-    // Cálculos Finales
-    const esperanzaMedia = distribucionMedias.reduce((acc, curr) => acc + (curr.media * (curr.frecuencia / curr.total)), 0);
-    const varianzaMedia = distribucionMedias.reduce((acc, curr) => acc + (Math.pow(curr.media - esperanzaMedia, 2) * (curr.frecuencia / curr.total)), 0);
+    // Cálculos Finales de Esperanza y Varianza de la Distribución
+    const esperanza = distribucion.reduce((acc, curr) => acc + (curr.valor * (curr.frecuencia / curr.total)), 0);
+    const varianzaDeDistribucion = distribucion.reduce((acc, curr) => acc + (Math.pow(curr.valor - esperanza, 2) * (curr.frecuencia / curr.total)), 0);
 
     const mediaPoblacional = calcularMedia(poblacion);
-    const varianzaPoblacional = calcularVarianza(poblacion, mediaPoblacional);
+    const varianzaPoblacional = calcularVarianzaPoblacional(poblacion, mediaPoblacional);
 
     const calculosFinales = {
-        esperanzaMedia: parseFloat(esperanzaMedia.toFixed(4)),
-        varianzaMedia: parseFloat(varianzaMedia.toFixed(4)),
+        esperanza: parseFloat(esperanza.toFixed(4)),
+        varianzaDeDistribucion: parseFloat(varianzaDeDistribucion.toFixed(4)),
         mediaPoblacional: parseFloat(mediaPoblacional.toFixed(4)),
         varianzaPoblacional: parseFloat(varianzaPoblacional.toFixed(4)),
         n: n,
         N: poblacion.length,
-        poblacionOriginal: poblacion.map(p => p.valor)
+        conReemplazo: conReemplazo,
+        parametroCalculo
     };
 
-    return { resultado: datosTabla, distribucionMedias, calculosFinales, conReemplazo };
+    return {
+        resultado: datosTabla,
+        distribucion: distribucion,
+        calculosFinales: calculosFinales
+    };
 };

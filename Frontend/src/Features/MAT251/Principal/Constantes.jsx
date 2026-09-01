@@ -1,3 +1,6 @@
+import React from 'react';
+import katex from 'katex';
+
 // v2 — Tema 2 habilitado
 export const FONT = 'system-ui, -apple-system, sans-serif';
 export const FS = { xs: '0.75rem', sm: '0.85rem', sx: '0.75rem', base: '0.95rem', md: '1rem', lg: '1.1rem' };
@@ -8,23 +11,19 @@ export const OPERACIONES = [
     tema: 'Tema 1',
     titulo: 'Cálculo de probabilidades e introducción al muestreo',
     operaciones: [
-      { value: 'conteo', label: 'Técnicas de Conteo (nPr / nCr)' },
+      { value: 'conteo', label: 'Técnicas de Conteo' },
       { value: 'probabilidad', label: 'Cálculo de Probabilidad' },
       { value: 'simulador_total', label: 'Teorema de Probabilidad Total' },
       { value: 'regla_adicion', label: 'Axiomas y Regla de la Adición' },
       { value: 'regla_multiplicacion', label: 'Regla de la Multiplicación' },
-      { value: 'muestreo', label: 'Introducción al Muestreo' },
-      { value: 'distribuciones_muestrales', label: 'Distribuciones Muestrales' },
-      { value: 'dist_uniforme', label: 'Probabilidad en Espacio Continuo' },
     ],
   },
   {
     tema: 'Tema 2',
     titulo: 'Variables aleatorias',
     operaciones: [
-      { value: 'dist_discreta', label: 'Variable Aleatoria Discreta' },
+      { value: 'dist_discreta', label: 'Variables Aleatorias Discretas' },
       { value: 'dist_continua_v2', label: 'Variable Aleatoria Continua' },
-      { value: 'dist_continua', label: 'Calculadora (Beta)' },
     ],
   },
   {
@@ -38,7 +37,9 @@ export const OPERACIONES = [
   {
     tema: 'Tema 4',
     titulo: 'Distribuciones en el muestreo estadístico',
-    operaciones: [],
+    operaciones: [
+      { value: 'distribuciones_muestrales', label: 'Distribuciones Muestrales' }
+    ],
   },
   {
     tema: 'Tema 5',

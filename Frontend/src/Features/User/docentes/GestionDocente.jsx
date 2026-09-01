@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../../services/api';
 import { alerta } from '../../../utils/Notificaciones';
 import Modal from '../../../utils/Modal'; 
-import { IconoBuscar } from '../../../ui/iconos'; 
+import { IconoBuscar } from '../../../ui/iconos';
 
 // Importaciones para el tour interactivo
 import { driver } from "driver.js";
@@ -375,7 +375,16 @@ export default function GestionDocente({ usuario }) {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-          <button onClick={iniciarTour} className="guia-rapida-flotante">
+          
+          {/* Botón de Guía Rápida */}
+          <button
+            onClick={iniciarTour}
+            className="guia-rapida-flotante"
+            style={{
+            bottom: '20px',
+            zIndex: 10000
+            }}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>

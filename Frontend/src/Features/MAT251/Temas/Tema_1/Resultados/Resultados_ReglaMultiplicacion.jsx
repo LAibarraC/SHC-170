@@ -27,7 +27,7 @@ const FormulaMultiplicacion = ({ resultado, modReemplazo }) => {
     }, [resultado, modReemplazo]);
 
     return (
-        <div style={{ overflowX: 'auto', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS }}>
+        <div style={{ overflowX: 'auto', background: 'var(--bg-input)', border: '1px solid var(--border-color)', padding: '10px', borderRadius: RADIUS }}>
             <div ref={formulaRef}></div>
         </div>
     );
@@ -134,6 +134,7 @@ export default function ResultadosReglaMultiplicacion({
                 <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                     <button
                         type="button"
+                        className={`btn-tema1-borde ${inputMode === 'matriz' ? 'active' : ''}`}
                         onClick={() => setInputMode('matriz')}
                         style={{
                             padding: '6px 16px',
@@ -151,6 +152,7 @@ export default function ResultadosReglaMultiplicacion({
                     </button>
                     <button
                         type="button"
+                        className={`btn-tema1-borde ${inputMode === 'manual' ? 'active' : ''}`}
                         onClick={() => setInputMode('manual')}
                         style={{
                             padding: '6px 16px',
@@ -169,75 +171,88 @@ export default function ResultadosReglaMultiplicacion({
                 </div>
             </div>
 
-            <div style={{ ...cardStyle, marginBottom: '20px' }}>
+            <div style={{ marginBottom: '20px' }}>
                 {inputMode === 'manual' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <h4 style={{ margin: 0, fontSize: FS.sm, fontWeight: 700, color: 'var(--primary-color)' }}>Datos del Ejercicio (Ingreso Manual)</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '15px' }}>
+                        <h4 style={{ marginBottom: '5px', fontSize: FS.sm, fontWeight: 700, color: 'var(--primary-color)' }}>Datos del Ejercicio</h4>
 
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-start', background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
-                            <div style={{ width: '100%', marginBottom: '5px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{ width: '100%', background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
                                 <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', fontWeight: 600 }}>Tipo de Extracción:</label>
                                 <select
                                     value={modReemplazo}
                                     onChange={(e) => setModReemplazo(e.target.value)}
                                     className="container_cal_input"
-                                    style={{ width: '100%', maxWidth: '300px', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--primary-color)', background: '#fff', fontWeight: 600 }}
+                                    style={{ width: '100%', maxWidth: '300px', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '2px solid var(--primary-color)', background: 'var(--bg-card)', color: 'var(--text-color)', fontWeight: 600 }}
                                 >
                                     <option value="con_reemplazo">Con reemplazo (Independientes)</option>
                                     <option value="sin_reemplazo">Sin reemplazo (Dependientes)</option>
                                 </select>
                             </div>
 
-                            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: FS.sm, fontFamily: FONT, fontWeight: 600, color: 'var(--primary-color)' }}>Evento 1 (A)</label>
-                                <input
-                                    type="text"
-                                    value={manualNameA}
-                                    onChange={(e) => setManualNameA(e.target.value)}
-                                    placeholder="Nombre del Evento 1"
-                                    style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)' }}
-                                />
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="1"
-                                    value={manualProbA}
-                                    onChange={(e) => setManualProbA(e.target.value)}
-                                    placeholder="Probabilidad P(A)"
-                                    style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)' }}
-                                />
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
+                                <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={labelStyle}>Evento <span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />:</label>
+                                    <input
+                                        type="text"
+                                        value={manualNameA}
+                                        onChange={(e) => setManualNameA(e.target.value)}
+                                        placeholder="Ej. A"
+                                        style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                                <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ ...labelStyle, marginBottom: 0 }}>Probabilidad</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: FS.sm, color: 'var(--text-main)', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: katex.renderToString('P(A)') + ':' }} />
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="1"
+                                            value={manualProbA}
+                                            onChange={(e) => setManualProbA(e.target.value)}
+                                            placeholder="0.00"
+                                            style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)', width: '100%', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', background: 'var(--bg-input)', padding: '10px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
+                                <div style={{ flex: '1 1 180px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <label style={labelStyle}>Evento <span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />:</label>
+                                    <input
+                                        type="text"
+                                        value={manualNameB}
+                                        onChange={(e) => setManualNameB(e.target.value)}
+                                        placeholder="Ej. B"
+                                        style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                                <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <label style={{ ...labelStyle, marginBottom: 0 }}>Probabilidad</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', fontWeight: 600, fontSize: FS.sm, color: 'var(--text-main)', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{ __html: katex.renderToString(modReemplazo === 'sin_reemplazo' ? 'P(B|A)' : 'P(B)') + ':' }} />
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="1"
+                                            value={manualProbB}
+                                            onChange={(e) => setManualProbB(e.target.value)}
+                                            placeholder="0.00"
+                                            style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)', width: '100%', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <label style={{ fontSize: FS.sm, fontFamily: FONT, fontWeight: 600, color: 'var(--primary-color)' }}>Evento 2 (B)</label>
-                                <input
-                                    type="text"
-                                    value={manualNameB}
-                                    onChange={(e) => setManualNameB(e.target.value)}
-                                    placeholder="Nombre del Evento 2"
-                                    style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)' }}
-                                />
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="1"
-                                    value={manualProbB}
-                                    onChange={(e) => setManualProbB(e.target.value)}
-                                    placeholder={modReemplazo === 'sin_reemplazo' ? "Prob. Condicional P(B|A)" : "Probabilidad P(B)"}
-                                    style={{ padding: '8px 12px', borderRadius: RADIUS, border: '1px solid var(--border-color)', fontSize: FS.sm, outline: 'none', background: 'var(--bg-card)', color: 'var(--text-color)' }}
-                                />
-                                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '-4px' }}>
-                                    {modReemplazo === 'sin_reemplazo' ? "Ingresa P(B|A) entre 0 y 1" : "Ingresa P(B) entre 0 y 1"}
-                                </small>
-                            </div>
-
-                            <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '5px' }}>
                                 <button
                                     onClick={calcular}
                                     className="button_calcular btn-icon"
-                                    style={{ padding: '8px 30px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '38px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer' }}
+                                    style={{ padding: '8px 30px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '38px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', width: 'fit-content' }}
                                 >
                                     <IconoCalculadora />
                                     CALCULAR
@@ -247,9 +262,9 @@ export default function ResultadosReglaMultiplicacion({
                     </div>
                 ) : (
                     <>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                        <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
                             <div>
-                                <span style={{ ...labelStyle, margin: 0 }}>Matriz Detectada (Datos Históricos):</span>
+                                <span style={{ ...labelStyle, margin: 0 }}>Datos:</span>
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '2px' }}>
                                     <small title="Datos provenientes de variables externas" style={{ color: 'var(--text-muted)', fontSize: FS.xs, cursor: 'help' }}>
                                         Cargados: <strong style={{ color: 'var(--primary-color)' }}>{statsDatos?.cargados || 0}</strong>
@@ -284,7 +299,7 @@ export default function ResultadosReglaMultiplicacion({
                                         value={modReemplazo}
                                         onChange={(e) => setModReemplazo(e.target.value)}
                                         className="container_cal_input"
-                                        style={{ width: '100%', maxWidth: '300px', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--primary-color)', background: '#fff', fontWeight: 600 }}
+                                        style={{ width: '100%', maxWidth: '300px', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '2px solid var(--primary-color)', fontWeight: 600 }}
                                     >
                                         <option value="con_reemplazo">Con reemplazo (Independientes)</option>
                                         <option value="sin_reemplazo">Sin reemplazo (Dependientes)</option>
@@ -294,7 +309,7 @@ export default function ResultadosReglaMultiplicacion({
                                 {/* EXTRACCIÓN 1 (A) */}
                                 <div style={{ flex: 1, minWidth: '200px' }}>
                                     <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontWeight: 600 }}>
-                                        Variable de A (Extracción 1):
+                                        Variable de <span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} /> (Extracción 1):
                                     </label>
                                     <select
                                         value={colA}
@@ -303,12 +318,12 @@ export default function ResultadosReglaMultiplicacion({
                                         style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)', marginBottom: '8px' }}
                                     >
                                         <option value="">-- Seleccionar Variable --</option>
-                                        {varSeleccionada.nombresColumnas.map(col => <option key={col} value={col}>{col}</option>)}
+                                        {varSeleccionada.nombresColumnas.filter(col => col !== colB).map(col => <option key={col} value={col}>{col}</option>)}
                                     </select>
 
                                     {colA && valoresUnicosA.length > 0 && (
                                         <>
-                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de A:</label>
+                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de <span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />:</label>
                                             <select
                                                 value={valA}
                                                 onChange={(e) => setValA(e.target.value)}
@@ -325,7 +340,7 @@ export default function ResultadosReglaMultiplicacion({
                                 {/* EXTRACCIÓN 2 (B) */}
                                 <div style={{ flex: 1, minWidth: '200px' }}>
                                     <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontWeight: 600 }}>
-                                        Variable de B (Extracción 2):
+                                        Variable de <span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} /> (Extracción 2):
                                     </label>
                                     <select
                                         value={colB}
@@ -334,12 +349,12 @@ export default function ResultadosReglaMultiplicacion({
                                         style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)', marginBottom: '8px' }}
                                     >
                                         <option value="">-- Seleccionar Variable --</option>
-                                        {varSeleccionada.nombresColumnas.map(col => <option key={col} value={col}>{col}</option>)}
+                                        {varSeleccionada.nombresColumnas.filter(col => col !== colA).map(col => <option key={col} value={col}>{col}</option>)}
                                     </select>
 
                                     {colB && valoresUnicosB.length > 0 && (
                                         <>
-                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de B:</label>
+                                            <label style={{ fontSize: FS.sm, fontFamily: FONT, display: 'block', marginBottom: '4px', color: 'var(--primary-color)', fontWeight: 'bold' }}>Condición de <span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />:</label>
                                             <select
                                                 value={valB}
                                                 onChange={(e) => setValB(e.target.value)}
@@ -353,11 +368,11 @@ export default function ResultadosReglaMultiplicacion({
                                     )}
                                 </div>
 
-                                <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
                                     <button
                                         onClick={calcular}
                                         className="button_calcular btn-icon"
-                                        style={{ padding: '8px 30px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '38px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer' }}
+                                        style={{ padding: '8px 30px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '38px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', width: 'fit-content' }}
                                         disabled={!varSeleccionada || !colA || !valA || !colB || !valB}
                                     >
                                         <IconoCalculadora />
@@ -386,34 +401,34 @@ export default function ResultadosReglaMultiplicacion({
 
             {resultado && (
                 <>
-                    <div style={{ ...cardStyle, marginBottom: '20px' }}>
+                    <div style={{ marginBottom: '20px' }}>
                         <h4 style={{ color: 'var(--primary-color)', margin: '0 0 10px 0', fontSize: FS.sm }}>
                             Desglose de Probabilidades Sucesivas:
                         </h4>
-                        <div style={{ overflowX: 'auto' }}>
+                        <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: RADIUS }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: FS.sm }}>
                                 <thead>
                                     <tr style={{ background: 'var(--bg-input)', borderBottom: '2px solid var(--border-color)' }}>
                                         <th style={{ padding: '8px 6px', width: inputMode === 'manual' ? '33.33%' : 'auto' }}>Paso</th>
                                         <th style={{ padding: '8px 6px', width: inputMode === 'manual' ? '33.33%' : 'auto' }}>Evento Extraído</th>
                                         {inputMode !== 'manual' && (
-                                            <th style={{ padding: '8px 6px', color: 'var(--text-muted)', fontWeight: 500 }}>Fracción (n/N)</th>
+                                            <th style={{ padding: '8px 6px', color: 'var(--text-muted)', fontWeight: 500 }}>Fracción <span dangerouslySetInnerHTML={{ __html: katex.renderToString('(n/N)') }} /></th>
                                         )}
-                                        <th style={{ padding: '8px 6px', width: inputMode === 'manual' ? '33.33%' : 'auto' }}>Probabilidad (P)</th>
+                                        <th style={{ padding: '8px 6px', width: inputMode === 'manual' ? '33.33%' : 'auto' }}>Probabilidad <span dangerouslySetInnerHTML={{ __html: katex.renderToString('(P)') }} /></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                                         <td style={{ padding: '8px 6px', fontWeight: 600 }}>Extracción 1</td>
-                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}>A: {resultado.nameA}</td>
+                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}><span dangerouslySetInnerHTML={{ __html: katex.renderToString('A') }} />: {resultado.nameA}</td>
                                         {inputMode !== 'manual' && (
                                             <td style={{ padding: '8px 6px', color: 'var(--text-muted)' }}>{resultado.countA} / {resultado.totalA}</td>
                                         )}
                                         <td style={{ padding: '8px 6px', fontWeight: 'bold' }}>{resultado.pA.toFixed(4)}</td>
                                     </tr>
-                                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                    <tr style={{ borderBottom: 'none', background: 'rgba(128, 128, 128, 0.05)' }}>
                                         <td style={{ padding: '8px 6px', fontWeight: 600 }}>Extracción 2</td>
-                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}>B: {resultado.nameB} {modReemplazo === 'sin_reemplazo' && '(dado A)'}</td>
+                                        <td style={{ padding: '8px 6px', fontWeight: 600 }}><span dangerouslySetInnerHTML={{ __html: katex.renderToString('B') }} />: {resultado.nameB} {modReemplazo === 'sin_reemplazo' && '(dado A)'}</td>
                                         {inputMode !== 'manual' && (
                                             <td style={{ padding: '8px 6px', color: 'var(--text-muted)' }}>{resultado.countB} / {resultado.totalB}</td>
                                         )}
@@ -424,10 +439,10 @@ export default function ResultadosReglaMultiplicacion({
                         </div>
                     </div>
 
-                    <div style={{ ...cardStyle, marginBottom: '20px' }}>
-                        <h3 style={{ color: 'var(--primary-color)', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', fontSize: FS.md, margin: '0 0 15px 0' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ color: 'var(--primary-color)', fontSize: FS.sm, margin: '0 0 10px 0' }}>
                             Desarrollo Matemático: Regla de la Multiplicación
-                        </h3>
+                        </h4>
                         <FormulaMultiplicacion resultado={resultado} modReemplazo={modReemplazo} />
                     </div>
 

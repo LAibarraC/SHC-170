@@ -28,7 +28,7 @@ const CustomKatexLabel = (props) => {
         <foreignObject x={x - 50} y={y - 30} width={100} height={30} style={{ overflow: 'visible' }}>
             <div 
                 dangerouslySetInnerHTML={{ __html: katex.renderToString(value, { throwOnError: false }) }} 
-                style={{ color: '#1e293b', fontSize: '12px', fontWeight: 'bold', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%' }} 
+                style={{ color: 'var(--text-main, #1e293b)', fontSize: '12px', fontWeight: 'bold', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%' }} 
             />
         </foreignObject>
     );
@@ -147,19 +147,19 @@ export default function GraficoBastonesModelos({ datos, condicion, resultados })
                                 domain={esBernoulli ? undefined : ['dataMin', 'dataMax']}
                                 padding={esBernoulli ? { left: 40, right: 40 } : { left: 20, right: 20 }}
                                 ticks={datosRecortados.map(d => d.x)}
-                                tick={{ fill: '#333333', fontSize: 12, fontWeight: 600 }}
-                                axisLine={{ stroke: '#333333', strokeWidth: 2 }}
-                                tickLine={{ stroke: '#333333', strokeWidth: 2 }}
-                                label={{ value: 'Valor (x)', position: 'insideBottom', offset: -10, fill: '#333333', fontSize: 14, fontWeight: 'bold', textAnchor: 'middle' }}
+                                tick={{ fill: 'var(--text-main, #333333)', fontSize: 12, fontWeight: 600 }}
+                                axisLine={{ stroke: 'var(--text-main, #333333)', strokeWidth: 2 }}
+                                tickLine={{ stroke: 'var(--text-main, #333333)', strokeWidth: 2 }}
+                                label={{ value: 'Valor (x)', position: 'insideBottom', offset: -10, fill: 'var(--text-main, #333333)', fontSize: 14, fontWeight: 'bold', textAnchor: 'middle' }}
                             />
 
                             <YAxis
                                 domain={esBernoulli ? [0, 1] : [0, 'auto']}
                                 padding={{ top: 30 }}
-                                tick={{ fill: '#333333', fontSize: 12, fontWeight: 600 }}
-                                axisLine={{ stroke: '#333333', strokeWidth: 2 }}
-                                tickLine={{ stroke: '#333333', strokeWidth: 2 }}
-                                label={{ value: 'Probabilidad P(x)', angle: -90, position: 'insideLeft', offset: 15, fill: '#333333', fontSize: 14, fontWeight: 'bold', textAnchor: 'middle' }}
+                                tick={{ fill: 'var(--text-main, #333333)', fontSize: 12, fontWeight: 600 }}
+                                axisLine={{ stroke: 'var(--text-main, #333333)', strokeWidth: 2 }}
+                                tickLine={{ stroke: 'var(--text-main, #333333)', strokeWidth: 2 }}
+                                label={{ value: 'Probabilidad P(x)', angle: -90, position: 'insideLeft', offset: 15, fill: 'var(--text-main, #333333)', fontSize: 14, fontWeight: 'bold', textAnchor: 'middle' }}
                             />
 
                             <Tooltip content={<CustomTooltip />} />
@@ -170,7 +170,7 @@ export default function GraficoBastonesModelos({ datos, condicion, resultados })
                             <Bar 
                                 dataKey="p" 
                                 fill="#3b82f6" 
-                                stroke={esBernoulli ? "#1e293b" : "none"}
+                                stroke={esBernoulli ? "transparent" : "none"}
                                 {...(esBernoulli ? {} : { barSize: 15, radius: [0, 0, 0, 0] })}
                             >
                                 {datosRecortados.map((entry, index) => (
@@ -197,7 +197,7 @@ export default function GraficoBastonesModelos({ datos, condicion, resultados })
                                     <Line
                                         type="linear"
                                         dataKey="p_linea"
-                                        stroke="#334155"
+                                        stroke="var(--text-main, #334155)"
                                         strokeWidth={1}
                                         dot={false}
                                         isAnimationActive={false}

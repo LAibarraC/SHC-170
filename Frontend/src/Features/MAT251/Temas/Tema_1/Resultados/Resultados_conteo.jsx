@@ -62,18 +62,17 @@ export default function ResultadosConteo({ resConteo, hayResultado }) {
                     const itemsToRender = datos.elementos.slice(0, maxRender);
                     const totalElements = datos.elementos.length;
                     const extraCount = totalElements - maxRender;
-                    const isDarkMode = document.documentElement.classList.contains('dark');
 
                     return (
                         <div style={{ marginTop: '20px' }}>
                             <p style={{ margin: '0 0 10px', color: 'var(--text-main)', fontSize: FS.sm, borderBottom: '1px solid var(--border-color)', paddingBottom: '5px' }}>
                                 Visualización de Elementos <strong style={{ color: 'var(--text-main)', fontSize: '0.9em' }}>({totalElements})</strong>:
                             </p>
-                            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '10px', borderRadius: RADIUS, background: 'var(--bg-body)' }}>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '10px', borderRadius: RADIUS, background: 'var(--bg-body)' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px' }}>
                                     {itemsToRender.map((el, idx) => (
                                         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <strong style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '0.8rem' }}>
+                                            <strong style={{ fontWeight: 'bold', color: 'var(--text-main)', fontSize: '0.8rem', minWidth: '24px', textAlign: 'right' }}>
                                                 {idx + 1}.
                                             </strong>
                                             <span style={{
@@ -82,16 +81,20 @@ export default function ResultadosConteo({ resConteo, hayResultado }) {
                                                 fontSize: '0.72rem',
                                                 padding: '2px 6px',
                                                 borderRadius: '3px',
-                                                backgroundColor: isDarkMode ? '#000000ff' : '#f3f4f6',
+                                                backgroundColor: 'var(--bg-input)',
                                                 border: '1px dashed var(--text-variable)',
                                                 color: 'var(--text-main)',
-                                                whiteSpace: 'nowrap'
+                                                whiteSpace: 'nowrap',
+                                                flex: 1,
+                                                textAlign: 'center'
                                             }}>
                                                 {el}
                                             </span>
                                         </div>
                                     ))}
-                                    {extraCount > 0 && (
+                                </div>
+                                {extraCount > 0 && (
+                                    <div style={{ textAlign: 'center', marginTop: '12px' }}>
                                         <button
                                             onClick={() => setLimite(prev => prev + 50)}
                                             style={{
@@ -99,8 +102,8 @@ export default function ResultadosConteo({ resConteo, hayResultado }) {
                                                 fontFamily: 'monospace',
                                                 fontSize: '0.72rem',
                                                 fontWeight: 'bold',
-                                                padding: '2px 8px',
-                                                borderRadius: '3px',
+                                                padding: '4px 12px',
+                                                borderRadius: '4px',
                                                 backgroundColor: 'var(--primary-color)',
                                                 color: '#fff',
                                                 border: 'none',
@@ -110,8 +113,8 @@ export default function ResultadosConteo({ resConteo, hayResultado }) {
                                         >
                                             + Ver 50 más ({extraCount} restantes)
                                         </button>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );

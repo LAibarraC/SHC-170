@@ -5,7 +5,7 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
     if (!resultado || !ramas || ramas.length === 0) return null;
 
     const height = Math.max(400, ramas.length * 140);
-    const rootX = 60, rootY = height / 2, nodeAX = 420, nodeBX = 720;
+    const rootX = 80, rootY = height / 2, nodeAX = 440, nodeBX = 740;
     const defaultHighlightColor = '#0ea5e9';
     const bayesHighlightColor = '#f97316';
     const dimColor = '#94a3b8';
@@ -18,7 +18,7 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
 
     resultado.desglose.forEach(rama => {
         const l1 = `P(${rama.nombre})=${rama.pA.toFixed(4)}`;
-        const l2 = `P(B|${rama.nombre})=${rama.pB_A.toFixed(4)}`;
+        const l2 = `P(A|${rama.nombre})=${rama.pB_A.toFixed(4)}`;
         maxWPill = Math.max(maxWPill, rama.nombre.length * 8 + 30);
         maxWLabel1 = Math.max(maxWLabel1, l1.length * 7 + 20);
         maxWLabel2 = Math.max(maxWLabel2, l2.length * 7 + 20);
@@ -31,18 +31,13 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
 
             <svg viewBox={`0 0 ${width} ${height + 40}`} width="100%" height="100%" style={{ display: 'block', margin: '0 auto', fontFamily: FONT }}>
 
-                {/* NODO RAÍZ */}
-                <rect x={rootX - 45} y={rootY - 15} width="45" height="30" rx="15" fill="var(--primary-color)" />
-                <text x={rootX - 22} y={rootY + 4} textAnchor="middle" fontSize="12" fontWeight="bold" fill="white">Inicio</text>
-                <circle cx={rootX} cy={rootY} r="4" fill="white" />
-
                 {resultado.desglose.map((rama, i) => {
                     const ySpacing = height / (ramas.length + 1);
                     const nodeAY = ySpacing * (i + 1);
 
                     // --- Textos dinámicos ---
                     const label1Text = `P(${rama.nombre})=${rama.pA.toFixed(4)}`;
-                    const label2Text = `P(B|${rama.nombre})=${rama.pB_A.toFixed(4)}`;
+                    const label2Text = `P(A|${rama.nombre})=${rama.pB_A.toFixed(4)}`;
                     const pillText = rama.nombre;
 
                     const wPill = maxWPill;
@@ -63,8 +58,14 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
 
                     const isBayesTarget = causaBayes && rama.nombre === causaBayes;
                     const isOtherBayes = causaBayes && rama.nombre !== causaBayes;
-                    
-                    const currentColor = isBayesTarget ? bayesHighlightColor : (isOtherBayes ? veryDimColor : defaultHighlightColor);
+
+                    // En lugar de usar un gris claro estático (veryDimColor) que falla en modo oscuro,
+                    // usamos el color original pero bajamos la opacidad (transparencia) para un difuminado natural.
+                    const currentColor = isBayesTarget ? bayesHighlightColor : defaultHighlightColor;
+                    const fadeOpacity = isOtherBayes ? "0.25" : "1";
+                    const lineOpacity = isOtherBayes ? "0.15" : "0.9";
+                    const textOpacity = isOtherBayes ? "0.4" : "1";
+
                     const strokeWidthCurrent = isBayesTarget ? "3.5" : "2.5";
                     const strokeWidthSubCurrent = isBayesTarget ? "3" : "2";
 
@@ -74,68 +75,80 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
                             <line
                                 x1={rootX} y1={rootY}
                                 x2={pillX} y2={nodeAY}
-                                stroke={currentColor} strokeWidth={strokeWidthCurrent} opacity={isOtherBayes ? "0.6" : "0.9"}
+                                stroke={currentColor} strokeWidth={strokeWidthCurrent} opacity={lineOpacity}
                             />
 
                             {/* Etiqueta P(A_i) sobre la línea */}
-                            <rect x={midX1 - wLabel1 / 2} y={midY1 - 12} width={wLabel1} height="24" rx="4" fill="white" stroke={currentColor} strokeWidth="1" />
-                            <text x={midX1} y={midY1 + 4} textAnchor="middle" fontSize="11" fill={currentColor} fontWeight="bold">
+                            <rect x={midX1 - wLabel1 / 2} y={midY1 - 12} width={wLabel1} height="24" rx="4" fill="var(--bg-card)" stroke={currentColor} strokeWidth="1" strokeOpacity={fadeOpacity} />
+                            <text x={midX1} y={midY1 + 4} textAnchor="middle" fontSize="11" fill={currentColor} fontWeight="bold" opacity={fadeOpacity}>
                                 {label1Text}
                             </text>
 
                             {/* Nodo A_i (Píldora dinámica) */}
-                            <rect x={pillX} y={nodeAY - 14} width={wPill} height="28" rx="14" fill={currentColor} />
-                            <text x={pillX + wPill / 2} y={nodeAY + 4} textAnchor="middle" fontSize="11" fontWeight="bold" fill="white">
+                            <rect x={pillX} y={nodeAY - 14} width={wPill} height="28" rx="14" fill={currentColor} fillOpacity={fadeOpacity} />
+                            <text x={pillX + wPill / 2} y={nodeAY + 4} textAnchor="middle" fontSize="11" fontWeight="bold" fill="white" opacity={textOpacity}>
                                 {pillText}
                             </text>
 
-                            {/* === SUB-RAMA ÉXITO (Hacia B) === */}
+                            {/* === SUB-RAMA ÉXITO (Hacia A) === */}
                             <line
                                 x1={nodeAX} y1={nodeAY}
                                 x2={nodeBX - 70} y2={nodeAY - 35}
-                                stroke={currentColor} strokeWidth={strokeWidthSubCurrent} opacity={isOtherBayes ? "0.6" : "1"}
+                                stroke={currentColor} strokeWidth={strokeWidthSubCurrent} opacity={lineOpacity}
                             />
-                            {/* Etiqueta P(B|A_i) */}
-                            <rect x={midX2 - wLabel2 / 2} y={midY2 - 12} width={wLabel2} height="24" rx="4" fill="white" stroke={currentColor} strokeWidth="1" />
-                            <text x={midX2} y={midY2 + 4} textAnchor="middle" fontSize="11" fill={currentColor} fontWeight="bold">
+                            {/* Etiqueta P(A|A_i) */}
+                            <rect x={midX2 - wLabel2 / 2} y={midY2 - 12} width={wLabel2} height="24" rx="4" fill="var(--bg-card)" stroke={currentColor} strokeWidth="1" strokeOpacity={fadeOpacity} />
+                            <text x={midX2} y={midY2 + 4} textAnchor="middle" fontSize="11" fill={currentColor} fontWeight="bold" opacity={fadeOpacity}>
                                 {label2Text}
                             </text>
 
-                            {/* Nodo B (Éxito) */}
-                            <rect x={nodeBX - 70} y={nodeAY - 35 - 12} width="70" height="24" rx="4" fill={currentColor} />
-                            <text x={nodeBX - 35} y={nodeAY - 35 + 4} textAnchor="middle" fontSize="11" fontWeight="bold" fill="white">B (Éxito)</text>
+                            {/* Nodo A (Éxito) */}
+                            <rect x={nodeBX - 70} y={nodeAY - 35 - 12} width="70" height="24" rx="4" fill={currentColor} fillOpacity={fadeOpacity} />
+                            <text x={nodeBX - 35} y={nodeAY - 35 + 4} textAnchor="middle" fontSize="11" fontWeight="bold" fill="white" opacity={textOpacity}>A (Éxito)</text>
 
                             {/* Multiplicador Final */}
-                            <text x={nodeBX + 10} y={nodeAY - 35 + 4} fontSize="12" fontWeight="bold" fill={currentColor}>
+                            <text x={nodeBX + 10} y={nodeAY - 35 + 4} fontSize="12" fontWeight="bold" fill={currentColor} opacity={fadeOpacity}>
                                 = {rama.mult.toFixed(4)}
                             </text>
 
-                            {/* === SUB-RAMA FRACASO (Hacia B') === */}
+                            {/* === SUB-RAMA FRACASO (Hacia A') === */}
                             <line
                                 x1={nodeAX} y1={nodeAY}
                                 x2={nodeBX - 70} y2={nodeAY + 35}
-                                stroke={dimColor} strokeWidth="1.5" strokeDasharray="5,5"
+                                stroke={dimColor} strokeWidth="1.5" strokeDasharray="5,5" opacity={isOtherBayes ? "0.2" : "1"}
                             />
-                            {/* Etiqueta P(B'|A_i) */}
-                            <rect x={midX3 - 25} y={midY3 - 10} width="50" height="20" rx="4" fill="white" stroke={dimColor} strokeWidth="1" />
-                            <text x={midX3} y={midY3 + 4} textAnchor="middle" fontSize="10" fill={dimColor}>
+                            {/* Etiqueta P(A'|A_i) */}
+                            <rect x={midX3 - 25} y={midY3 - 10} width="50" height="20" rx="4" fill="var(--bg-card)" stroke={dimColor} strokeWidth="1" strokeOpacity={isOtherBayes ? "0.25" : "1"} />
+                            <text x={midX3} y={midY3 + 4} textAnchor="middle" fontSize="10" fill={dimColor} opacity={isOtherBayes ? "0.4" : "1"}>
                                 {(1 - rama.pB_A).toFixed(4)}
                             </text>
 
-                            {/* Nodo B' (Otro) */}
-                            <rect x={nodeBX - 70} y={nodeAY + 35 - 10} width="70" height="20" rx="4" fill="white" stroke={dimColor} strokeWidth="1" />
-                            <text x={nodeBX - 35} y={nodeAY + 35 + 4} textAnchor="middle" fontSize="10" fill={dimColor}>B' (Otro)</text>
+                            {/* Nodo A' (Otro) */}
+                            <rect x={nodeBX - 70} y={nodeAY + 35 - 10} width="70" height="20" rx="4" fill="var(--bg-card)" stroke={dimColor} strokeWidth="1" strokeOpacity={isOtherBayes ? "0.25" : "1"} />
+                            <text x={nodeBX - 35} y={nodeAY + 35 + 4} textAnchor="middle" fontSize="10" fill={dimColor} opacity={isOtherBayes ? "0.4" : "1"}>A' (Otro)</text>
                         </g>
                     );
                 })}
+
+                {/* NODO RAÍZ (Renderizado al final para que esté por encima de las líneas) */}
+                <rect x={rootX - 70} y={rootY - 16} width="70" height="32" rx="16" fill="var(--primary-color)" />
+                <text x={rootX - 35} y={rootY + 4} textAnchor="middle" fontSize="13" fontWeight="bold" fill="white">Inicio</text>
+                <circle cx={rootX} cy={rootY} r="5" fill="white" />
+
                 {/* LEYENDA */}
-                <text x={width / 2} y={height + 25} textAnchor="middle" fontSize="12" fill="var(--text-muted)">
-                    <tspan fill={defaultHighlightColor} fontWeight="bold">■ </tspan>
-                    Rutas ponderadas que conforman la Probabilidad Total
-                    {causaBayes && (
-                        <tspan fill={bayesHighlightColor} fontWeight="bold"> | ■ Ruta evaluada con el Teorema de Bayes</tspan>
-                    )}
-                </text>
+                {(() => {
+                    const maxNodeY = (height / (ramas.length + 1)) * ramas.length;
+                    const legendY = maxNodeY + 85; // Se calcula 85px debajo de la última rama (la cual baja hasta +35px)
+                    return (
+                        <text x={width / 2} y={legendY} textAnchor="middle" fontSize="12" fill="var(--text-muted)">
+                            <tspan fill={defaultHighlightColor} fontWeight="bold">■ </tspan>
+                            Rutas ponderadas que conforman la Probabilidad Total
+                            {causaBayes && (
+                                <tspan fill={bayesHighlightColor} fontWeight="bold"> | ■ Ruta evaluada con el Teorema de Bayes</tspan>
+                            )}
+                        </text>
+                    );
+                })()}
             </svg>
         </div>
     );

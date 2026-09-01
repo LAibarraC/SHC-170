@@ -101,14 +101,14 @@ export default function Inicio() {
   // --- DATOS DEL EQUIPO ---
   const autoridades = [
     { nombre: "Ph.D. Roberto Rivera Salazar", cargo: "Director de Administración de Empresas", imagen: "https://ui-avatars.com/api/?name=Roberto+Rivera&background=f1c40f&color=fff&size=150" },
-    { nombre: "Ing. José Boris Bellido Santa María", cargo: "Supervisión y Asesoría Técnica", imagen: "https://ui-avatars.com/api/?name=Boris+Bellido&background=f1c40f&color=fff&size=150" }
+    { nombre: "Ph.D. José Boris Bellido Santa María", cargo: "Supervisión y Asesoría Técnica", imagen: "https://ui-avatars.com/api/?name=Boris+Bellido&background=f1c40f&color=fff&size=150" }
   ];
 
   const desarrolladores = [
     { nombre: "Diego Coa Véliz", cargo: "Desarrollador Full-Stack", modulo: "Estadística General", imagen: "https://ui-avatars.com/api/?name=Diego+Coa&background=17a2b8&color=fff&size=150" },
     { nombre: "Luis Alberto Ibarra Calderon", cargo: "Desarrollador Full-Stack", modulo: "Estadística Matemática", imagen: "https://ui-avatars.com/api/?name=Luis+Ibarra&background=17a2b8&color=fff&size=150" },
     { nombre: "Diego Santiago Solorzano Arancibia", cargo: "Desarrollador Full-Stack", modulo: "Analisis Empresarial", imagen: "https://ui-avatars.com/api/?name=Diego+Solorzano&background=17a2b8&color=fff&size=150" },
-    { nombre: "Ulises", cargo: "Desarrollador Full-Stack", modulo: "Marketing", imagen: "https://ui-avatars.com/api/?name=Ulises&background=17a2b8&color=fff&size=150" }
+    { nombre: "Ulises Jesús Mancilla Rodriguez", cargo: "Desarrollador Full-Stack", modulo: "Marketing", imagen: "https://ui-avatars.com/api/?name=Ulises&background=17a2b8&color=fff&size=150" }
   ];
 
   return (
@@ -153,6 +153,9 @@ export default function Inicio() {
           transition: all 0.3s ease;
           box-shadow: 0 4px 15px rgba(0,0,0,0.03);
           box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
         }
         .profile-card:hover {
           transform: translateY(-5px);
@@ -411,9 +414,11 @@ export default function Inicio() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '30px', maxWidth: '800px', margin: '0 auto 60px' }}>
             {autoridades.map((autoridad, idx) => (
               <div key={idx} className="profile-card">
-                <img src={autoridad.imagen} alt={autoridad.nombre} className="profile-img" />
-                <h4 style={{ fontSize: '1.2rem', marginBottom: '8px', fontWeight: '700' }}>{autoridad.nombre}</h4>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.5' }}>{autoridad.cargo}</p>
+                <img src={autoridad.imagen} alt={autoridad.nombre} className="profile-img" style={{ margin: '0 auto 15px' }} />
+                <h4 style={{ fontSize: '1.2rem', marginBottom: '8px', fontWeight: '700', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{autoridad.nombre}</h4>
+                <div style={{ marginTop: 'auto' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.5', margin: 0 }}>{autoridad.cargo}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -422,13 +427,15 @@ export default function Inicio() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '30px' }}>
             {desarrolladores.map((dev, idx) => (
               <div key={idx} className="profile-card">
-                <img src={dev.imagen} alt={dev.nombre} className="profile-img" />
-                <h4 style={{ fontSize: '1.1rem', marginBottom: '10px', fontWeight: '700' }}>{dev.nombre}</h4>
-                <p className="yellow-text" style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '15px' }}>{dev.cargo}</p>
-                <div style={{ backgroundColor: 'rgba(128,128,128,0.1)', padding: '10px', borderRadius: '8px' }}>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
-                    <strong>Módulo:</strong> <br />{dev.modulo}
-                  </p>
+                <img src={dev.imagen} alt={dev.nombre} className="profile-img" style={{ margin: '0 auto 15px' }} />
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '10px', fontWeight: '700', flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{dev.nombre}</h4>
+                <div style={{ marginTop: 'auto' }}>
+                  <p className="yellow-text" style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '15px' }}>{dev.cargo}</p>
+                  <div style={{ backgroundColor: 'rgba(128,128,128,0.1)', padding: '10px', borderRadius: '8px' }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>
+                      <strong>Módulo:</strong> <br />{dev.modulo}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}

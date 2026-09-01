@@ -28,6 +28,16 @@ export default function Controles_ModelosContinuos({
     const [paramMu, setParamMu] = useState('');
     const [paramSigma, setParamSigma] = useState('');
 
+    // Parámetros Manuales Chi-cuadrado
+    const [paramK, setParamK] = useState('');
+
+    // Parámetros Manuales F de Fisher
+    const [paramV1, setParamV1] = useState('');
+    const [paramV2, setParamV2] = useState('');
+
+    // Parámetros Manuales T de Student
+    const [paramNStudent, setParamNStudent] = useState('');
+
     // Condición
     const [calcMode, setCalcMode] = useState('directa'); // 'directa' o 'inversa'
     const [tipoCondicion, setTipoCondicion] = useState('menor_igual');
@@ -46,6 +56,10 @@ export default function Controles_ModelosContinuos({
         setParamB('');
         setParamMu('');
         setParamSigma('');
+        setParamK('');
+        setParamV1('');
+        setParamV2('');
+        setParamNStudent('');
         
         setCalcMode('directa');
         setTipoCondicion('menor_igual');
@@ -65,10 +79,17 @@ export default function Controles_ModelosContinuos({
         if (modelo === nuevoModelo) return;
         setModelo(nuevoModelo);
         
+        if (nuevoModelo === 'NormalEstandar' || nuevoModelo === 'FFisher' || nuevoModelo === 'ChiCuadrado') {
+            setModo('manual');
+        }
+
         setParamA('');
         setParamB('');
         setParamMu('');
         setParamSigma('');
+        setParamK('');
+        setParamV1('');
+        setParamV2('');
         
         setTipoCondicion('menor_igual');
         setValorX('');
@@ -134,6 +155,20 @@ export default function Controles_ModelosContinuos({
 
             setParamMu(media.toFixed(4));
             setParamSigma(dev.toFixed(4));
+        } else if (modelo === 'ChiCuadrado' || modelo === 'TStudent') {
+            const num = datosColumna.length - 1;
+            if (num <= 0) {
+                setError(`Se requieren al menos 2 datos para estimar los grados de libertad (n = total - 1).`);
+                return;
+            }
+            
+            setStatsEstimados({
+                total: datosColumna.length,
+                n: num
+            });
+
+            if (modelo === 'ChiCuadrado') setParamK(num.toString());
+            if (modelo === 'TStudent') setParamNStudent(num.toString());
         }
         setError('');
     };
@@ -155,6 +190,21 @@ export default function Controles_ModelosContinuos({
             if (isNaN(mu) || isNaN(sigma)) return setError('En Normal, la media y desviación deben ser números válidos.');
             if (sigma <= 0) return setError('La desviación estándar debe ser mayor a 0.');
             params = { mu, sigma };
+        } else if (modelo === 'NormalEstandar') {
+            params = { mu: 0, sigma: 1 };
+        } else if (modelo === 'ChiCuadrado') {
+            const k = parseInt(paramK, 10);
+            if (isNaN(k) || k <= 0) return setError('En Chi-cuadrado, los grados de libertad (k) deben ser un número entero mayor a 0.');
+            params = { k };
+        } else if (modelo === 'FFisher') {
+            const v1 = parseInt(paramV1, 10);
+            const v2 = parseInt(paramV2, 10);
+            if (isNaN(v1) || v1 <= 0 || isNaN(v2) || v2 <= 0) return setError('En F de Fisher, los grados de libertad (v1 y v2) deben ser enteros mayores a 0.');
+            params = { v1, v2 };
+        } else if (modelo === 'TStudent') {
+            const n = parseInt(paramNStudent, 10);
+            if (isNaN(n) || n <= 0) return setError('En T de Student, los grados de libertad (n) deben ser un número entero mayor a 0.');
+            params = { n };
         } else {
             return setError('Este modelo continuo aún está en construcción.');
         }
@@ -194,17 +244,19 @@ export default function Controles_ModelosContinuos({
 
     const renderParametrosManuales = () => {
         const isMatriz = modo === 'matriz';
-        const readOnlyParams = isMatriz;
+        const modelSupportsMatriz = modelo === 'Uniforme' || modelo === 'Normal' || modelo === 'ChiCuadrado' || modelo === 'TStudent';
+        const readOnlyParams = isMatriz && modelSupportsMatriz;
 
         const disabledStyle = {
-            backgroundColor: '#f1f5f9',
-            color: '#475569',
-            border: '1px dashed #94a3b8',
+            backgroundColor: 'var(--bg-input, #f1f5f9)',
+            color: 'var(--text-muted, #475569)',
+            border: '1px dashed var(--border-color, #94a3b8)',
             cursor: 'not-allowed',
-            fontWeight: 600
+            fontWeight: 600,
+            opacity: 0.7
         };
 
-        if (modelo !== 'Uniforme' && modelo !== 'Normal') {
+        if (modelo !== 'Uniforme' && modelo !== 'Normal' && modelo !== 'NormalEstandar' && modelo !== 'ChiCuadrado' && modelo !== 'FFisher' && modelo !== 'TStudent') {
             return (
                 <div style={{ textAlign: 'center', marginTop: '20px', padding: '20px', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px dashed var(--border-color)', width: '100%' }}>
                     <p style={{ color: 'var(--text-muted)' }}>Módulo en construcción. Muy pronto podrás estimar y graficar esta distribución continua.</p>
@@ -237,36 +289,144 @@ export default function Controles_ModelosContinuos({
                             />
                         </div>
                     </div>
-                    <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#334155', background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                    <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', fontSize: '1.1rem' }}>
                         {renderLatex(`f(x) = \\frac{1}{\\sigma \\sqrt{2\\pi}} e^{-\\frac{1}{2}\\left(\\frac{x-\\mu}{\\sigma}\\right)^2}`)}
                     </div>
                 </div>
             );
         }
 
+        if (modelo === 'NormalEstandar') {
+            return (
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: '1 1 250px' }}>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '100px', display: 'flex', alignItems: 'center' }}>Media <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('\\mu')}</span></label>
+                            <input
+                                type="text" className="tema3-input"
+                                value="0"
+                                disabled={true}
+                                style={{ ...disabledStyle, padding: '6px 10px', fontSize: '0.85rem', flex: 1, textAlign: 'center' }}
+                            />
+                        </div>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '100px', display: 'flex', alignItems: 'center' }}>Desviación <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('\\sigma')}</span></label>
+                            <input
+                                type="text" className="tema3-input"
+                                value="1"
+                                disabled={true}
+                                style={{ ...disabledStyle, padding: '6px 10px', fontSize: '0.85rem', flex: 1, textAlign: 'center' }}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', fontSize: '1.1rem' }}>
+                        {renderLatex(`f(z) = \\frac{1}{\\sqrt{2\\pi}} e^{-\\frac{1}{2}z^2}`)}
+                    </div>
+                </div>
+            );
+        }
+
+        if (modelo === 'ChiCuadrado') {
+            return (
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: '1 1 250px' }}>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '130px', display: 'flex', alignItems: 'center' }}>Grados de lib. <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('n')}</span></label>
+                            <input
+                                type="number" className="tema3-input" step="1" min="1"
+                                value={paramK} onChange={e => setParamK(e.target.value)}
+                                placeholder="Ej: 5"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', fontSize: '1.1rem' }}>
+                        {renderLatex(`f(x) = \\frac{1}{2^{n/2}\\Gamma(\\frac{n}{2})}x^{n/2-1}e^{-x/2}`)}
+                    </div>
+                </div>
+            );
+        }
+
+        if (modelo === 'FFisher') {
+            return (
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: '1 1 250px' }}>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '150px', display: 'flex', alignItems: 'center' }}>Grados Numerador <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('n')}</span></label>
+                            <input
+                                type="number" className="tema3-input" step="1" min="1"
+                                value={paramV1} onChange={e => setParamV1(e.target.value)}
+                                placeholder="Ej: 5"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                            />
+                        </div>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '150px', display: 'flex', alignItems: 'center' }}>Grados Denominador <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('m')}</span></label>
+                            <input
+                                type="number" className="tema3-input" step="1" min="1"
+                                value={paramV2} onChange={e => setParamV2(e.target.value)}
+                                placeholder="Ej: 10"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', fontSize: '1.1rem' }}>
+                        {renderLatex(`f(x) = \\frac{\\Gamma\\left(\\frac{n+m}{2}\\right)\\left(\\frac{n}{m}\\right)^{n/2}}{\\Gamma\\left(\\frac{n}{2}\\right)\\Gamma\\left(\\frac{m}{2}\\right)} \\frac{x^{\\frac{n}{2}-1}}{\\left(1+\\frac{n}{m}x\\right)^{(n+m)/2}}`)}
+                    </div>
+                </div>
+            );
+        }
+
+        if (modelo === 'TStudent') {
+            return (
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: '1 1 250px' }}>
+                        <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '130px', display: 'flex', alignItems: 'center' }}>Grados de lib. <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('n')}</span></label>
+                            <input
+                                type="number" className="tema3-input" step="1" min="1"
+                                value={paramNStudent} onChange={e => setParamNStudent(e.target.value)}
+                                placeholder="Ej: 5"
+                                disabled={readOnlyParams}
+                                style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                            />
+                        </div>
+                    </div>
+                    <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', fontSize: '1.1rem' }}>
+                        {renderLatex(`f(t) = \\frac{\\Gamma(\\frac{n+1}{2})}{\\Gamma(\\frac{n}{2})\\sqrt{n\\pi}}\\left(1+\\frac{t^2}{n}\\right)^{-\\frac{n+1}{2}} \\quad \\text{para } -\\infty < t < \\infty`)}
+                    </div>
+                </div>
+            );
+        }
+
         return (
-            <div className="tema3-grid" style={{ marginBottom: '5px', gap: '10px' }}>
-                <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>Mínimo <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('a')}</span></label>
-                    <input
-                        type="number" className="tema3-input" step="any"
-                        value={paramA} onChange={e => setParamA(e.target.value)}
-                        placeholder="0.00"
-                        disabled={readOnlyParams}
-                        style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
-                    />
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', flex: '1 1 250px' }}>
+                    <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '100px', display: 'flex', alignItems: 'center' }}>Mínimo <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('a')}</span></label>
+                        <input
+                            type="number" className="tema3-input" step="any"
+                            value={paramA} onChange={e => setParamA(e.target.value)}
+                            placeholder="0.00"
+                            disabled={readOnlyParams}
+                            style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                        />
+                    </div>
+                    <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', width: '100px', display: 'flex', alignItems: 'center' }}>Máximo <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('b')}</span></label>
+                        <input
+                            type="number" className="tema3-input" step="any"
+                            value={paramB} onChange={e => setParamB(e.target.value)}
+                            placeholder="0.00"
+                            disabled={readOnlyParams}
+                            style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
+                        />
+                    </div>
                 </div>
-                <div className="tema3-form-group" style={{ marginBottom: '0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>Máximo <span style={{ fontSize: '1.05rem', marginLeft: '6px', transform: 'translateY(-1px)' }}>{renderLatex('b')}</span></label>
-                    <input
-                        type="number" className="tema3-input" step="any"
-                        value={paramB} onChange={e => setParamB(e.target.value)}
-                        placeholder="0.00"
-                        disabled={readOnlyParams}
-                        style={{ ...readOnlyParams ? disabledStyle : {}, padding: '6px 10px', fontSize: '0.85rem', flex: 1 }}
-                    />
-                </div>
-                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginTop: '15px', color: '#334155', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px dashed #cbd5e1', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ flex: '1 1 300px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-main, #334155)', background: 'var(--bg-input, #f8fafc)', padding: '15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)', fontSize: '1.1rem' }}>
                     {renderLatex(`f(x) = \\frac{1}{${paramB || 'b'} - ${paramA || 'a'}}`)}
                 </div>
             </div>
@@ -285,12 +445,13 @@ export default function Controles_ModelosContinuos({
                         { id: 'Uniforme', label: 'Uniforme' },
                         { id: 'Normal', label: 'Normal' },
                         { id: 'NormalEstandar', label: 'Normal Estándar' },
-                        { id: 'ChiCuadrado', label: 'Chi-cuadrado' },
+                        { id: 'ChiCuadrado', label: 'Chi-cuadrada' },
                         { id: 'FFisher', label: 'F de Fisher' }
                     ].map(tipo => (
                         <button
                             key={tipo.id}
                             type="button"
+                            className={modelo === tipo.id ? 'btn-tema3-active' : ''}
                             onClick={() => handleCambiarModelo(tipo.id)}
                             style={{
                                 flex: 1,
@@ -300,7 +461,7 @@ export default function Controles_ModelosContinuos({
                                 fontWeight: 600,
                                 border: 'none',
                                 cursor: 'pointer',
-                                background: modelo === tipo.id ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                                background: modelo === tipo.id ? '#3b82f6' : 'transparent',
                                 color: modelo === tipo.id ? '#fff' : 'var(--text-muted, #64748b)',
                                 transition: 'all 0.2s ease',
                                 boxShadow: modelo === tipo.id ? '0 2px 4px rgba(13, 110, 253, 0.3)' : 'none'
@@ -311,9 +472,11 @@ export default function Controles_ModelosContinuos({
                     ))}
                 </div>
 
-                <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                {modelo !== 'NormalEstandar' && modelo !== 'FFisher' && modelo !== 'ChiCuadrado' && (
+                    <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
                     <button
                         type="button"
+                        className={modo === 'matriz' ? 'btn-tema3-active' : ''}
                         onClick={() => { setModo('matriz'); setError(''); }}
                         style={{
                             padding: '6px 16px',
@@ -322,7 +485,7 @@ export default function Controles_ModelosContinuos({
                             fontWeight: 600,
                             border: 'none',
                             cursor: 'pointer',
-                            background: modo === 'matriz' ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                            background: modo === 'matriz' ? '#3b82f6' : 'transparent',
                             color: modo === 'matriz' ? '#fff' : 'var(--text-muted, #64748b)',
                             transition: 'all 0.2s'
                         }}
@@ -331,6 +494,7 @@ export default function Controles_ModelosContinuos({
                     </button>
                     <button
                         type="button"
+                        className={modo === 'manual' ? 'btn-tema3-active' : ''}
                         onClick={() => { setModo('manual'); setError(''); }}
                         style={{
                             padding: '6px 16px',
@@ -339,7 +503,7 @@ export default function Controles_ModelosContinuos({
                             fontWeight: 600,
                             border: 'none',
                             cursor: 'pointer',
-                            background: modo === 'manual' ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                            background: modo === 'manual' ? '#3b82f6' : 'transparent',
                             color: modo === 'manual' ? '#fff' : 'var(--text-muted, #64748b)',
                             transition: 'all 0.2s'
                         }}
@@ -347,6 +511,7 @@ export default function Controles_ModelosContinuos({
                         Modo Manual
                     </button>
                 </div>
+                )}
             </div>
 
             <div className="tema3-card">
@@ -357,20 +522,21 @@ export default function Controles_ModelosContinuos({
                     </div>
                 )}
 
-                {modo === 'matriz' && (modelo === 'Uniforme' || modelo === 'Normal') && (
+                {modo === 'matriz' && (modelo === 'Uniforme' || modelo === 'Normal' || modelo === 'ChiCuadrado' || modelo === 'TStudent') && (
                     <div style={{ marginBottom: '20px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-card, #fff)', padding: '12px 15px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', marginBottom: '20px' }}>
                             <div>
-                                <div style={{ color: 'var(--primary-color, #2563eb)', fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Conjunto de Datos:</div>
+                                <div style={{ color: '#3b82f6', fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Conjunto de Datos:</div>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
-                                    Cargados: <strong style={{ color: 'var(--primary-color, #2563eb)' }}>{statsDatos ? statsDatos.cargados : 0}</strong> &nbsp;
-                                    Agregados: <strong style={{ color: 'var(--primary-color, #2563eb)' }}>{statsDatos ? statsDatos.agregados : 0}</strong> &nbsp;
-                                    Total: <strong style={{ color: 'var(--primary-color, #2563eb)' }}>{statsDatos ? statsDatos.total : 0}</strong>
+                                    Cargados: <strong style={{ color: '#3b82f6' }}>{statsDatos ? statsDatos.cargados : 0}</strong> &nbsp;
+                                    Agregados: <strong style={{ color: '#3b82f6' }}>{statsDatos ? statsDatos.agregados : 0}</strong> &nbsp;
+                                    Total: <strong style={{ color: '#3b82f6' }}>{statsDatos ? statsDatos.total : 0}</strong>
                                 </div>
                             </div>
                             <button
+                                className="btn-tema3-active"
                                 onClick={abrirEditor}
-                                style={{ padding: '8px 16px', background: 'var(--primary-color, #2563eb)', border: 'none', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)' }}
+                                style={{ padding: '8px 16px', background: '#3b82f6', border: 'none', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)' }}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                 Editar Datos
@@ -401,30 +567,35 @@ export default function Controles_ModelosContinuos({
                                     <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '5px', color: 'var(--text-muted, #475569)', marginTop: '10px', backgroundColor: 'var(--bg-card, #ffffff)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color, #cbd5e1)', textAlign: 'center' }}>
                                         <div style={{ flex: 1 }}>
                                             <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Total Registros</span>
-                                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.total}</strong>
+                                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.total}</strong>
                                         </div>
                                         {modelo === 'Uniforme' ? (
                                             <>
                                                 <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Mínimo {renderLatex('a')}</span>
-                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.min?.toFixed(4)}</strong>
+                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.min?.toFixed(4)}</strong>
                                                 </div>
                                                 <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Máximo {renderLatex('b')}</span>
-                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.max?.toFixed(4)}</strong>
+                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.max?.toFixed(4)}</strong>
                                                 </div>
                                             </>
                                         ) : modelo === 'Normal' ? (
                                             <>
                                                 <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Media {renderLatex('\\mu')}</span>
-                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.media?.toFixed(4)}</strong>
+                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.media?.toFixed(4)}</strong>
                                                 </div>
                                                 <div style={{ flex: 1 }}>
                                                     <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Desviación {renderLatex('\\sigma')}</span>
-                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-color, #0f172a)' }}>{statsEstimados.desviacion?.toFixed(4)}</strong>
+                                                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.desviacion?.toFixed(4)}</strong>
                                                 </div>
                                             </>
+                                        ) : modelo === 'ChiCuadrado' || modelo === 'TStudent' ? (
+                                            <div style={{ flex: 1 }}>
+                                                <span style={{ display: 'block', fontSize: '0.65rem', textTransform: 'uppercase' }}>Grados de Lib. {renderLatex('n')}</span>
+                                                <strong style={{ fontSize: '0.9rem', color: 'var(--text-main, #0f172a)' }}>{statsEstimados.n}</strong>
+                                            </div>
                                         ) : null}
                                     </div>
                                 )}
@@ -437,23 +608,24 @@ export default function Controles_ModelosContinuos({
 
                 {renderParametrosManuales()}
 
-                {(modelo === 'Uniforme' || modelo === 'Normal') && (
+                {(modelo === 'Uniforme' || modelo === 'Normal' || modelo === 'NormalEstandar' || modelo === 'ChiCuadrado' || modelo === 'FFisher' || modelo === 'TStudent') && (
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-                        <button className="tema3-btn" onClick={manejarCalculo} style={{ padding: '8px 16px', fontSize: '0.9rem', width: 'auto' }}>
+                        <button className="tema3-btn btn-tema3-active" onClick={manejarCalculo} style={{ padding: '8px 16px', fontSize: '0.9rem', width: 'auto' }}>
                             Graficar
                         </button>
                     </div>
                 )}
 
-                {children && (modelo === 'Uniforme' || modelo === 'Normal') && (
+                {children && (modelo === 'Uniforme' || modelo === 'Normal' || modelo === 'NormalEstandar' || modelo === 'ChiCuadrado' || modelo === 'TStudent' || modelo === 'FFisher') && (
                     <>
                         <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)', margin: '15px 0' }}></div>
 
-                        <h4 style={{ color: 'var(--text-color, #334155)', fontSize: '0.85rem', margin: '0 0 10px 0' }}>Condición de Probabilidad</h4>
+                        <h4 style={{ color: 'var(--text-main, #334155)', fontSize: '0.85rem', margin: '0 0 10px 0' }}>Condición de Probabilidad</h4>
 
                         {/* Toggle de Modo de Cálculo */}
                         <div style={{ display: 'inline-flex', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)', marginBottom: '20px' }}>
                             <button 
+                                className={calcMode === 'directa' ? 'btn-tema3-active' : ''}
                                 onClick={() => {
                                     setCalcMode('directa');
                                     setTipoCondicion('menor_igual');
@@ -466,7 +638,7 @@ export default function Controles_ModelosContinuos({
                                     fontWeight: 600,
                                     border: 'none',
                                     cursor: 'pointer',
-                                    background: calcMode === 'directa' ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                                    background: calcMode === 'directa' ? '#3b82f6' : 'transparent',
                                     color: calcMode === 'directa' ? '#fff' : 'var(--text-muted, #64748b)',
                                     transition: 'all 0.2s ease',
                                     display: 'flex',
@@ -478,6 +650,7 @@ export default function Controles_ModelosContinuos({
                                 Calcular Probabilidad
                             </button>
                             <button 
+                                className={calcMode === 'inversa' ? 'btn-tema3-active' : ''}
                                 onClick={() => {
                                     setCalcMode('inversa');
                                     setTipoCondicion('inversa_menor');
@@ -490,7 +663,7 @@ export default function Controles_ModelosContinuos({
                                     fontWeight: 600,
                                     border: 'none',
                                     cursor: 'pointer',
-                                    background: calcMode === 'inversa' ? 'var(--primary-color, #0d6efd)' : 'transparent',
+                                    background: calcMode === 'inversa' ? '#3b82f6' : 'transparent',
                                     color: calcMode === 'inversa' ? '#fff' : 'var(--text-muted, #64748b)',
                                     transition: 'all 0.2s ease',
                                     display: 'flex',
@@ -506,7 +679,7 @@ export default function Controles_ModelosContinuos({
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', marginBottom: '25px' }}>
                             
                             {/* Select Custom */}
-                            <div style={{ flex: '1 1 0%', minWidth: '180px', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ flex: tipoCondicion === 'suma_intervalos' ? '0 1 400px' : '1 1 0%', minWidth: '180px', display: 'flex', flexDirection: 'column' }}>
                                 <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '6px', fontWeight: '600' }}>Tipo de Probabilidad</label>
                                 <CustomSelect
                                     value={tipoCondicion}
@@ -518,37 +691,39 @@ export default function Controles_ModelosContinuos({
                                     options={(() => {
                                         // Regla estricta: Si es continua, solo mostrar <= y >= (inclusivos).
                                         const isContinua = true; 
+                                        const vari = modelo === 'NormalEstandar' ? 'Z' : (modelo === 'ChiCuadrado' ? '\\chi^2' : 'X');
+                                        const val = modelo === 'NormalEstandar' ? 'z' : (modelo === 'ChiCuadrado' ? 'x' : 'x');
 
                                         if (calcMode === 'directa') {
                                             const opts = [];
                                             if (!isContinua) {
-                                                opts.push({ value: 'igual', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex('P(X = x)')}</span> });
+                                                opts.push({ value: 'igual', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(`P(${vari} = ${val})`)}</span> });
                                             }
                                             
                                             // Cola Izquierda
-                                            opts.push({ value: 'menor_igual', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex('P(X \\leq x)')}</span> });
+                                            opts.push({ value: 'menor_igual', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(`P(${vari} \\leq ${val})`)}</span> });
                                             if (!isContinua) {
-                                                opts.push({ value: 'menor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex('P(X < x)')}</span> });
+                                                opts.push({ value: 'menor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(`P(${vari} < ${val})`)}</span> });
                                             }
 
                                             // Cola Derecha
-                                            opts.push({ value: 'mayor_igual', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex('P(X \\geq x)')}</span> });
+                                            opts.push({ value: 'mayor_igual', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(`P(${vari} \\geq ${val})`)}</span> });
                                             if (!isContinua) {
-                                                opts.push({ value: 'mayor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex('P(X > x)')}</span> });
+                                                opts.push({ value: 'mayor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(`P(${vari} > ${val})`)}</span> });
                                             }
 
                                             // Intervalos
-                                            opts.push({ value: 'entre', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? 'P(a \\leq X \\leq b)' : 'P(a < X < b)')}</span> });
-                                            opts.push({ value: 'exterior', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? 'P(a > X > b)' : 'P(X < a \\cup X > b)')}</span> });
-                                            opts.push({ value: 'suma_intervalos', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex('P(a \\leq X \\leq b) + \\dots')}</span> });
+                                            opts.push({ value: 'entre', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? `P(a \\leq ${vari} \\leq b)` : `P(a < ${vari} < b)`)}</span> });
+                                            opts.push({ value: 'exterior', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? `P(a > ${vari} > b)` : `P(${vari} < a \\cup ${vari} > b)`)}</span> });
+                                            opts.push({ value: 'suma_intervalos', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(`P(a \\leq ${vari} \\leq b) + P(a \\leq ${vari} \\leq b) + \\dots`)}</span> });
                                             
                                             return opts;
                                         } else {
                                             return [
-                                                { value: 'inversa_menor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? 'P(X \\leq c) = p' : 'P(X < c) = p')}</span> },
-                                                { value: 'inversa_mayor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? 'P(X \\geq c) = p' : 'P(X > c) = p')}</span> },
-                                                { value: 'inversa_entre', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? 'P(c_1 \\leq X \\leq c_2) = p' : 'P(c_1 < X < c_2) = p')}</span> },
-                                                { value: 'inversa_exterior', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? 'P(c_1 > X > c_2) = p' : 'P(X < c_1 \\cup X > c_2) = p')}</span> }
+                                                { value: 'inversa_menor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? `P(${vari} \\leq c) = p` : `P(${vari} < c) = p`)}</span> },
+                                                { value: 'inversa_mayor', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? `P(${vari} \\geq c) = p` : `P(${vari} > c) = p`)}</span> },
+                                                { value: 'inversa_entre', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? `P(c_1 \\leq ${vari} \\leq c_2) = p` : `P(c_1 < ${vari} < c_2) = p`)}</span> },
+                                                { value: 'inversa_exterior', label: <span style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>{renderLatex(isContinua ? `P(c_1 > ${vari} > c_2) = p` : `P(${vari} < c_1 \\cup ${vari} > c_2) = p`)}</span> }
                                             ];
                                         }
                                     })()}
@@ -573,7 +748,13 @@ export default function Controles_ModelosContinuos({
                                 <>
                                     <div style={{ flex: '1 1 0%', minWidth: '150px', display: 'flex', flexDirection: 'column' }}>
                                         <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '6px', fontWeight: '600' }}>
-                                            {tipoCondicion === 'exterior' ? 'Límite Izq. (a)' : ['entre', 'intervalo'].includes(tipoCondicion) ? 'Lím. Inferior (a)' : 'Valor (x)'}
+                                            {tipoCondicion === 'exterior' ? (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>Límite Izq. <span style={{ marginLeft: '3px', transform: 'translateY(-1px)' }}>{renderLatex('(a)')}</span></span>
+                                            ) : ['entre', 'intervalo'].includes(tipoCondicion) ? (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>Lím. Inferior <span style={{ marginLeft: '3px', transform: 'translateY(-1px)' }}>{renderLatex('(a)')}</span></span>
+                                            ) : (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>Valor <span style={{ marginLeft: '3px', transform: 'translateY(-1px)' }}>{renderLatex(`(${modelo === 'NormalEstandar' ? 'z' : (modelo === 'ChiCuadrado' ? '\\chi^2' : (modelo === 'FFisher' ? 'F' : (modelo === 'TStudent' ? 't' : 'x')))})`)}</span></span>
+                                            )}
                                         </label>
                                         <input
                                             type="number" step="any" className="tema3-input"
@@ -585,7 +766,11 @@ export default function Controles_ModelosContinuos({
                                     {['entre', 'exterior', 'intervalo'].includes(tipoCondicion) && (
                                         <div style={{ flex: '1 1 0%', minWidth: '150px', display: 'flex', flexDirection: 'column' }}>
                                             <label className="tema3-label" style={{ fontSize: '0.8rem', marginBottom: '6px', fontWeight: '600' }}>
-                                                {tipoCondicion === 'exterior' ? 'Límite Der. (b)' : 'Lím. Superior (b)'}
+                                                {tipoCondicion === 'exterior' ? (
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>Límite Der. <span style={{ marginLeft: '3px', transform: 'translateY(-1px)' }}>{renderLatex('(b)')}</span></span>
+                                                ) : (
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>Lím. Superior <span style={{ marginLeft: '3px', transform: 'translateY(-1px)' }}>{renderLatex('(b)')}</span></span>
+                                                )}
                                             </label>
                                             <input
                                                 type="number" step="any" className="tema3-input"
@@ -601,71 +786,92 @@ export default function Controles_ModelosContinuos({
                             {/* Interfaz para Suma de Intervalos */}
                             {calcMode === 'directa' && tipoCondicion === 'suma_intervalos' && (
                                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
-                                        {intervals.map((inv, index) => (
-                                            <div key={inv.id} style={{ position: 'relative', flex: '1 1 calc(50% - 15px)', minWidth: '250px', display: 'flex', flexDirection: 'column', gap: '15px', background: 'var(--bg-card, #fff)', padding: '24px 15px 15px 15px', borderRadius: '8px', border: '1px dashed var(--border-color, #cbd5e1)' }}>
-                                                <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <label style={{ fontSize: '12px', flex: '0 0 140px', color: 'var(--text-color, #334155)' }}>
-                                                        {renderLatex(`\\text{Límite Inferior } (x_{${index * 2 + 1}}):`)}
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        value={inv.min}
-                                                        onChange={e => {
-                                                            const newIntervals = [...intervals];
-                                                            newIntervals[index].min = e.target.value;
-                                                            setIntervals(newIntervals);
-                                                        }}
-                                                        step="any"
-                                                        style={{ flex: 1, minWidth: '60px', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-input, #fff)', color: 'var(--text-color, #334155)', marginRight: '30px' }}
-                                                    />
-                                                </div>
-                                                <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                    <label style={{ fontSize: '12px', flex: '0 0 140px', color: 'var(--text-color, #334155)' }}>
-                                                        {renderLatex(`\\text{Límite Superior } (x_{${index * 2 + 2}}):`)}
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        value={inv.max}
-                                                        onChange={e => {
-                                                            const newIntervals = [...intervals];
-                                                            newIntervals[index].max = e.target.value;
-                                                            setIntervals(newIntervals);
-                                                        }}
-                                                        step="any"
-                                                        style={{ flex: 1, minWidth: '60px', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color, #cbd5e1)', background: 'var(--bg-input, #fff)', color: 'var(--text-color, #334155)', marginRight: '30px' }}
-                                                    />
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        if (intervals.length > 1) {
-                                                            setIntervals(intervals.filter(i => i.id !== inv.id));
-                                                        }
-                                                    }}
-                                                    disabled={intervals.length === 1}
-                                                    style={{
-                                                        position: 'absolute', top: '8px', right: '8px',
-                                                        padding: '5px', background: intervals.length === 1 ? 'transparent' : '#fee2e2', color: intervals.length === 1 ? '#94a3b8' : '#ef4444', border: 'none', borderRadius: '6px', cursor: intervals.length === 1 ? 'not-allowed' : 'pointer'
-                                                    }}
-                                                    title="Eliminar intervalo"
-                                                >
-                                                    <IconoBasura width="15" height="15" />
-                                                </button>
-                                            </div>
-                                        ))}
+                                    <div style={{ width: '100%', overflowX: 'auto', background: 'var(--bg-card, #fff)', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                                            <thead>
+                                                <tr style={{ background: 'var(--bg-input, #f8fafc)', borderBottom: '1px solid var(--border-color, #cbd5e1)' }}>
+                                                    <th style={{ padding: '6px', fontSize: '0.85rem', color: 'var(--text-main, #334155)', fontWeight: 'bold' }}>Intervalo</th>
+                                                    <th style={{ padding: '6px', fontSize: '0.85rem', color: 'var(--text-main, #334155)', fontWeight: 'bold' }}>Límite Inferior</th>
+                                                    <th style={{ padding: '6px', fontSize: '0.85rem', color: 'var(--text-main, #334155)', fontWeight: 'bold' }}>Límite Superior</th>
+                                                    <th style={{ padding: '6px', fontSize: '0.85rem', color: 'var(--text-main, #334155)', fontWeight: 'bold', width: '60px' }}></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {intervals.map((inv, index) => (
+                                                    <tr key={inv.id} style={{ borderBottom: index < intervals.length - 1 ? '1px solid var(--border-color, #cbd5e1)' : 'none', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-input, #f8fafc)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                        <td style={{ padding: '4px', fontSize: '0.9rem', color: 'var(--text-muted, #64748b)', fontWeight: '600' }}>
+                                                            {index + 1}
+                                                        </td>
+                                                        <td style={{ padding: '4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-main, #334155)' }}>{renderLatex(`x_{${index * 2 + 1}}`)} =</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={inv.min}
+                                                                    onChange={e => {
+                                                                        const newIntervals = [...intervals];
+                                                                        newIntervals[index].min = e.target.value;
+                                                                        setIntervals(newIntervals);
+                                                                    }}
+                                                                    step="any"
+                                                                    className="tema3-input"
+                                                                    style={{ maxWidth: '120px', padding: '4px 8px', boxSizing: 'border-box' }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                                                                <span style={{ fontSize: '0.9rem', color: 'var(--text-main, #334155)' }}>{renderLatex(`x_{${index * 2 + 2}}`)} =</span>
+                                                                <input
+                                                                    type="number"
+                                                                    value={inv.max}
+                                                                    onChange={e => {
+                                                                        const newIntervals = [...intervals];
+                                                                        newIntervals[index].max = e.target.value;
+                                                                        setIntervals(newIntervals);
+                                                                    }}
+                                                                    step="any"
+                                                                    className="tema3-input"
+                                                                    style={{ maxWidth: '120px', padding: '4px 8px', boxSizing: 'border-box' }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '4px' }}>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (intervals.length > 1) {
+                                                                        setIntervals(intervals.filter(i => i.id !== inv.id));
+                                                                    }
+                                                                }}
+                                                                disabled={intervals.length === 1}
+                                                                style={{
+                                                                    padding: '4px', background: intervals.length === 1 ? 'transparent' : 'rgba(239, 68, 68, 0.15)', color: intervals.length === 1 ? 'var(--text-muted, #94a3b8)' : '#ef4444', border: 'none', borderRadius: '6px', cursor: intervals.length === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto'
+                                                                }}
+                                                                title="Eliminar intervalo"
+                                                            >
+                                                                <IconoBasura width="16" height="16" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                     <button
+                                        className="btn-tema3-active"
                                         onClick={() => setIntervals([...intervals, { id: Date.now(), min: '', max: '' }])}
-                                        style={{ padding: '8px 12px', background: 'var(--primary-color, #2563eb)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                        style={{ padding: '8px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px', margin: '0 auto' }}
                                     >
                                         <IconoMas width="16" height="16" /> Agregar otro intervalo
                                     </button>
                                 </div>
                             )}
 
-                            <button className="tema3-btn" onClick={manejarCalculo} style={{ flex: '0 0 auto', padding: '0 24px', fontSize: '0.9rem', height: '38px', width: 'auto' }}>
-                                Calcular
-                            </button>
+                            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '0px' }}>
+                                <button className="tema3-btn btn-tema3-active" onClick={manejarCalculo} style={{ width: 'auto', padding: '6px 30px', fontSize: '0.95rem', fontWeight: 'bold' }}>
+                                    Calcular
+                                </button>
+                            </div>
                         </div>
                     </>
                 )}
@@ -721,7 +927,7 @@ function CustomSelect({ value, onChange, options }) {
                     borderRadius: '8px', cursor: 'pointer',
                     boxShadow: isOpen ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
                     transition: 'all 0.2s ease',
-                    color: 'var(--text-color, #1e293b)',
+                    color: 'var(--text-main, #1e293b)',
                     userSelect: 'none',
                 }}
             >
@@ -736,7 +942,7 @@ function CustomSelect({ value, onChange, options }) {
             {isOpen && (
                 <div style={{
                     position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-                    background: 'var(--bg-panel, white)',
+                    background: 'var(--bg-card, white)',
                     border: '1px solid var(--border-color, #cbd5e1)',
                     borderRadius: '8px',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
@@ -750,7 +956,7 @@ function CustomSelect({ value, onChange, options }) {
                         if (op.group) {
                             return (
                                 <div key={op.group}>
-                                    <div style={{ padding: '8px 12px', fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                                    <div style={{ padding: '8px 12px', fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'var(--bg-input, #f8fafc)', borderBottom: '1px solid var(--border-color, #f1f5f9)' }}>
                                         {op.group}
                                     </div>
                                     {op.items.map((subOp, subIdx) => {
@@ -768,13 +974,13 @@ function CustomSelect({ value, onChange, options }) {
                                                 onMouseLeave={e => {
                                                     if (!active) {
                                                         e.currentTarget.style.background = 'transparent';
-                                                        e.currentTarget.style.color = 'var(--text-color, #1e293b)';
+                                                        e.currentTarget.style.color = 'var(--text-main, #1e293b)';
                                                     }
                                                 }}
                                                 style={{
                                                     padding: '10px 14px', cursor: 'pointer',
                                                     background: active ? 'var(--primary-color, #3b82f6)' : 'transparent',
-                                                    color: active ? 'white' : 'var(--text-color, #1e293b)',
+                                                    color: active ? 'white' : 'var(--text-main, #1e293b)',
                                                     fontSize: '0.85rem',
                                                     transition: 'all 0.15s ease',
                                                     borderBottom: (subIdx < op.items.length - 1) ? '1px solid var(--border-color, #f1f5f9)' : 'none'
@@ -796,7 +1002,7 @@ function CustomSelect({ value, onChange, options }) {
                                     style={{
                                         padding: '10px 14px', cursor: 'pointer',
                                         background: active ? 'var(--primary-color, #3b82f6)' : 'transparent',
-                                        color: active ? 'white' : 'var(--text-color, #1e293b)',
+                                        color: active ? 'white' : 'var(--text-main, #1e293b)',
                                         fontSize: '0.85rem',
                                         borderBottom: idx < options.length - 1 ? '1px solid var(--border-color, #f1f5f9)' : 'none'
                                     }}

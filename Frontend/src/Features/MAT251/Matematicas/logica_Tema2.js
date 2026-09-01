@@ -11,7 +11,7 @@ export function integracionNumerica(expr, a, b, n = 1000, varName = 'x') {
         try {
             return compiledExpr.evaluate({ [varName]: val });
         } catch (e) {
-            return 0; 
+            return 0;
         }
     };
 
@@ -38,7 +38,7 @@ export function integracionNumerica(expr, a, b, n = 1000, varName = 'x') {
 
     if (n % 2 !== 0) n++; // Asegurar que sea par
     const h = (end - start) / n;
-    
+
     let suma = f(start) + f(end);
 
     for (let i = 1; i < n; i++) {
@@ -130,7 +130,7 @@ export function calcularMomentosDiscreta(matrizDatos) {
             return { error: `La probabilidad en la fila ${i + 1} debe estar entre 0 y 1.` };
         }
         sumP += p;
-        datosValidos.push({ x, p });
+        datosValidos.push({ ...matrizDatos[i], x, p });
     }
 
     if (Math.abs(sumP - 1.0) > 0.0001) {
@@ -159,5 +159,133 @@ export function calcularMomentosDiscreta(matrizDatos) {
         desviacion,
         asimetria,
         curtosis
+    };
+}
+
+export function calcularBivariante(matrizDatos, valoresX, valoresY) {
+    // Parseo de los números
+    const numX = valoresX.map(v => parseFloat(v));
+    const numY = valoresY.map(v => parseFloat(v));
+    const matriz = matrizDatos.map(fila => fila.map(v => parseFloat(v)));
+
+    // Probabilidades Marginales
+    const probX = Array(numX.length).fill(0);
+    const probY = Array(numY.length).fill(0);
+
+    for (let i = 0; i < numX.length; i++) {
+        for (let j = 0; j < numY.length; j++) {
+            probX[i] += matriz[i][j];
+            probY[j] += matriz[i][j];
+        }
+    }
+
+    // Esperanzas Simples y Cuadráticas
+    let EX = 0;
+    let EX2 = 0;
+    for (let i = 0; i < numX.length; i++) {
+        EX += numX[i] * probX[i];
+        EX2 += (numX[i] ** 2) * probX[i];
+    }
+
+    let EY = 0;
+    let EY2 = 0;
+    for (let j = 0; j < numY.length; j++) {
+        EY += numY[j] * probY[j];
+        EY2 += (numY[j] ** 2) * probY[j];
+    }
+
+    // Esperanza Conjunta E(XY)
+    let EXY = 0;
+    let latexExyTerms = [];
+    for (let i = 0; i < numX.length; i++) {
+        for (let j = 0; j < numY.length; j++) {
+            if (matriz[i][j] !== 0) {
+                EXY += numX[i] * numY[j] * matriz[i][j];
+                latexExyTerms.push(`(${numX[i]})(${numY[j]})(${matriz[i][j]})`);
+            }
+        }
+    }
+
+    // Varianzas
+    const VarX = EX2 - (EX ** 2);
+    const VarY = EY2 - (EY ** 2);
+    
+    // Covarianza
+    const CovXY = EXY - (EX * EY);
+    
+    // Coeficiente de Correlación
+    const denom = Math.sqrt(VarX * VarY);
+    const Rho = denom === 0 ? 0 : CovXY / denom;
+
+    return {
+        EX, EX2, VarX,
+        EY, EY2, VarY,
+        EXY,
+        latexExyStr: latexExyTerms.join(' + '),
+        CovXY,
+        Rho
+    };
+}
+
+export function calcularContinuaPlantilla(tipoFuncion, a, b, n = 0, c = 0) {
+    const numA = parseFloat(a);
+    const numB = parseFloat(b);
+    const numN = parseFloat(n);
+    const numC = parseFloat(c);
+
+    if (tipoFuncion !== 'exponencial') {
+        if (isNaN(numA) || isNaN(numB)) return { error: 'Límites inválidos' };
+        if (numA >= numB) return { error: 'El límite inferior (a) debe ser menor al límite superior (b).' };
+    } else {
+        if (isNaN(numC) || numC <= 0) return { error: 'Coeficiente c inválido. Debe ser mayor a 0.' };
+    }
+
+    let k = 0, EX = 0, EX2 = 0, VarX = 0, Desv = 0;
+    
+    if (tipoFuncion === 'uniforme') {
+        k = 1 / (numB - numA);
+        EX = (numA + numB) / 2;
+        VarX = Math.pow(numB - numA, 2) / 12;
+        Desv = Math.sqrt(VarX);
+        EX2 = VarX + Math.pow(EX, 2);
+    } else if (tipoFuncion === 'polinomica') {
+        if (isNaN(numN)) return { error: 'Exponente inválido' };
+        
+        const termSuperiorK = Math.pow(numB, numN + 1);
+        const termInferiorK = Math.pow(numA, numN + 1);
+        
+        if (termSuperiorK - termInferiorK === 0) return { error: 'División por cero al calcular k.' };
+        
+        k = (numN + 1) / (termSuperiorK - termInferiorK);
+        
+        const termSuperiorE1 = Math.pow(numB, numN + 2);
+        const termInferiorE1 = Math.pow(numA, numN + 2);
+        EX = k * ((termSuperiorE1 - termInferiorE1) / (numN + 2));
+        
+        const termSuperiorE2 = Math.pow(numB, numN + 3);
+        const termInferiorE2 = Math.pow(numA, numN + 3);
+        EX2 = k * ((termSuperiorE2 - termInferiorE2) / (numN + 3));
+        
+        VarX = EX2 - Math.pow(EX, 2);
+        Desv = Math.sqrt(Math.max(0, VarX));
+    } else if (tipoFuncion === 'exponencial') {
+        k = numC;
+        EX = 1 / numC;
+        VarX = 1 / Math.pow(numC, 2);
+        Desv = Math.sqrt(VarX);
+        EX2 = VarX + Math.pow(EX, 2);
+    }
+
+    return {
+        tipoFuncion,
+        a: tipoFuncion === 'exponencial' ? 0 : numA,
+        b: tipoFuncion === 'exponencial' ? '∞' : numB,
+        n: numN,
+        c: numC,
+        k,
+        EX,
+        EX2,
+        VarX,
+        Desv
     };
 }
