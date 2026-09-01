@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { alerta } from "../../utils/Notificaciones.jsx";
 import logoCarrera from "../../assets/images/Logo-Adm.png";
-import OscuroClaro from "../../ui/oscuro_claro.jsx";
 import "../../styles/ui/Login.css";
 
 export default function ResetPassword() {
@@ -59,9 +58,12 @@ export default function ResetPassword() {
 
   return (
     <div className="login-container" style={{ position: "relative" }}>
-      <div style={{ position: "absolute", top: "20px", left: "20px", zIndex: 1000 }}>
-        <OscuroClaro />
-      </div>
+      {/* Ocultamos el pie de página global */}
+      <style>{`
+        .pie-top, footer, .pie-pagina-institucional {
+          display: none !important;
+        }
+      `}</style>
 
       <div className="login-card">
         <div style={{ textAlign: "center", marginBottom: "20px" }}>
