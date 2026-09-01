@@ -171,7 +171,17 @@ async def registrar_usuario_logic(usuario: UsuarioRegistro, db: AsyncSession):
         await db.commit()
         await db.refresh(nuevo_usuario)
         
-        # Enviar correo de activación
+        # Crear notificación en el sistema
+        notif_activacion = models.Notificacion(
+            tipo="sistema",
+            mensaje="Se ha enviado un mensaje de confirmación a tu correo electrónico. Por favor, revísalo para asegurar que podrás recuperar tu contraseña en el futuro.",
+            usuario_id=nuevo_usuario.id,
+            leido=False
+        )
+        db.add(notif_activacion)
+        await db.commit()
+
+        # Enviar correo de activación en segundo plano (no bloqueante)
         asunto = "Activación de cuenta - Simulador Empresarial"
         logo_path = os.path.join(os.path.dirname(__file__), "..", "public", "images", "Logo-Adm.svg")
         
@@ -188,17 +198,15 @@ async def registrar_usuario_logic(usuario: UsuarioRegistro, db: AsyncSession):
             </body>
         </html>
         """
-        await send_email_async(usuario.email, asunto, cuerpo, logo_path)
         
-        # Crear notificación en el sistema
-        notif_activacion = models.Notificacion(
-            tipo="sistema",
-            mensaje="Se ha enviado un mensaje de confirmación a tu correo electrónico. Por favor, revísalo para asegurar que podrás recuperar tu contraseña en el futuro.",
-            usuario_id=nuevo_usuario.id,
-            leido=False
-        )
-        db.add(notif_activacion)
-        await db.commit()
+        # Función auxiliar segura para enviar correo en background
+        async def _enviar_correo_background():
+            try:
+                await send_email_async(usuario.email, asunto, cuerpo, logo_path)
+            except Exception as email_err:
+                print(f"Advertencia: No se pudo enviar correo de bienvenida a {usuario.email}: {email_err}")
+
+        asyncio.create_task(_enviar_correo_background())
         
         return {"message": "Usuario registrado con éxito"}
     except Exception as e:

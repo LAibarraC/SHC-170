@@ -17,6 +17,7 @@ export default function Registro({ onLogin }) {
   const [confirmPass, setConfirmPass] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [cargando, setCargando] = useState(false);
 
   const navigate = useNavigate();
 
@@ -75,6 +76,8 @@ export default function Registro({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (cargando) return;
+
     // Si no está en el paso 4, el botón Siguiente manejará el avance
     if (step !== 4) {
       nextStep();
@@ -92,6 +95,7 @@ export default function Registro({ onLogin }) {
     }
 
     if (nombres && apellidos && email && pass && rol) {
+      setCargando(true);
       try {
         const payload = {
           nombre: `${String(nombres).trim()} ${String(apellidos).trim()}`,
@@ -145,6 +149,8 @@ export default function Registro({ onLogin }) {
         }
       } catch (error) {
         alerta.error("Error de conexión", "No se pudo conectar con el servidor. Asegúrate de que el backend esté corriendo.");
+      } finally {
+        setCargando(false);
       }
     } else {
       alerta.error("Datos incompletos", "Por favor, llena todos los campos del formulario.");
@@ -572,6 +578,7 @@ export default function Registro({ onLogin }) {
               <button
                 type="button"
                 onClick={prevStep}
+                disabled={cargando}
                 className="btn-auth"
                 style={{
                   backgroundColor: 'transparent',
@@ -579,7 +586,8 @@ export default function Registro({ onLogin }) {
                   fontSize: '1rem',
                   color: 'var(--text-main)',
                   border: '1px solid var(--border-color)',
-                  cursor: 'pointer',
+                  cursor: cargando ? 'not-allowed' : 'pointer',
+                  opacity: cargando ? 0.6 : 1,
                   borderRadius: '5px',
                   fontWeight: 'bold',
                   flex: 1
@@ -591,6 +599,7 @@ export default function Registro({ onLogin }) {
 
             <button
               type="submit"
+              disabled={cargando}
               className="btn-auth"
               style={{
                 backgroundColor: 'var(--accent-color)',
@@ -598,13 +607,14 @@ export default function Registro({ onLogin }) {
                 fontSize: '1rem',
                 color: 'white',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: cargando ? 'not-allowed' : 'pointer',
+                opacity: cargando ? 0.7 : 1,
                 borderRadius: '5px',
                 fontWeight: 'bold',
                 flex: 2
               }}
             >
-              {step === 4 ? 'Crear Cuenta' : 'Siguiente'}
+              {cargando ? 'Creando cuenta...' : (step === 4 ? 'Crear Cuenta' : 'Siguiente')}
             </button>
           </div>
         </form>
