@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ExcelViewer from "../../components/excel/ExcelViewer";
 import ExcelUploader from "../../components/excel/ExcelUploader";
 import ExcelContent from "../../components/excel/ExcelContent";
@@ -24,10 +24,13 @@ export default function Archivos({ usuario }) {
   // 🆕 ESTADO PARA LA CUOTA DE ALMACENAMIENTO (Límite por defecto 10MB)
   const [espacio, setEspacio] = useState({ usado: 0, limite: 10 * 1024 * 1024 });
 
-  // ESTADO PARA LAS PESTAÑAS
-  const [tabActiva, setTabActiva] = useState("personales"); // 'personales' o 'cursos'
-
   const location = useLocation();
+  const cursoInicial = location.state?.cursoIdSeleccionado
+    ? String(location.state.cursoIdSeleccionado)
+    : "";
+  const [tabActiva, setTabActiva] = useState(cursoInicial ? "cursos" : "personales"); // 'personales' o 'cursos'
+  const [cargandoArchivos, setCargandoArchivos] = useState(false);
+  const solicitudArchivos = useRef(0);
 
   const iniciarTour = () => {
     const driverObj = driver({
@@ -97,18 +100,14 @@ export default function Archivos({ usuario }) {
     driverObj.drive();
   };
 
-  // EFECTO PARA DETECTAR SI VENIMOS DE LA PÁGINA DE GRUPOS
+  const [cursoSeleccionado, setCursoSeleccionado] = useState(cursoInicial);
+  const [misCursos, setMisCursos] = useState([]);
+
   useEffect(() => {
-    if (location.state && location.state.cursoIdSeleccionado) {
-      setTabActiva("cursos");
-      setCursoSeleccionado(location.state.cursoIdSeleccionado);
+    if (location.state?.cursoIdSeleccionado) {
       navigate("/archivos", { replace: true, state: {} });
     }
   }, [location, navigate]);
-
-  // Estados para la lógica de Cursos
-  const [cursoSeleccionado, setCursoSeleccionado] = useState("");
-  const [misCursos, setMisCursos] = useState([]);
 
   useEffect(() => {
     const cargarCursos = async () => {
@@ -145,19 +144,37 @@ export default function Archivos({ usuario }) {
 
   const loadFiles = async () => {
     if (!usuario) return;
-    try {
-      const esPestañaCursos = tabActiva === "cursos";
-      const visibilidad = esPestañaCursos ? "privado" : "personal";
 
+    if (tabActiva === "cursos" && !cursoSeleccionado) {
+      solicitudArchivos.current += 1;
+      setFiles([]);
+      setSelectedFile(null);
+      setCargandoArchivos(false);
+      return;
+    }
+
+    const solicitudActual = ++solicitudArchivos.current;
+    setCargandoArchivos(true);
+    setFiles([]);
+    setSelectedFile(null);
+
+    try {
+      const visibilidad = tabActiva === "cursos" ? "privado" : "personal";
       const data = await api.obtenerArchivos(
         usuario.nombre,
         visibilidad,
         cursoSeleccionado,
       );
 
-      if (data.files) setFiles(data.files);
+      if (solicitudActual === solicitudArchivos.current && data.files) {
+        setFiles(data.files);
+      }
     } catch (err) {
       console.error("Error al cargar:", err);
+    } finally {
+      if (solicitudActual === solicitudArchivos.current) {
+        setCargandoArchivos(false);
+      }
     }
   };
 
@@ -533,6 +550,16 @@ export default function Archivos({ usuario }) {
                     }}
                   >
                     Selecciona un curso arriba para ver sus archivos.
+                  </p>
+                ) : cargandoArchivos ? (
+                  <p
+                    style={{
+                      color: "var(--text-muted)",
+                      fontStyle: "italic",
+                      textAlign: "center",
+                    }}
+                  >
+                    Cargando archivos...
                   </p>
                 ) : (
                   <ExcelViewer
