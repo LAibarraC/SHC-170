@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from "react";
+import DatePicker, { registerLocale } from "react-datepicker";
+import { es } from "date-fns/locale";
+import "react-datepicker/dist/react-datepicker.css";
+import "../../styles/components/SelectorFecha.css";
 import { useNavigate } from "react-router-dom";
 import { useData } from "../../components/Gestion_Datos/DataContext";
 import { alerta } from "../../utils/Notificaciones";
@@ -10,6 +14,22 @@ import escudoAdmin from "../../assets/images/escudoAdmin.png";
 import ModalQR from "../qr/ModalQR";
 import EscanerQR from "../qr/EscanerQR";
 import { IconoQr, CierreX } from "../../ui/iconos";
+
+registerLocale("es", es);
+
+const fechaIsoADate = (fecha) => {
+  if (!fecha) return null;
+  const [year, month, day] = String(fecha).slice(0, 10).split("-").map(Number);
+  return year && month && day ? new Date(year, month - 1, day) : null;
+};
+
+const dateAFechaIso = (fecha) => {
+  if (!fecha) return "";
+  const year = fecha.getFullYear();
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
+  const day = String(fecha.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export default function Grupos() {
   const { usuario } = useData();
@@ -1060,11 +1080,15 @@ export default function Grupos() {
 
               <div style={{ marginBottom: "25px" }}>
                 <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>Fecha Límite de Matriculación (Opcional):</label>
-                <input
-                  type="date"
-                  value={fechaLimiteMatriculacion}
-                  onChange={(e) => setFechaLimiteMatriculacion(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "5px", border: "1px solid var(--border-color)", boxSizing: "border-box", background: "var(--bg-input)", color: "var(--text-main)" }}
+                <DatePicker
+                  selected={fechaIsoADate(fechaLimiteMatriculacion)}
+                  onChange={(fecha) => setFechaLimiteMatriculacion(dateAFechaIso(fecha))}
+                  dateFormat="dd/MM/yyyy"
+                  locale="es"
+                  placeholderText="dd/mm/aaaa"
+                  isClearable
+                  className="selector-fecha"
+                  wrapperClassName="selector-fecha-wrapper"
                 />
               </div>
 
@@ -1107,11 +1131,15 @@ export default function Grupos() {
 
               <div style={{ marginBottom: "25px" }}>
                 <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>Fecha Límite de Matriculación (Opcional):</label>
-                <input
-                  type="date"
-                  value={editarFechaLimite}
-                  onChange={(e) => setEditarFechaLimite(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "5px", border: "1px solid var(--border-color)", boxSizing: "border-box", background: "var(--bg-input)", color: "var(--text-main)" }}
+                <DatePicker
+                  selected={fechaIsoADate(editarFechaLimite)}
+                  onChange={(fecha) => setEditarFechaLimite(dateAFechaIso(fecha))}
+                  dateFormat="dd/MM/yyyy"
+                  locale="es"
+                  placeholderText="dd/mm/aaaa"
+                  isClearable
+                  className="selector-fecha"
+                  wrapperClassName="selector-fecha-wrapper"
                 />
               </div>
 

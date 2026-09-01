@@ -1,9 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import DatePicker, { registerLocale } from "react-datepicker";
+import { es } from "date-fns/locale";
+import "react-datepicker/dist/react-datepicker.css";
+import "../../styles/components/SelectorFecha.css";
 import { alerta } from "../../utils/Notificaciones";
 import qrApi from "../../services/qrApi";
 import api from "../../services/api";
 import { Descargar, Copiar, Desactivar, Regenerar, Graduacion, CierreX } from "../../ui/iconos";
+
+registerLocale("es", es);
+
+const fechaIsoADate = (fecha) => {
+  if (!fecha) return null;
+  const [year, month, day] = String(fecha).slice(0, 10).split("-").map(Number);
+  return year && month && day ? new Date(year, month - 1, day) : null;
+};
+
+const dateAFechaIso = (fecha) => {
+  if (!fecha) return "";
+  const year = fecha.getFullYear();
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
+  const day = String(fecha.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 
 /**
@@ -428,7 +448,16 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 <label style={{ color: "var(--text-main)", fontWeight: "bold" }}>
                   {fechaVencida ? "Ampliar fecha:" : "Cambiar fecha:"}
                 </label>
-                <input type="date" value={fechaLimite} onChange={(e) => setFechaLimite(e.target.value)} disabled={actualizandoFecha} />
+                <DatePicker
+                  selected={fechaIsoADate(fechaLimite)}
+                  onChange={(fecha) => setFechaLimite(dateAFechaIso(fecha))}
+                  dateFormat="dd/MM/yyyy"
+                  locale="es"
+                  placeholderText="dd/mm/aaaa"
+                  isClearable
+                  className="selector-fecha selector-fecha-qr"
+                  disabled={actualizandoFecha}
+                />
                 <button onClick={handleCambiarFecha} disabled={actualizandoFecha} style={{ padding: "7px 10px", border: "1px solid var(--border-color)", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}>
                   {actualizandoFecha ? "Guardando…" : "Guardar fecha"}
                 </button>
