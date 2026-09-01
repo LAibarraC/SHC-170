@@ -161,9 +161,10 @@ async def registrar_usuario_logic(usuario: UsuarioRegistro, db: AsyncSession):
             return JSONResponse(status_code=400, content={"error": "Este correo electrónico ya está registrado."})
         
         password_hasheada = get_password_hash(password_plana)
+        rol_final = "Docente" if usuario.rol and usuario.rol.strip().lower() == "docente" else "Estudiante"
         nuevo_usuario = models.Usuario(
             email=usuario.email, nombre=usuario.nombre, password=password_hasheada,
-            rol="Estudiante", perfil="Estudiante", institucion=""
+            rol=rol_final, perfil=rol_final, institucion=""
         )
         
         db.add(nuevo_usuario)
