@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "../../components/Gestion_Datos/DataContext";
 import { alerta } from "../../utils/Notificaciones";
 import qrApi from "../../services/qrApi";
-import { CierreX, Regenerar, Desactivar, CheckCirculo, Graduacion } from "../../ui/iconos";
+import { CierreX, Regenerar, Desactivar, Graduacion } from "../../ui/iconos";
 
 /**
  * Pantalla a la que llega el estudiante tras escanear el QR del docente.
@@ -35,13 +35,18 @@ export default function Matricular() {
   const [info, setInfo] = useState(null);
   const [cargandoInfo, setCargandoInfo] = useState(true);
   const [matriculando, setMatriculando] = useState(false);
-  const [confirmado, setConfirmado] = useState(null); // { clase_nombre, clase_id }
-  const [yaInscrito, setYaInscrito] = useState(null); // { clase_nombre } cuando el estudiante ya está matriculado
+  const [redirigiendoRol, setRedirigiendoRol] = useState(false);
+  const redireccionPendiente = useRef(null);
 
-  // Re-evaluar si la sesión cambia (login recién hecho que nos trae aquí).
-  useEffect(() => {
-    // No hacemos nada especial: simplemente dejamos que el render dependa de `usuario`.
-  }, [usuario]);
+  const redirigirDespuesDelToast = (ruta) => {
+    redireccionPendiente.current = setTimeout(() => {
+      navigate(ruta, { replace: true });
+    }, 1200);
+  };
+
+  useEffect(() => () => {
+    if (redireccionPendiente.current) clearTimeout(redireccionPendiente.current);
+  }, []);
 
   // 1. Cargar información pública del QR
   useEffect(() => {
@@ -77,22 +82,36 @@ export default function Matricular() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargandoInfo, usuario, info]);
 
+  // Los docentes no pueden matricularse desde un QR externo.
+  useEffect(() => {
+    if (cargandoInfo || info?.estado !== "valido" || usuario?.rol !== "Docente") return;
+
+    setRedirigiendoRol(true);
+    alerta.error(
+      "Acción no permitida",
+      "Esta funcionalidad es solo para estudiantes. Tu cuenta tiene rol de Docente."
+    );
+    redirigirDespuesDelToast("/grupos");
+    // La función usa navigate y mantiene el retardo común del flujo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargandoInfo, info, usuario]);
+
   const handleMatricular = async () => {
     if (!token) return;
     setMatriculando(true);
     try {
       const data = await qrApi.matricularPorQR(token);
-      setConfirmado({
-        clase_id: data.clase_id,
-        clase_nombre: data.clase_nombre,
-      });
-      alerta.success("¡Matrícula exitosa!", data.message || "Te has matriculado correctamente.");
+      alerta.success(
+        "¡Inscripción Exitosa!",
+        `Te has unido a ${data.clase_nombre || "la materia"} exitosamente`
+      );
+      redirigirDespuesDelToast("/mis-cursos");
     } catch (e) {
       // Mapeo de mensajes amigables según el código de error
       const mensaje = e.message || "No fue posible completar la matrícula.";
       if (e.status === 409) {
-        // Ya está inscrito: mostramos un estado limpio en lugar de mantener el form.
-        setYaInscrito({ clase_nombre: info?.clase_nombre });
+        alerta.warning("Ya Matriculado", "Ya te encuentras matriculado en esta asignatura.");
+        redirigirDespuesDelToast("/mis-cursos");
       } else if (e.status === 400) {
         alerta.warning("QR no disponible", mensaje);
       } else if (e.status === 403) {
@@ -191,173 +210,29 @@ export default function Matricular() {
     );
   }
 
+  if (usuario.rol === "Docente" && redirigiendoRol) {
+    return (
+      <PantallaContenedor>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <Spinner />
+          <p style={{ color: "var(--text-muted)", marginTop: "15px" }}>
+            Redirigiendo al gestor de grupos…
+          </p>
+        </div>
+      </PantallaContenedor>
+    );
+  }
+
   if (usuario.rol !== "Estudiante") {
     return (
       <PantallaContenedor>
         <EstadoMensaje
           icono={<CierreX width="40" height="40" style={{ color: "#dc2626" }} />}
           titulo="Acción no permitida"
-          mensaje="Esta funcionalidad es solo para estudiantes. Tu cuenta actual no tiene rol de Estudiante."
+          mensaje="Esta funcionalidad es solo para estudiantes."
           color="#dc2626"
           navigate={navigate}
         />
-      </PantallaContenedor>
-    );
-  }
-
-  // ────────────── Render: confirmación de matrícula exitosa ──────────────
-
-  if (confirmado) {
-    return (
-      <PantallaContenedor>
-        <div
-          style={{
-            textAlign: "center",
-            padding: "30px 20px",
-            background: "var(--bg-card, white)",
-            borderRadius: "10px",
-            border: "1px solid var(--border-color, #eee)",
-            boxShadow: "0 4px 12px rgba(16, 185, 129, 0.15)",
-          }}
-        >
-          <div style={{ lineHeight: 1, display: "flex", justifyContent: "center" }}>
-            <CheckCirculo width="64" height="64" style={{ color: "#10b981" }} />
-          </div>
-          <h2
-            style={{
-              color: "var(--text-main)",
-              marginTop: "15px",
-              fontSize: "clamp(1.2rem, 4vw, 1.6rem)",
-            }}
-          >
-            ¡Matrícula exitosa!
-          </h2>
-          {confirmado.clase_nombre && (
-            <p style={{ color: "var(--text-muted)", margin: "10px 0" }}>
-              Te has matriculado en <strong>{confirmado.clase_nombre}</strong>.
-            </p>
-          )}
-          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-            El docente ha sido notificado.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              justifyContent: "center",
-              marginTop: "25px",
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              onClick={() => navigate("/grupos")}
-              style={{
-                padding: "12px 20px",
-                background: "var(--accent-color)",
-                color: "white",
-                border: "none",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                fontSize: "1rem",
-              }}
-            >
-              Ir a Mis Cursos
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                padding: "12px 20px",
-                background: "var(--bg-main)",
-                color: "var(--text-main)",
-                border: "1px solid var(--border-color)",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                fontSize: "1rem",
-              }}
-            >
-              Volver al Inicio
-            </button>
-          </div>
-        </div>
-      </PantallaContenedor>
-    );
-  }
-
-  // ────────────── Render: ya está inscrito en la asignatura ──────────────
-
-  if (yaInscrito) {
-    return (
-      <PantallaContenedor>
-        <div
-          style={{
-            textAlign: "center",
-            padding: "30px 20px",
-            background: "var(--bg-card, white)",
-            borderRadius: "10px",
-            border: "1px solid var(--border-color, #eee)",
-            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.15)",
-          }}
-        >
-          <div style={{ lineHeight: 1, display: "flex", justifyContent: "center" }}>
-            <Graduacion width="64" height="64" style={{ color: "#3b82f6" }} />
-          </div>
-          <h2
-            style={{
-              color: "var(--text-main)",
-              marginTop: "15px",
-              fontSize: "clamp(1.2rem, 4vw, 1.6rem)",
-            }}
-          >
-            ¡Ya estás inscrito en esta asignatura!
-          </h2>
-          <p style={{ color: "var(--text-muted)", margin: "10px 0" }}>
-            Actualmente formas parte del grupo MAT-100
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              justifyContent: "center",
-              marginTop: "25px",
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              onClick={() => navigate("/grupos")}
-              style={{
-                padding: "12px 20px",
-                background: "var(--accent-color)",
-                color: "white",
-                border: "none",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                fontSize: "1rem",
-              }}
-            >
-              Ir a Mis Cursos
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              style={{
-                padding: "12px 20px",
-                background: "var(--bg-main)",
-                color: "var(--text-main)",
-                border: "1px solid var(--border-color)",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontWeight: "bold",
-                fontSize: "1rem",
-              }}
-            >
-              Volver al Inicio
-            </button>
-          </div>
-        </div>
       </PantallaContenedor>
     );
   }
@@ -507,7 +382,6 @@ function EstadoMensaje({ icono, titulo, mensaje, color, datosAdicionales, naviga
       <p style={{ color: "var(--text-muted)", margin: "10px 0" }}>{mensaje}</p>
       {datosAdicionales}
 
-      {/* Botones de acción funcional */}
       {navigate && (
         <div
           style={{

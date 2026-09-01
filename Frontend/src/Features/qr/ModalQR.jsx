@@ -3,7 +3,8 @@ import { QRCodeSVG } from "qrcode.react";
 import { alerta } from "../../utils/Notificaciones";
 import qrApi from "../../services/qrApi";
 import api from "../../services/api";
-import { Descargar, Copiar, Compartir, Desactivar, Regenerar, Graduacion, CierreX } from "../../ui/iconos";
+import { Descargar, Copiar, Desactivar, Regenerar, Graduacion, CierreX } from "../../ui/iconos";
+
 
 /**
  * Modal dinámico para generar y mostrar un código QR de matriculación.
@@ -152,28 +153,6 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
     }
   };
 
-  const handleCompartir = async () => {
-    if (!qr?.url) return;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Matricúlate a ${qr.clase_nombre}`,
-          text: `Escanea el código QR o abre el siguiente enlace para matricularte a "${qr.clase_nombre}".`,
-          url: qr.url,
-        });
-        return;
-      } catch (err) {
-        if (err?.name === "AbortError") return;
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(qr.url);
-      alerta.success("Enlace copiado", "Tu navegador no soporta 'Compartir'. El enlace fue copiado al portapapeles.");
-    } catch {
-      alerta.error("No se pudo compartir", "Copia manualmente el enlace mostrado en pantalla.");
-    }
-  };
-
   const handleDescargar = () => {
     if (!qrContainerRef.current) return;
     const svg = qrContainerRef.current.querySelector("svg");
@@ -305,7 +284,6 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
           border: "1px solid var(--border-color, #eee)",
         }}
       >
-        {/* ── HEADER ── */}
         <div
           style={{
             display: "flex",
@@ -356,9 +334,7 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
           </button>
         </div>
 
-        {/* ── BODY ── */}
         <div style={{ padding: "20px" }}>
-          {/* Info del curso */}
           <div
             style={{
               background: "var(--bg-input, #f9fafb)",
@@ -428,7 +404,6 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 </span>
               </div>
 
-              {/* Info */}
               <div
                 style={{
                   textAlign: "left",
@@ -447,22 +422,6 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                   <strong style={{ color: "var(--text-main)" }}>Válido hasta:</strong>{" "}
                   {formatearFecha(fechaLimite)}
                 </p>
-                {/* <p style={{ margin: "3px 0", color: "var(--text-muted)" }}>
-                  <strong style={{ color: "var(--text-main)" }}>
-                    Alumnos matriculados:
-                  </strong>{" "}
-                  {qr.alumnos_inscritos ?? 0}
-                </p> */}
-                {/* <p
-                  style={{
-                    margin: "3px 0",
-                    color: "var(--text-muted)",
-                    wordBreak: "break-all",
-                  }}
-                >
-                  <strong style={{ color: "var(--text-main)" }}>Enlace:</strong>{" "}
-                  {qr.url}
-                </p> */}
               </div>
 
               <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "12px", flexWrap: "wrap" }}>
@@ -475,7 +434,6 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 </button>
               </div>
 
-              {/* Acciones */}
               <div
                 style={{
                   display: "grid",
@@ -522,25 +480,7 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                 >
                   <Copiar width="16" height="16" /> Copiar enlace
                 </button>
-                {/* <button
-                  onClick={handleCompartir}
-                  style={{
-                    padding: "10px 12px",
-                    background: "var(--bg-main)",
-                    color: "var(--text-main)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: "5px",
-                    cursor: "pointer",
-                    fontWeight: "bold",
-                    fontSize: "0.9rem",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <Compartir width="16" height="16" /> Compartir
-                </button> */}
+
                 <button
                     onClick={handleCambiarEstado}
                     disabled={desactivando}
@@ -567,7 +507,6 @@ export default function ModalQR({ curso, qrActivo: qrActivoProp, onClose, onDesa
                   </button>
               </div>
 
-              {/* Generar nuevo / cerrar */}
               <div
                 style={{
                   marginTop: "16px",

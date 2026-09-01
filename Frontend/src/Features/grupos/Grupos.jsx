@@ -442,10 +442,15 @@ export default function Grupos() {
     return (candidato || "").split(/[?#]/)[0].trim();
   };
 
-  const handleUnirseCurso = async () => {
-    const codigoLimpiado = codigoBusqueda.trim().toUpperCase();
+  const redirigirDespuesDelToast = () => {
+    setTimeout(() => navigate("/mis-cursos", { replace: true }), 1200);
+  };
 
-    if (!codigoLimpiado) {
+  // Handler único para matrícula manual y QR dentro de la plataforma.
+  const procesarMatricula = async (tokenOCodigo, esQR = false) => {
+    const valor = (tokenOCodigo || "").trim();
+
+    if (!valor) {
       alerta.error("Campo vacío", "Ingresa el código de matriculación del curso.");
       return;
     }
@@ -453,97 +458,65 @@ export default function Grupos() {
     if (procesandoUnion) return;
     setProcesandoUnion(true);
 
-    const urlCompleta = `${BASE_URL}/unirse_clase`;
-    console.log("=== INTENTANDO MATRICULACIÓN ===");
-    console.log("URL completa:", urlCompleta);
-    console.log("Código:", codigoLimpiado);
-    console.log("Email:", correoUsuario);
-
     try {
-      console.log("Iniciando fetch...");
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
-
-      const res = await fetch(urlCompleta, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          codigo_acceso: codigoLimpiado,
-          estudiante_email: correoUsuario
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-      console.log("✓ Respuesta recibida:", res.status, res.statusText);
-
       let data = {};
-      let responseText = "";
-      try {
-        responseText = await res.text();
-        console.log("Texto de respuesta:", responseText.substring(0, 200));
+      let res;
 
-        if (responseText.trim()) {
-          data = JSON.parse(responseText);
-          console.log("✓ JSON parseado correctamente");
+      if (esQR) {
+        data = await qrApi.matricularPorQR(valor);
+        res = { ok: true, status: 200 };
+      } else {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          res = await fetch(`${BASE_URL}/unirse_clase`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({
+              codigo_acceso: valor.toUpperCase(),
+              estudiante_email: correoUsuario,
+            }),
+            signal: controller.signal,
+          });
+          data = await res.json().catch(() => ({}));
+        } finally {
+          clearTimeout(timeoutId);
         }
-      } catch (jsonError) {
-        console.error("✗ Error parseando respuesta como JSON:", jsonError.message);
-        console.error("Respuesta recibida:", responseText);
-        data = {};
       }
 
-      const errorMsg = data.error || data.detail || "";
+      const mensajeError = data.error || data.detail || "No fue posible completar la matrícula.";
 
       if (res.ok) {
-        console.log("✓ Matriculación exitosa (200), recargando cursos...");
-        alerta.success("¡Inscripción Exitosa!", data.message || "Te has matriculado correctamente.");
         setCodigoBusqueda("");
-        setMostrarModalMatricular(false); // Cierra el modal al tener éxito
-        try {
-          await cargarCursos();
-          console.log("✓ Cursos recargados");
-        } catch (cargaError) {
-          console.error("✗ Error recargando cursos:", cargaError.message);
-        }
+        setMostrarModalMatricular(false);
+        alerta.success(
+          "¡Inscripción Exitosa!",
+          `Te has unido a ${data.clase_nombre || "la materia"} exitosamente`
+        );
+        redirigirDespuesDelToast();
+        await cargarCursos();
       } else if (res.status === 409) {
-        console.log("⚠ Ya inscrito (409), recargando cursos...");
-        setCodigoBusqueda("");
-        setMostrarModalMatricular(false); // Cierra el modal también aquí
-        try {
-          await cargarCursos();
-        } catch (cargaError) {
-          console.error("✗ Error recargando cursos:", cargaError.message);
-        }
-        alerta.warning("Ya matriculado", "Ya te encuentras inscrito en este curso.");
-      } else if (res.status >= 500) {
-        console.error("✗ Error del servidor:", res.status);
-        alerta.error("Error del servidor", `Código ${res.status}: El servidor experimentó un error.`);
-      } else if (res.status >= 400) {
-        console.error("✗ Error del cliente:", res.status, errorMsg);
-        alerta.error("No se pudo unir", errorMsg || "Asegúrate de escribir bien el código.");
+        const errorYaMatriculado = new Error(mensajeError);
+        errorYaMatriculado.status = 409;
+        throw errorYaMatriculado;
       } else {
-        console.error("✗ Estado HTTP inesperado:", res.status);
-        alerta.error("Error inesperado", `Código HTTP ${res.status}: Ocurrió un error al procesar tu solicitud.`);
+        alerta.error("No se pudo completar la matrícula", mensajeError);
       }
     } catch (error) {
-      console.error("=== ERROR EN HANDLEUNIRSECURSO ===");
-      console.error("Tipo de error:", error.name);
-      console.error("Mensaje:", error.message);
-      console.error("Stack:", error.stack);
-
-      if (error.name === "AbortError") {
-        alerta.error("Timeout", "El servidor tardó demasiado en responder. Intenta nuevamente.");
+      if (error.status === 409) {
+        setMostrarModalMatricular(false);
+        alerta.warning("Ya Matriculado", "Ya te encuentras matriculado en esta asignatura.");
+        redirigirDespuesDelToast();
+      } else if (error.name === "AbortError") {
+        alerta.error("Error de matrícula", "El servidor tardó demasiado en responder. Intenta nuevamente.");
       } else {
-        alerta.error("Error de conexión", `No se pudo conectar a ${BASE_URL}. Verifica: 1) El servidor esté corriendo, 2) La URL sea correcta, 3) Tu conexión de red.`);
+        alerta.error(
+          "No se pudo completar la matrícula",
+          error.message || "No se pudo conectar con el servidor."
+        );
       }
     } finally {
       setProcesandoUnion(false);
-      console.log("=== FIN INTENTO MATRICULACIÓN ===\n");
     }
   };
 
@@ -963,7 +936,7 @@ export default function Grupos() {
                   type="text"
                   value={codigoBusqueda}
                   onChange={(e) => setCodigoBusqueda(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleUnirseCurso()}
+                  onKeyDown={(e) => e.key === "Enter" && procesarMatricula(codigoBusqueda)}
                   placeholder="Ej. MAT-205..."
                   style={{
                     flex: 1,
@@ -1013,68 +986,17 @@ export default function Grupos() {
             {/* Escáner de QR — se monta dentro del modal cuando está activo */}
             <EscanerQR
               activo={escanerActivo}
-              onDeteccion={async (texto) => {
-                // 1) Cierra la cámara / lector de archivo inmediatamente.
-                //    NO pegamos nada en el input manual: se reutiliza el mismo
-                //    flujo que ya se activa con la cámara o el link directo.
+              onDeteccion={(texto) => {
                 setEscanerActivo(false);
-                setProcesandoUnion(false);
-
                 const tokenLimpio = extraerTokenDeQR(texto);
                 if (!tokenLimpio) {
                   alerta.error(
-                    "QR Inválido",
+                    "QR inválido",
                     "No se detectó un código de matriculación en la lectura."
                   );
                   return;
                 }
-
-                // 2) Validamos contra el backend usando el mismo endpoint público
-                //    (infoQR) que usa la ruta /matricular/:token. Si el QR está
-                //    expirado / desactivado / no existe, mostramos el mismo tipo
-                //    de alerta que la cámara / el link directo.
-                try {
-                  const info = await qrApi.infoQR(tokenLimpio);
-
-                  if (info?.estado === "valido") {
-                    // 3) Reutilizamos el modal de confirmación ya existente en
-                    //    /matricular/:token cerrando primero el modal actual.
-                    setMostrarModalMatricular(false);
-                    setCodigoBusqueda("");
-                    navigate(`/matricular/${encodeURIComponent(tokenLimpio)}`);
-                    return;
-                  }
-
-                  if (info?.estado === "expirado") {
-                    alerta.warning(
-                      "QR expirado",
-                      info.mensaje ||
-                        "Este código QR ha expirado. Pide al docente que genere uno nuevo."
-                    );
-                    return;
-                  }
-
-                  if (info?.estado === "desactivado") {
-                    alerta.warning(
-                      "QR desactivado",
-                      info.mensaje ||
-                        "Este código QR fue desactivado por el docente y ya no permite nuevas matrículas."
-                    );
-                    return;
-                  }
-
-                  alerta.error(
-                    "QR no válido",
-                    info?.mensaje || "El código QR no existe o no se pudo verificar."
-                  );
-                } catch (err) {
-                  // Cualquier error HTTP del endpoint se mapea a la misma
-                  // experiencia que el link directo.
-                  alerta.error(
-                    "QR no válido",
-                    err?.message || "El código QR no existe o no se pudo verificar."
-                  );
-                }
+                procesarMatricula(tokenLimpio, true);
               }}
               onErrorCamara={(mensaje) => alerta.warning("Cámara no disponible", mensaje)}
               onErrorArchivo={(mensaje) => alerta.warning("No se pudo leer la imagen", mensaje)}
@@ -1093,7 +1015,7 @@ export default function Grupos() {
                 Cancelar
               </button>
               <button
-                onClick={handleUnirseCurso}
+                onClick={() => procesarMatricula(codigoBusqueda)}
                 disabled={procesandoUnion}
                 style={{
                   background: procesandoUnion ? "#95a5a6" : "#27ae60",

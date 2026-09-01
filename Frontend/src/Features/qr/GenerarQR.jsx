@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { useData } from "../../components/Gestion_Datos/DataContext";
@@ -49,7 +49,7 @@ export default function GenerarQR() {
       try {
         const data = await api.obtenerClasesDocente();
         setMisCursos(Array.isArray(data) ? data : []);
-      } catch (e) {
+      } catch {
         alerta.error("Error", "No se pudieron cargar tus cursos.");
       } finally {
         setCargandoCursos(false);
@@ -65,11 +65,6 @@ export default function GenerarQR() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claseId, cargandoCursos]);
-
-  const claseSeleccionada = useMemo(
-    () => misCursos.find((c) => c.id === claseId) || null,
-    [misCursos, claseId]
-  );
 
   const handleGenerar = async () => {
     if (!claseId) {
@@ -181,7 +176,7 @@ export default function GenerarQR() {
       };
       img.onerror = () => alerta.error("No se pudo descargar", "Error al procesar la imagen.");
       img.src = `data:image/svg+xml;base64,${svg64}`;
-    } catch (e) {
+    } catch {
       alerta.error("No se pudo descargar", "Tu navegador no soporta la descarga directa.");
     }
   };
@@ -284,7 +279,6 @@ export default function GenerarQR() {
               </span>
             </div>
 
-            {/* Información del QR */}
             <div style={{ textAlign: "left", marginTop: "20px", padding: "15px", background: "var(--bg-input, #f9fafb)", borderRadius: "6px" }}>
               <p style={{ margin: "4px 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
                 <strong style={{ color: "var(--text-main)" }}>Creado:</strong> {formatearFecha(qr.fecha_creacion)}
@@ -300,7 +294,6 @@ export default function GenerarQR() {
               </p>
             </div>
 
-            {/* Acciones */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "10px", marginTop: "20px" }}>
               <button
                 onClick={handleDescargar}

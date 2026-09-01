@@ -123,6 +123,7 @@ function App() {
                       } />
                       <Route path="/historial" element={<Historial />} />
                       <Route path="/grupos" element={<Grupos />} />
+                      <Route path="/mis-cursos" element={<Grupos />} />
                       <Route path="/matricular/:token" element={<Matricular />} />
 
                       <Route path="/lti-tester" element={<Navigate to="/" />} />

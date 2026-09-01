@@ -144,25 +144,35 @@ export default function EscanerQR({
 
     try {
       // Usamos una instancia temporal para no chocar con el contenedor #qr-reader.
-      const elementId = "qr-reader-temp";
-      const tempContainer = document.getElementById(elementId);
-      // Si el contenedor no existe, lo creamos de forma invisible.
-      let container = tempContainer;
-      if (!container) {
-        container = document.createElement("div");
-        container.id = elementId;
-        container.style.display = "none";
-        document.body.appendChild(container);
-      }
+      // No debe tener `display: none`: algunos navegadores no calculan el canvas
+      // necesario para decodificar la imagen en ese estado.
+      const elementId = `qr-reader-temp-${Date.now()}`;
+      const container = document.createElement("div");
+      container.id = elementId;
+      Object.assign(container.style, {
+        position: "fixed",
+        width: "1px",
+        height: "1px",
+        left: "-10000px",
+        top: "-10000px",
+        overflow: "hidden",
+        opacity: "0",
+        pointerEvents: "none",
+      });
+      document.body.appendChild(container);
 
       const scannerArchivo = new Html5Qrcode(elementId, { verbose: false });
-      const texto = await scannerArchivo.scanFile(archivo, false);
       try {
-        scannerArchivo.clear();
-      } catch {
-        /* ignorar */
+        const texto = await scannerArchivo.scanFile(archivo, false);
+        onDeteccion?.(texto);
+      } finally {
+        try {
+          scannerArchivo.clear();
+        } catch {
+          /* ignorar */
+        }
+        container.remove();
       }
-      onDeteccion?.(texto);
     } catch (err) {
       const mensaje =
         err?.message ||
@@ -172,10 +182,6 @@ export default function EscanerQR({
     } finally {
       setProcesandoArchivo(false);
     }
-  };
-
-  const abrirSelectorArchivo = () => {
-    fileInputRef.current?.click();
   };
 
   if (!activo) return null;
@@ -237,7 +243,6 @@ export default function EscanerQR({
         </button>
       </div>
 
-      {/* Contenedor donde html5-qrcode monta el video */}
       <div
         id="qr-reader"
         style={{
@@ -256,7 +261,6 @@ export default function EscanerQR({
         </p>
       )}
 
-      {/* Opción de cargar QR desde archivo (computadora o celular) */}
       <div
         style={{
           marginTop: "12px",
@@ -290,7 +294,6 @@ export default function EscanerQR({
             fontSize: "0.875rem",
           }}
         >
-          {/* Ícono SVG de Imagen / Galería */}
           <svg
             width="18"
             height="18"
