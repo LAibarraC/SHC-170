@@ -57,3 +57,13 @@ async def desmatricular_estudiante(clase_id: int, estudiante_id: int, user_email
 @router.get("/clases/mis-clases")
 async def obtener_mis_clases_docente_v2(db: AsyncSession = Depends(get_db), current_user: Usuario = Depends(get_current_user)):
     return await grupos_controller.obtener_mis_clases_docente_db(db, current_user)
+
+@router.get("/estadisticas-docente")
+@router.get("/grupos/estadisticas-docente")
+async def obtener_estadisticas_docente(
+    clase_id: int = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    return await grupos_controller.obtener_estadisticas_docente_db(db, current_user, clase_id)
+

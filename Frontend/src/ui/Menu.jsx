@@ -110,7 +110,7 @@
 
     // Detectamos si estamos en alguna de las páginas de la calculadora
     const isCalculadoraActive = location.pathname === '/calculadora' || location.pathname === '/MAT251';
-    const isGruposActive = location.pathname === '/grupos' || location.pathname === '/gestion-docente';
+    const isGruposActive = location.pathname === '/grupos' || location.pathname === '/gestion-docente' || location.pathname === '/reportes-docente';
 
     useEffect(() => {
       const updateUnderline = () => {
@@ -228,6 +228,11 @@
                   <li className="dropdown-li" style={{ transitionDelay: '0.1s' }}>
                     <NavLink to="/gestion-docente" onClick={closeMenu} className="dropdown-item">
                       Gestión Alumnos
+                    </NavLink>
+                  </li>
+                  <li className="dropdown-li" style={{ transitionDelay: '0.15s' }}>
+                    <NavLink to="/reportes-docente" onClick={closeMenu} className="dropdown-item">
+                      Estadísticas y Reportes
                     </NavLink>
                   </li>
                 </ul>

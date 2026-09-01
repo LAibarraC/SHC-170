@@ -394,3 +394,290 @@ async def obtener_mis_clases_docente_db(db: AsyncSession, current_user: Usuario)
             "docente_email": docente_email
         })
     return res_list
+
+
+async def obtener_estadisticas_docente_db(db: AsyncSession, current_user: Usuario, clase_id: int = None):
+    """
+    Genera estadísticas y métricas analíticas para el Docente.
+    Soporta vista General (todos sus grupos consolidados) o filtrada por un grupo específico.
+    """
+    try:
+        rol_usuario = (current_user.rol or "").capitalize()
+        if rol_usuario not in ["Docente", "Administrador"]:
+            return JSONResponse(status_code=403, content={"error": "Acceso restringido a docentes y administradores"})
+
+        # 1. Obtener todas las clases a cargo del docente
+        if rol_usuario == "Administrador":
+            res_clases = await db.execute(select(Clase))
+            todas_clases = res_clases.scalars().all()
+        else:
+            res_clases = await db.execute(select(Clase).filter(Clase.docente_id == current_user.id))
+            todas_clases = res_clases.scalars().all()
+
+        clases_disponibles = [
+            {"id": c.id, "nombre": c.nombre, "codigo": c.codigo_acceso}
+            for c in todas_clases
+        ]
+
+        # Determinar qué clases entran en el análisis
+        clase_seleccionada_obj = None
+        if clase_id is not None and int(clase_id) > 0:
+            clases_filtradas = [c for c in todas_clases if c.id == int(clase_id)]
+            if not clases_filtradas:
+                # Si no estaba en su lista (o admin), buscar directamente en BD
+                res_c = await db.execute(select(Clase).filter(Clase.id == int(clase_id)))
+                c_encontrada = res_c.scalars().first()
+                if c_encontrada and (rol_usuario == "Administrador" or c_encontrada.docente_id == current_user.id):
+                    clases_filtradas = [c_encontrada]
+                else:
+                    return JSONResponse(status_code=404, content={"error": "Clase no encontrada o sin permisos"})
+
+            clase_seleccionada_obj = {
+                "id": clases_filtradas[0].id,
+                "nombre": clases_filtradas[0].nombre,
+                "codigo": clases_filtradas[0].codigo_acceso,
+                "fecha_limite": clases_filtradas[0].fecha_limite_matriculacion
+            }
+        else:
+            clases_filtradas = todas_clases
+
+        clases_ids = [c.id for c in clases_filtradas]
+
+        if not clases_ids:
+            return {
+                "kpis": {
+                    "total_clases": 0,
+                    "total_alumnos": 0,
+                    "alumnos_activos": 0,
+                    "alumnos_inactivos": 0,
+                    "total_calculos": 0,
+                    "promedio_calculos": 0,
+                    "total_archivos": 0
+                },
+                "distribucion_modulos": [],
+                "comparativa_grupos": [],
+                "evolucion_temporal": [],
+                "ranking_estudiantes": [],
+                "lista_estudiantes": [],
+                "clases_disponibles": clases_disponibles,
+                "clase_seleccionada": None
+            }
+
+        # 2. Obtener inscripciones de las clases filtradas
+        res_insc = await db.execute(
+            select(Inscripcion).filter(Inscripcion.clase_id.in_(clases_ids))
+        )
+        inscripciones = res_insc.scalars().all()
+
+        # Mapeo de estudiantes e inscripciones
+        estudiante_ids = list(set([ins.estudiante_id for ins in inscripciones]))
+
+        # Mapa de información de usuarios
+        usuarios_map = {}
+        if estudiante_ids:
+            res_users = await db.execute(
+                select(Usuario).filter(Usuario.id.in_(estudiante_ids))
+            )
+            for u in res_users.scalars().all():
+                usuarios_map[u.id] = u
+
+        # Mapa de clases
+        clases_map = {c.id: c for c in todas_clases}
+
+        # 3. Obtener Historial de Cálculos
+        from sqlalchemy import or_
+        condiciones = []
+        if estudiante_ids:
+            condiciones.append(HistorialCalculo.usuario_id.in_(estudiante_ids))
+        if clases_ids:
+            condiciones.append(HistorialCalculo.clase_id.in_(clases_ids))
+
+        calculos_list = []
+        if condiciones:
+            res_calc = await db.execute(
+                select(HistorialCalculo).filter(or_(*condiciones))
+            )
+            calculos_list = res_calc.scalars().all()
+
+        # Conteo de cálculos por estudiante
+        calculos_por_estudiante = {}
+        for c in calculos_list:
+            calculos_por_estudiante[c.usuario_id] = calculos_por_estudiante.get(c.usuario_id, 0) + 1
+
+        # Conteo de cálculos por tipo/módulo
+        modulos_counter = {}
+        for c in calculos_list:
+            tipo = c.tipo_analisis or "Análisis General"
+            modulos_counter[tipo] = modulos_counter.get(tipo, 0) + 1
+
+        distribucion_modulos = [
+            {"name": k, "cantidad": v}
+            for k, v in sorted(modulos_counter.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+        # 4. Conteo de archivos de las clases
+        res_arch = await db.execute(
+            select(func.count()).select_from(Archivo).filter(Archivo.clase_id.in_(clases_ids))
+        )
+        total_archivos = res_arch.scalar() or 0
+
+        # 5. Lista detallada de estudiantes inscritos (un único registro por alumno consolidando sus materias)
+        estudiantes_map_info = {}
+        alumnos_activos_set = set()
+
+        for ins in inscripciones:
+            est = usuarios_map.get(ins.estudiante_id)
+            if not est:
+                continue
+
+            c_obj = clases_map.get(ins.clase_id)
+            num_calculos = calculos_por_estudiante.get(est.id, 0)
+            if num_calculos > 0:
+                alumnos_activos_set.add(est.id)
+
+            if est.id not in estudiantes_map_info:
+                estudiantes_map_info[est.id] = {
+                    "id": est.id,
+                    "nombre": est.nombre or "Sin Nombre",
+                    "email": est.email,
+                    "clases": [],
+                    "clase_nombres": [],
+                    "calculos_count": num_calculos,
+                    "estado_actividad": "Activo" if num_calculos > 0 else "Sin Actividad",
+                    "fecha_inscripcion": ins.fecha_creacion.strftime("%Y-%m-%d %H:%M") if ins.fecha_creacion else "N/A",
+                    "fecha_inscripcion_dt": ins.fecha_creacion
+                }
+
+            if c_obj:
+                estudiantes_map_info[est.id]["clases"].append({
+                    "id": c_obj.id,
+                    "nombre": c_obj.nombre,
+                    "codigo": c_obj.codigo_acceso
+                })
+                estudiantes_map_info[est.id]["clase_nombres"].append(f"{c_obj.nombre} ({c_obj.codigo_acceso})")
+
+            # Mantener la fecha de inscripción más reciente si tiene múltiples
+            if ins.fecha_creacion:
+                cur_dt = estudiantes_map_info[est.id]["fecha_inscripcion_dt"]
+                if cur_dt is None or ins.fecha_creacion > cur_dt:
+                    estudiantes_map_info[est.id]["fecha_inscripcion_dt"] = ins.fecha_creacion
+                    estudiantes_map_info[est.id]["fecha_inscripcion"] = ins.fecha_creacion.strftime("%Y-%m-%d %H:%M")
+
+        lista_estudiantes = []
+        for info in estudiantes_map_info.values():
+            clases_list = info["clases"]
+            if len(clases_list) == 1:
+                clase_nombre = clases_list[0]["nombre"]
+                clase_codigo = clases_list[0]["codigo"]
+                clase_id_val = clases_list[0]["id"]
+            elif len(clases_list) > 1:
+                clase_nombre = ", ".join(info["clase_nombres"])
+                clase_codigo = ", ".join([c["codigo"] for c in clases_list])
+                clase_id_val = None
+            else:
+                clase_nombre = "Sin grupo"
+                clase_codigo = "-"
+                clase_id_val = None
+
+            lista_estudiantes.append({
+                "id": info["id"],
+                "nombre": info["nombre"],
+                "email": info["email"],
+                "clases": info["clases"],
+                "clase_id": clase_id_val,
+                "clase_nombre": clase_nombre,
+                "clase_codigo": clase_codigo,
+                "calculos_count": info["calculos_count"],
+                "estado_actividad": info["estado_actividad"],
+                "fecha_inscripcion": info["fecha_inscripcion"]
+            })
+
+        # Ordenar estudiantes por más cálculos primero
+        lista_estudiantes.sort(key=lambda x: x["calculos_count"], reverse=True)
+
+        # Ranking de top estudiantes más participativos
+        ranking_estudiantes = [
+            {
+                "id": est["id"],
+                "nombre": est["nombre"],
+                "email": est["email"],
+                "clase_nombre": est["clase_nombre"],
+                "calculos_count": est["calculos_count"]
+            }
+            for est in lista_estudiantes[:10] if est["calculos_count"] > 0
+        ]
+
+        # 6. Comparativa entre todos los grupos del docente
+        comparativa_grupos = []
+        for c in todas_clases:
+            insc_clase = [ins for ins in inscripciones if ins.clase_id == c.id]
+            est_clase_ids = [ins.estudiante_id for ins in insc_clase]
+            calc_clase = sum(calculos_por_estudiante.get(eid, 0) for eid in est_clase_ids)
+            comparativa_grupos.append({
+                "id": c.id,
+                "nombre": c.nombre,
+                "codigo": c.codigo_acceso,
+                "alumnos": len(insc_clase),
+                "calculos": calc_clase
+            })
+
+        # 7. Evolución temporal de inscripciones y cálculos
+        meses_nombres = {
+            1: "Ene", 2: "Feb", 3: "Mar", 4: "Abr", 5: "May", 6: "Jun",
+            7: "Jul", 8: "Ago", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dic"
+        }
+        evolucion_dict = {}
+
+        for ins in inscripciones:
+            if ins.fecha_creacion:
+                key = (ins.fecha_creacion.year, ins.fecha_creacion.month)
+                if key not in evolucion_dict:
+                    evolucion_dict[key] = {"inscripciones": 0, "calculos": 0}
+                evolucion_dict[key]["inscripciones"] += 1
+
+        for calc in calculos_list:
+            if calc.fecha_creacion:
+                key = (calc.fecha_creacion.year, calc.fecha_creacion.month)
+                if key not in evolucion_dict:
+                    evolucion_dict[key] = {"inscripciones": 0, "calculos": 0}
+                evolucion_dict[key]["calculos"] += 1
+
+        evolucion_temporal = []
+        for (year, month), val in sorted(evolucion_dict.items()):
+            evolucion_temporal.append({
+                "mes": f"{meses_nombres.get(month, str(month))} {year}",
+                "inscripciones": val["inscripciones"],
+                "calculos": val["calculos"]
+            })
+
+        # 8. Consolidación de KPIs
+        total_alumnos = len(lista_estudiantes)
+        total_alumnos_activos = len(alumnos_activos_set)
+        total_alumnos_inactivos = max(total_alumnos - total_alumnos_activos, 0)
+        total_calculos = len(calculos_list)
+        promedio_calculos = round(total_calculos / max(total_alumnos, 1), 1)
+
+        return {
+            "kpis": {
+                "total_clases": len(clases_filtradas),
+                "total_alumnos": total_alumnos,
+                "alumnos_activos": total_alumnos_activos,
+                "alumnos_inactivos": total_alumnos_inactivos,
+                "total_calculos": total_calculos,
+                "promedio_calculos": promedio_calculos,
+                "total_archivos": total_archivos
+            },
+            "distribucion_modulos": distribucion_modulos,
+            "comparativa_grupos": comparativa_grupos,
+            "evolucion_temporal": evolucion_temporal,
+            "ranking_estudiantes": ranking_estudiantes,
+            "lista_estudiantes": lista_estudiantes,
+            "clases_disponibles": clases_disponibles,
+            "clase_seleccionada": clase_seleccionada_obj
+        }
+    except Exception as e:
+        print(f"Error en obtener_estadisticas_docente_db: {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": f"Error interno al calcular estadísticas: {str(e)}"})
+
