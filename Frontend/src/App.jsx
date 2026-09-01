@@ -15,6 +15,7 @@ import ForgotPassword from "./Features/auth/ForgotPassword";
 import ResetPassword from "./Features/auth/ResetPassword";
 import Admin from "./Features/Admin/Admin";
 import GestionDocente from "./Features/User/docentes/GestionDocente";
+import ReportesDocente from "./Features/User/docentes/ReportesDocente";
 
 import SelectorRol from './ui/SelectorRol';
 import ModalSeleccionRolInicial from './ui/ModalSeleccionRolInicial';
@@ -146,6 +147,7 @@ function App() {
                       <Route path="/perfil" element={<Perfil usuario={usuario} setUsuario={setUsuario} />} />
                       <Route path="/admin" element={usuario?.rol === "Administrador" ? <Admin /> : <Navigate to="/" />} />
                       <Route path="/gestion-docente" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <GestionDocente usuario={usuario} /> : <Navigate to="/" />} />
+                      <Route path="/reportes-docente" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <ReportesDocente usuario={usuario} /> : <Navigate to="/" />} />
                       <Route path="/qr" element={usuario?.rol === "Docente" || usuario?.rol === "Administrador" ? <GenerarQR /> : <Navigate to="/" />} />
                     </>
                   )}

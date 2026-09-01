@@ -647,6 +647,31 @@ export const api = {
       throw error;
     }
   },
+
+  obtenerEstadisticasDocente: async (claseId = null) => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      let url = `${BASE_URL}/estadisticas-docente`;
+      if (claseId) {
+        url += `?clase_id=${encodeURIComponent(claseId)}`;
+      }
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: headers,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.error || "Error al obtener las estadísticas del docente");
+      return data;
+    } catch (error) {
+      console.error("Error en api.obtenerEstadisticasDocente:", error);
+      throw error;
+    }
+  },
 };
 
 export default api;
