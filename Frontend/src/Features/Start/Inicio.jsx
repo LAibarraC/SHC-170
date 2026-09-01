@@ -89,11 +89,11 @@ export default function Inicio() {
         const rect = hero.getBoundingClientRect();
         setShowFloating(rect.bottom < window.innerHeight * 0.5);
       }
-      
+
       const scrolled = window.scrollY;
       const windowHeight = window.innerHeight;
     };
-    
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -278,9 +278,9 @@ export default function Inicio() {
       </div>
 
       {/* 🆕 Botón flotante: Ahora solo se muestra si NO estamos al final */}
-        {showFloating && (
-        <button 
-          className="floating-scroll-btn" 
+      {showFloating && (
+        <button
+          className="floating-scroll-btn"
           onClick={goToNextSection}
           type="button"
           title="Ir a la siguiente sección"
@@ -291,11 +291,11 @@ export default function Inicio() {
       )}
 
       {/* ---------------- SECCIÓN 2: CONTENIDO PRINCIPAL ---------------- */}
-      <div id="contenido-principal" style={{ maxWidth: '1200px', margin: '100px 100px', padding: '80px 20px 60px', color: 'var(--text-main)', minHeight: '100vh', boxSizing: 'border-box'}}>
+      <div id="contenido-principal" style={{ maxWidth: '1200px', margin: '100px 100px', padding: '80px 20px 60px', color: 'var(--text-main)', minHeight: '100vh', boxSizing: 'border-box' }}>
 
         {/* INTRODUCCIÓN + MÓDULOS */}
-        <div id="modulos" style={{ marginBottom: '100px'}}>
-          
+        <div id="modulos" style={{ marginBottom: '100px' }}>
+
           <div style={{ textAlign: 'center', marginBottom: '80px' }}>
             <h1 className="yellow-text responsive-title" style={{ marginBottom: '20px', fontWeight: '800', letterSpacing: '-0.5px' }}>
               Innovación Académica
@@ -307,7 +307,7 @@ export default function Inicio() {
           </div>
 
           <h2 style={{ textAlign: 'center', marginBottom: '40px', fontSize: '2rem', fontWeight: '800' }}>Módulos de Aprendizaje</h2>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '30px' }}>
 
             <div className="modern-card" style={{ backgroundColor: 'var(--bg-card)', padding: '35px', borderRadius: '20px', border: '1px solid var(--border-color)' }}>

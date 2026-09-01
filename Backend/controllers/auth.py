@@ -22,7 +22,8 @@ import models
 from validators.auth import (
     UsuarioRegistro, UsuarioLogin, RecuperarPassword, ResetearPassword,
     CambiarPasswordPerfil, ForgotPasswordRequest, ResetPasswordRequest,
-    CambiarRol, CambiarEstado, VerificarEmailRequest, GoogleLoginRequest
+    CambiarRol, CambiarEstado, VerificarEmailRequest, GoogleLoginRequest,
+    AsignarRolInicial
 )
 
 from google.oauth2 import id_token
@@ -161,16 +162,27 @@ async def registrar_usuario_logic(usuario: UsuarioRegistro, db: AsyncSession):
             return JSONResponse(status_code=400, content={"error": "Este correo electrónico ya está registrado."})
         
         password_hasheada = get_password_hash(password_plana)
+        rol_final = "Docente" if usuario.rol and usuario.rol.strip().lower() == "docente" else "Estudiante"
         nuevo_usuario = models.Usuario(
             email=usuario.email, nombre=usuario.nombre, password=password_hasheada,
-            rol="Estudiante", perfil="Estudiante", institucion=""
+            rol=rol_final, perfil=rol_final, institucion=""
         )
         
         db.add(nuevo_usuario)
         await db.commit()
         await db.refresh(nuevo_usuario)
         
-        # Enviar correo de activación
+        # Crear notificación en el sistema
+        notif_activacion = models.Notificacion(
+            tipo="sistema",
+            mensaje="Se ha enviado un mensaje de confirmación a tu correo electrónico. Por favor, revísalo para asegurar que podrás recuperar tu contraseña en el futuro.",
+            usuario_id=nuevo_usuario.id,
+            leido=False
+        )
+        db.add(notif_activacion)
+        await db.commit()
+
+        # Enviar correo de activación en segundo plano (no bloqueante)
         asunto = "Activación de cuenta - Simulador Empresarial"
         logo_path = os.path.join(os.path.dirname(__file__), "..", "public", "images", "Logo-Adm.svg")
         
@@ -187,17 +199,15 @@ async def registrar_usuario_logic(usuario: UsuarioRegistro, db: AsyncSession):
             </body>
         </html>
         """
-        await send_email_async(usuario.email, asunto, cuerpo, logo_path)
         
-        # Crear notificación en el sistema
-        notif_activacion = models.Notificacion(
-            tipo="sistema",
-            mensaje="Se ha enviado un mensaje de confirmación a tu correo electrónico. Por favor, revísalo para asegurar que podrás recuperar tu contraseña en el futuro.",
-            usuario_id=nuevo_usuario.id,
-            leido=False
-        )
-        db.add(notif_activacion)
-        await db.commit()
+        # Función auxiliar segura para enviar correo en background
+        async def _enviar_correo_background():
+            try:
+                await send_email_async(usuario.email, asunto, cuerpo, logo_path)
+            except Exception as email_err:
+                print(f"Advertencia: No se pudo enviar correo de bienvenida a {usuario.email}: {email_err}")
+
+        asyncio.create_task(_enviar_correo_background())
         
         return {"message": "Usuario registrado con éxito"}
     except Exception as e:
@@ -215,10 +225,11 @@ async def login_local_logic(credentials: UsuarioLogin, db: AsyncSession):
         
     access_token = create_access_token(data={"id": user_info.id, "email": user_info.email, "rol": user_info.rol})
     
+    requiere_rol = (not user_info.rol or user_info.rol == "Pendiente")
     return {
         "token": access_token, "id": user_info.email, "nombre": user_info.nombre,
         "rol": user_info.rol, "email": user_info.email, "perfil": user_info.perfil,
-        "institucion": user_info.institucion
+        "institucion": user_info.institucion, "requiere_rol": requiere_rol
     }
 
 async def login_google_logic(req: GoogleLoginRequest, db: AsyncSession):
@@ -236,15 +247,17 @@ async def login_google_logic(req: GoogleLoginRequest, db: AsyncSession):
         result = await db.execute(select(models.Usuario).filter(models.Usuario.email == email))
         user_info = result.scalars().first()
 
-        # Si no existe, lo creamos
+        es_nuevo = False
+        # Si no existe, lo creamos con rol Pendiente para que elija su rol
         if not user_info:
+            es_nuevo = True
             password_hasheada = get_password_hash(os.urandom(24).hex()) # Contraseña aleatoria (login con google)
             user_info = models.Usuario(
                 email=email,
                 nombre=nombre,
                 password=password_hasheada,
-                rol="Estudiante",
-                perfil="Estudiante",
+                rol="Pendiente",
+                perfil="Pendiente",
                 institucion=""
             )
             db.add(user_info)
@@ -255,11 +268,12 @@ async def login_google_logic(req: GoogleLoginRequest, db: AsyncSession):
             return JSONResponse(status_code=403, content={"error": "Cuenta suspendida"})
             
         access_token = create_access_token(data={"id": user_info.id, "email": user_info.email, "rol": user_info.rol})
+        requiere_rol = (not user_info.rol or user_info.rol == "Pendiente" or es_nuevo)
         
         return {
             "token": access_token, "id": user_info.email, "nombre": user_info.nombre,
             "rol": user_info.rol, "email": user_info.email, "perfil": user_info.perfil,
-            "institucion": user_info.institucion
+            "institucion": user_info.institucion, "requiere_rol": requiere_rol, "es_nuevo": es_nuevo
         }
 
     except ValueError as e:
@@ -404,6 +418,25 @@ async def cambiar_rol_logic(datos: CambiarRol, db: AsyncSession):
     await db.commit()
     return {"message": f"El rol del usuario ha sido actualizado a {datos.nuevo_rol}"}
 
+async def asignar_rol_inicial_logic(datos: AsignarRolInicial, current_user: models.Usuario, db: AsyncSession):
+    rol_final = "Docente" if datos.rol and datos.rol.strip().lower() == "docente" else "Estudiante"
+    current_user.rol = rol_final
+    current_user.perfil = rol_final
+    await db.commit()
+    await db.refresh(current_user)
+    
+    access_token = create_access_token(data={"id": current_user.id, "email": current_user.email, "rol": current_user.rol})
+    return {
+        "token": access_token,
+        "id": current_user.email,
+        "nombre": current_user.nombre,
+        "rol": current_user.rol,
+        "email": current_user.email,
+        "perfil": current_user.perfil,
+        "institucion": current_user.institucion,
+        "requiere_rol": False
+    }
+
 async def cambiar_estado_logic(datos: CambiarEstado, db: AsyncSession, current_user_id: int):
     result = await db.execute(select(models.Usuario).filter(models.Usuario.email == datos.email))
     usuario = result.scalars().first()
@@ -452,3 +485,146 @@ async def obtener_usuarios_logic(db: AsyncSession):
         "perfil": u.perfil, "institucion": u.institucion, "activo": u.activo,
         "fecha_creacion": u.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if u.fecha_creacion else None
     } for u in usuarios]
+
+async def obtener_estadisticas_admin_logic(db: AsyncSession):
+    from collections import defaultdict
+    from datetime import datetime, timedelta
+    
+    ahora = datetime.now()
+    hace_7d = ahora - timedelta(days=7)
+    hace_30d = ahora - timedelta(days=30)
+    
+    # 1. Usuarios
+    res_usuarios = await db.execute(select(models.Usuario))
+    usuarios = res_usuarios.scalars().all()
+    
+    total_usuarios = len(usuarios)
+    usuarios_activos = sum(1 for u in usuarios if getattr(u, 'activo', True))
+    usuarios_suspendidos = total_usuarios - usuarios_activos
+    
+    usuarios_7d = 0
+    usuarios_30d = 0
+    
+    roles_count = defaultdict(int)
+    registros_por_mes = defaultdict(int)
+    
+    for u in usuarios:
+        rol = u.rol or "Sin Rol"
+        roles_count[rol] += 1
+        if u.fecha_creacion:
+            mes_str = u.fecha_creacion.strftime("%Y-%m")
+            registros_por_mes[mes_str] += 1
+            if u.fecha_creacion >= hace_7d:
+                usuarios_7d += 1
+            if u.fecha_creacion >= hace_30d:
+                usuarios_30d += 1
+            
+    # 2. Clases e Inscripciones
+    res_clases = await db.execute(select(models.Clase))
+    clases = res_clases.scalars().all()
+    total_clases = len(clases)
+    
+    res_inscripciones = await db.execute(select(models.Inscripcion))
+    inscripciones = res_inscripciones.scalars().all()
+    total_inscripciones = len(inscripciones)
+    
+    # Conteo de inscritos por clase
+    inscritos_por_clase = defaultdict(int)
+    for ins in inscripciones:
+        inscritos_por_clase[ins.clase_id] += 1
+        
+    docentes_map = {u.id: u.nombre for u in usuarios}
+    
+    top_clases = []
+    for c in clases:
+        top_clases.append({
+            "id": c.id,
+            "nombre": c.nombre,
+            "codigo": c.codigo_acceso,
+            "docente": docentes_map.get(c.docente_id, "Desconocido"),
+            "estudiantes_count": inscritos_por_clase.get(c.id, 0),
+            "fecha_creacion": c.fecha_creacion.strftime("%Y-%m-%d") if c.fecha_creacion else None
+        })
+    top_clases.sort(key=lambda x: x["estudiantes_count"], reverse=True)
+    
+    # 3. Historial de Cálculos
+    res_calculos = await db.execute(select(models.HistorialCalculo))
+    calculos = res_calculos.scalars().all()
+    total_calculos = len(calculos)
+    
+    calculos_7d = 0
+    calculos_30d = 0
+    usuarios_con_calculo_7d = set()
+    usuarios_con_calculo_30d = set()
+    
+    analisis_count = defaultdict(int)
+    calculos_por_mes = defaultdict(int)
+    for calc in calculos:
+        tipo = calc.tipo_analisis or "Otro"
+        analisis_count[tipo] += 1
+        if calc.fecha_creacion:
+            mes_str = calc.fecha_creacion.strftime("%Y-%m")
+            calculos_por_mes[mes_str] += 1
+            if calc.fecha_creacion >= hace_7d:
+                calculos_7d += 1
+                usuarios_con_calculo_7d.add(calc.usuario_id)
+            if calc.fecha_creacion >= hace_30d:
+                calculos_30d += 1
+                usuarios_con_calculo_30d.add(calc.usuario_id)
+
+    # Combinamos usuarios que se registraron o que hicieron actividad en el período
+    usuarios_unicos_7d = len(set(u.id for u in usuarios if u.fecha_creacion and u.fecha_creacion >= hace_7d) | usuarios_con_calculo_7d)
+    usuarios_unicos_30d = len(set(u.id for u in usuarios if u.fecha_creacion and u.fecha_creacion >= hace_30d) | usuarios_con_calculo_30d)
+            
+    # 4. Archivos
+    res_archivos = await db.execute(select(models.Archivo))
+    archivos = res_archivos.scalars().all()
+    total_archivos = len(archivos)
+    total_bytes = sum(getattr(a, 'size_bytes', 0) or 0 for a in archivos)
+    
+    # Formatear series de tiempo ordenadas
+    todos_meses = sorted(set(list(registros_por_mes.keys()) + list(calculos_por_mes.keys())))
+    evolucion_temporal = []
+    for m in todos_meses:
+        evolucion_temporal.append({
+            "mes": m,
+            "registros": registros_por_mes.get(m, 0),
+            "calculos": calculos_por_mes.get(m, 0)
+        })
+        
+    distribucion_roles = [{"name": k, "value": v} for k, v in roles_count.items()]
+    distribucion_analisis = [{"name": k, "cantidad": v} for k, v in analisis_count.items()]
+    
+    return {
+        "kpis": {
+            "total_usuarios": total_usuarios,
+            "usuarios_activos": usuarios_activos,
+            "usuarios_suspendidos": usuarios_suspendidos,
+            "total_estudiantes": roles_count.get("Estudiante", 0),
+            "total_docentes": roles_count.get("Docente", 0),
+            "total_administradores": roles_count.get("Administrador", 0),
+            "total_clases": total_clases,
+            "total_inscripciones": total_inscripciones,
+            "total_calculos": total_calculos,
+            "total_archivos": total_archivos,
+            "total_mb": round(total_bytes / (1024 * 1024), 2),
+            "actividad_periodo": {
+                "todo": {
+                    "usuarios": total_usuarios,
+                    "calculos": total_calculos
+                },
+                "30d": {
+                    "usuarios": max(usuarios_unicos_30d, 1 if total_usuarios > 0 else 0),
+                    "calculos": calculos_30d
+                },
+                "7d": {
+                    "usuarios": max(usuarios_unicos_7d, 1 if total_usuarios > 0 else 0),
+                    "calculos": calculos_7d
+                }
+            }
+        },
+        "distribucion_roles": distribucion_roles,
+        "evolucion_temporal": evolucion_temporal,
+        "distribucion_analisis": distribucion_analisis,
+        "top_clases": top_clases[:10]
+    }

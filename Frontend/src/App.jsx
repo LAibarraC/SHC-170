@@ -17,6 +17,7 @@ import Admin from "./Features/Admin/Admin";
 import GestionDocente from "./Features/User/docentes/GestionDocente";
 
 import SelectorRol from './ui/SelectorRol';
+import ModalSeleccionRolInicial from './ui/ModalSeleccionRolInicial';
 import OscuroClaro from "./ui/oscuro_claro";
 
 import { DataProvider, CalculadoraDataProvider, MAT251DataProvider, ActiveModuleContext } from "./components/Gestion_Datos/DataContext";
@@ -71,6 +72,12 @@ function App() {
       <CalculadoraDataProvider usuario={usuario}>
         <MAT251DataProvider usuario={usuario}>
           <HashRouter>
+            {usuario && (usuario.requiere_rol || usuario.rol === 'Pendiente' || !usuario.rol) && (
+              <ModalSeleccionRolInicial 
+                usuario={usuario} 
+                onRolAsignado={(usuarioActualizado) => setUsuario(usuarioActualizado)} 
+              />
+            )}
             <SelectorRol />
             <div className="app-main" style={{ backgroundColor: 'var(--bg-main)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
               <div style={{ position: 'fixed', zIndex: 99999, inset: 0, pointerEvents: 'none' }}>

@@ -44,6 +44,30 @@ export const alerta = {
       styles: estilosBase
     });
   },
+  info: (titulo, descripcion) => {
+    if (sileo && typeof sileo.info === 'function') {
+      sileo.info({
+        title: titulo,
+        description: descripcion,
+        fill: "#1e293b",
+        styles: estilosBase
+      });
+    } else if (sileo && typeof sileo.show === 'function') {
+      sileo.show({
+        title: titulo,
+        description: descripcion,
+        fill: "#1e293b",
+        styles: estilosBase
+      });
+    } else {
+      sileo.success({
+        title: titulo,
+        description: descripcion,
+        fill: "#1e293b",
+        styles: estilosBase
+      });
+    }
+  },
   /**
    * Muestra un modal de confirmación con el mismo diseño de la app y devuelve
    * una promesa que se resuelve con `true` si el usuario confirma o `false` si

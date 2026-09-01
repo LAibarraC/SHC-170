@@ -1,9 +1,11 @@
+from typing import Optional
 from pydantic import BaseModel
 
 class UsuarioRegistro(BaseModel):
     nombre: str
     email: str
     password: str
+    rol: Optional[str] = "Estudiante"
 
 class UsuarioLogin(BaseModel):
     email: str
@@ -42,3 +44,6 @@ class CambiarEstado(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     token: str
+
+class AsignarRolInicial(BaseModel):
+    rol: str

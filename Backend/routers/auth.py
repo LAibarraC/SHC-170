@@ -13,14 +13,14 @@ from controllers.auth import (
     forgot_password_logic, reset_password_logic, recuperar_password_logic,
     resetear_password_logic, cambiar_password_perfil_logic, eliminar_cuenta_logic,
     cambiar_rol_logic, cambiar_estado_logic, admin_eliminar_usuario_logic, obtener_usuarios_logic,
-    login_google_logic
+    login_google_logic, asignar_rol_inicial_logic, obtener_estadisticas_admin_logic
 )
 
 # Importamos de nuestro validador
 from validators.auth import (
     VerificarEmailRequest, UsuarioRegistro, UsuarioLogin, ForgotPasswordRequest, 
     ResetPasswordRequest, RecuperarPassword, ResetearPassword, CambiarPasswordPerfil, 
-    CambiarRol, CambiarEstado, GoogleLoginRequest
+    CambiarRol, CambiarEstado, GoogleLoginRequest, AsignarRolInicial
 )
 
 from middlewares.auth import get_current_user, require_role
@@ -71,8 +71,13 @@ async def read_users_me(current_user: models.Usuario = Depends(get_current_user)
         "rol": current_user.rol,
         "email": current_user.email,
         "perfil": current_user.perfil,
-        "institucion": current_user.institucion
+        "institucion": current_user.institucion,
+        "requiere_rol": current_user.rol == "Pendiente" or not current_user.rol
     }
+
+@router.post("/asignar_rol_inicial")
+async def asignar_rol_inicial(datos: AsignarRolInicial, db: AsyncSession = Depends(get_db), current_user: models.Usuario = Depends(get_current_user)):
+    return await asignar_rol_inicial_logic(datos, current_user, db)
 
 @router.get("/docente-only")
 async def test_docente_only(current_user: models.Usuario = Depends(require_role("Docente"))):
@@ -117,3 +122,7 @@ async def admin_eliminar_usuario(email: str, db: AsyncSession = Depends(get_db),
 @router.get("/usuarios")
 async def obtener_usuarios(db: AsyncSession = Depends(get_db), current_user: models.Usuario = Depends(require_role("Administrador"))):
     return await obtener_usuarios_logic(db)
+
+@router.get("/admin/estadisticas")
+async def obtener_estadisticas_admin(db: AsyncSession = Depends(get_db), current_user: models.Usuario = Depends(require_role("Administrador"))):
+    return await obtener_estadisticas_admin_logic(db)
