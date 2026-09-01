@@ -163,6 +163,12 @@ export default function Registro({ onLogin }) {
 
   return (
     <div className="login-container" style={{ padding: '20px', position: 'relative' }}>
+      {/* Ocultamos el pie de página global para la vista de registro */}
+      <style>{`
+        .pie-top, footer, .pie-pagina-institucional {
+          display: none !important;
+        }
+      `}</style>
 
       <div className="login-card" style={{ maxWidth: '500px', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '50px' }}>
