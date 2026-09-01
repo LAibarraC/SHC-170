@@ -22,7 +22,8 @@ import models
 from validators.auth import (
     UsuarioRegistro, UsuarioLogin, RecuperarPassword, ResetearPassword,
     CambiarPasswordPerfil, ForgotPasswordRequest, ResetPasswordRequest,
-    CambiarRol, CambiarEstado, VerificarEmailRequest, GoogleLoginRequest
+    CambiarRol, CambiarEstado, VerificarEmailRequest, GoogleLoginRequest,
+    AsignarRolInicial
 )
 
 from google.oauth2 import id_token
@@ -224,10 +225,11 @@ async def login_local_logic(credentials: UsuarioLogin, db: AsyncSession):
         
     access_token = create_access_token(data={"id": user_info.id, "email": user_info.email, "rol": user_info.rol})
     
+    requiere_rol = (not user_info.rol or user_info.rol == "Pendiente")
     return {
         "token": access_token, "id": user_info.email, "nombre": user_info.nombre,
         "rol": user_info.rol, "email": user_info.email, "perfil": user_info.perfil,
-        "institucion": user_info.institucion
+        "institucion": user_info.institucion, "requiere_rol": requiere_rol
     }
 
 async def login_google_logic(req: GoogleLoginRequest, db: AsyncSession):
@@ -245,15 +247,17 @@ async def login_google_logic(req: GoogleLoginRequest, db: AsyncSession):
         result = await db.execute(select(models.Usuario).filter(models.Usuario.email == email))
         user_info = result.scalars().first()
 
-        # Si no existe, lo creamos
+        es_nuevo = False
+        # Si no existe, lo creamos con rol Pendiente para que elija su rol
         if not user_info:
+            es_nuevo = True
             password_hasheada = get_password_hash(os.urandom(24).hex()) # Contraseña aleatoria (login con google)
             user_info = models.Usuario(
                 email=email,
                 nombre=nombre,
                 password=password_hasheada,
-                rol="Estudiante",
-                perfil="Estudiante",
+                rol="Pendiente",
+                perfil="Pendiente",
                 institucion=""
             )
             db.add(user_info)
@@ -264,11 +268,12 @@ async def login_google_logic(req: GoogleLoginRequest, db: AsyncSession):
             return JSONResponse(status_code=403, content={"error": "Cuenta suspendida"})
             
         access_token = create_access_token(data={"id": user_info.id, "email": user_info.email, "rol": user_info.rol})
+        requiere_rol = (not user_info.rol or user_info.rol == "Pendiente" or es_nuevo)
         
         return {
             "token": access_token, "id": user_info.email, "nombre": user_info.nombre,
             "rol": user_info.rol, "email": user_info.email, "perfil": user_info.perfil,
-            "institucion": user_info.institucion
+            "institucion": user_info.institucion, "requiere_rol": requiere_rol, "es_nuevo": es_nuevo
         }
 
     except ValueError as e:
@@ -412,6 +417,25 @@ async def cambiar_rol_logic(datos: CambiarRol, db: AsyncSession):
     db.add(nueva_notificacion)
     await db.commit()
     return {"message": f"El rol del usuario ha sido actualizado a {datos.nuevo_rol}"}
+
+async def asignar_rol_inicial_logic(datos: AsignarRolInicial, current_user: models.Usuario, db: AsyncSession):
+    rol_final = "Docente" if datos.rol and datos.rol.strip().lower() == "docente" else "Estudiante"
+    current_user.rol = rol_final
+    current_user.perfil = rol_final
+    await db.commit()
+    await db.refresh(current_user)
+    
+    access_token = create_access_token(data={"id": current_user.id, "email": current_user.email, "rol": current_user.rol})
+    return {
+        "token": access_token,
+        "id": current_user.email,
+        "nombre": current_user.nombre,
+        "rol": current_user.rol,
+        "email": current_user.email,
+        "perfil": current_user.perfil,
+        "institucion": current_user.institucion,
+        "requiere_rol": False
+    }
 
 async def cambiar_estado_logic(datos: CambiarEstado, db: AsyncSession, current_user_id: int):
     result = await db.execute(select(models.Usuario).filter(models.Usuario.email == datos.email))

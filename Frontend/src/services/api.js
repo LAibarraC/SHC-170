@@ -468,6 +468,21 @@ export const api = {
     return data;
   },
 
+  asignarRolInicial: async (rol) => {
+    const token = localStorage.getItem("token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE_URL}/asignar_rol_inicial`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ rol }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al asignar rol inicial");
+    return data;
+  },
+
   // --- SISTEMA DE NOTIFICACIONES ---
   obtenerNotificaciones: async () => {
     const token = localStorage.getItem("token");
