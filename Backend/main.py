@@ -25,6 +25,7 @@ app = FastAPI(
     openapi_url=None if _is_production else "/openapi.json",
 )
 
+#base de datos aiven
 # Configuración de CORS
 origins = [
     "http://localhost:5173",         # Desarrollo local (Vite)
