@@ -49,6 +49,19 @@ export const api = {
     return data;
   },
 
+  // --- RESETEAR INTEGRANTES DE UNA CLASE ---
+  resetearIntegrantesClase: async (claseId) => {
+    const res = await fetch(`${BASE_URL}/clases/${claseId}/integrantes`, {
+      method: "DELETE",
+      headers: {
+        ...(localStorage.getItem("token") ? { Authorization: `Bearer ${localStorage.getItem("token")}` } : {}),
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.detail || "No se pudieron eliminar los integrantes");
+    return data;
+  },
+
   // --- OBTENER ESTUDIANTES DE UNA CLASE ---
   obtenerEstudiantesClase: async (claseId, userEmail) => {
     const res = await fetch(`${BASE_URL}/clases/${claseId}/estudiantes?user_email=${encodeURIComponent(userEmail)}`);

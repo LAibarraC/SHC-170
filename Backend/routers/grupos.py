@@ -26,6 +26,14 @@ async def actualizar_clase(
 ):
     return await grupos_controller.actualizar_clase_db(db, datos, current_user)
 
+@router.delete("/clases/{clase_id}/integrantes")
+async def resetear_integrantes_clase(
+    clase_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(require_role(["Docente", "Administrador"])),
+):
+    return await grupos_controller.resetear_integrantes_clase_db(db, clase_id, current_user)
+
 @router.post("/unirse_clase")
 async def unirse_clase(datos: UnirseClase, db: AsyncSession = Depends(get_db)):
     return await grupos_controller.unirse_clase_db(db, datos)

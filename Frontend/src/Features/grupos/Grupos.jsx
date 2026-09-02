@@ -11,7 +11,7 @@ import qrApi from "../../services/qrApi";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import escudoAdmin from "../../assets/images/escudoAdmin.png";
-import ModalQR from "../qr/ModalQR";
+import CentroControlCurso from "../qr/CentroControlCurso";
 import EscanerQR from "../qr/EscanerQR";
 import { IconoQr, CierreX } from "../../ui/iconos";
 
@@ -169,13 +169,6 @@ export default function Grupos() {
   const [fechaLimiteMatriculacion, setFechaLimiteMatriculacion] = useState("");
   const [hoveredCursoId, setHoveredCursoId] = useState(null);
 
-  // Estados para la edición de cursos (Gestionar)
-  const [mostrarModalEditar, setMostrarModalEditar] = useState(false);
-  const [cursoAEditar, setCursoAEditar] = useState(null);
-  const [editarNombre, setEditarNombre] = useState("");
-  const [editarFechaLimite, setEditarFechaLimite] = useState("");
-  const [resetearCodigo, setResetearCodigo] = useState(false);
-
   // Estados para la eliminación de cursos
   const [mostrarModalEliminar, setMostrarModalEliminar] = useState(false);
   const [cursoAEliminar, setCursoAEliminar] = useState(null);
@@ -188,11 +181,10 @@ export default function Grupos() {
   const [procesandoUnion, setProcesandoUnion] = useState(false);
   const [escanerActivo, setEscanerActivo] = useState(false);
 
-  // 🆕 ESTADOS PARA EL MODAL DE QR
-  const [mostrarModalQR, setMostrarModalQR] = useState(false);
-  const [cursoParaQR, setCursoParaQR] = useState(null);
+  // Estados del Centro de Control del Curso
+  const [mostrarCentroControl, setMostrarCentroControl] = useState(false);
+  const [cursoParaGestionar, setCursoParaGestionar] = useState(null);
   const [qrsActivos, setQrsActivos] = useState({}); // { clase_id: qrObject }
-  const [cargandoQRs, setCargandoQRs] = useState(false);
 
   // --- ESTADOS PARA BÚSQUEDA Y PAGINACIÓN ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -239,7 +231,6 @@ export default function Grupos() {
   // 🆕 CARGAR QRs ACTIVOS PARA LOS CURSOS DEL DOCENTE
   const cargarQRsActivos = async () => {
     if (!esDocente && !esAdmin) return; // Solo para docentes
-    setCargandoQRs(true);
     try {
       const listaQRs = await qrApi.listarMisQRs();
       const qrsPorClase = {};
@@ -253,8 +244,6 @@ export default function Grupos() {
       setQrsActivos(qrsPorClase);
     } catch (error) {
       console.error("Error cargando QRs activos:", error);
-    } finally {
-      setCargandoQRs(false);
     }
   };
 
@@ -361,48 +350,10 @@ export default function Grupos() {
     }
   };
 
-  // --- LÓGICA DEL DOCENTE: Editar curso (Gestionar) ---
-  const handleOpenEditar = (curso) => {
-    setCursoAEditar(curso);
-    setEditarNombre(curso.nombre);
-    setEditarFechaLimite(curso.fecha_limite_matriculacion || "");
-    setResetearCodigo(false);
-    setMostrarModalEditar(true);
-  };
-
-  const handleActualizarCurso = async (e) => {
-    e.preventDefault();
-    if (!editarNombre.trim()) {
-      alerta.error("Campos vacíos", "Por favor ingresa el nombre del curso.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${BASE_URL}/actualizar_clase`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: cursoAEditar.id,
-          nombre: editarNombre,
-          fecha_limite_matriculacion: editarFechaLimite || null,
-          resetear_codigo: resetearCodigo
-        })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        alerta.success("Curso actualizado", "Los datos del curso han sido actualizados correctamente.");
-        setMostrarModalEditar(false);
-        setCursoAEditar(null);
-        setResetearCodigo(false);
-        cargarCursos(); // Recargamos la lista desde la BD
-      } else {
-        alerta.error("Error", data.error || "No se pudo actualizar el curso.");
-      }
-    } catch (error) {
-      alerta.error("Error de conexión", "No hay respuesta del servidor.");
-    }
+  // El botón Gestionar curso abre el Centro de Control del Curso.
+  const handleOpenGestionar = (curso) => {
+    setCursoParaGestionar(curso);
+    setMostrarCentroControl(true);
   };
 
   // --- LÓGICA DEL DOCENTE/ADMIN: Eliminar curso (Seguro) ---
@@ -685,9 +636,22 @@ export default function Grupos() {
               <div id="tour-lista-cursos" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
                 {currentCursos.map((curso) => {
                   const puedeGestionar = esAdmin || curso.docente_email === correoUsuario;
+                  const qrDeCurso = obtenerQRActivoDeClase(curso.id);
+                  const qrHabilitado = Boolean(curso.codigo && qrDeCurso?.activo !== false && qrDeCurso);
                   return (
                     <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-                      <h3 style={{ margin: "0 0 10px 0", color: "var(--text-main, #333)" }}>{curso.nombre}</h3>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "10px" }}>
+                        <h3 style={{ margin: 0, color: "var(--text-main, #333)", lineHeight: 1.3, overflowWrap: "anywhere" }}>{curso.nombre}</h3>
+                        {qrHabilitado && (
+                          <span
+                            title="Código QR habilitado"
+                            aria-label="Código QR habilitado"
+                            style={{ flex: "0 0 auto", display: "inline-flex", alignItems: "center", justifyContent: "center", width: "30px", height: "30px", borderRadius: "8px", color: "var(--accent-color)", background: "color-mix(in srgb, var(--accent-color) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--accent-color) 28%, transparent)" }}
+                          >
+                            <IconoQr width="17" height="17" />
+                          </span>
+                        )}
+                      </div>
                       <p style={{ margin: "0 0 5px 0", color: "var(--text-muted, #666)" }}>
                         <strong>Código de Matriculación:</strong> <span className="tour-curso-codigo" style={{ color: "var(--accent-color)", fontWeight: "bold" }}>{curso.codigo}</span>
                       </p>
@@ -704,7 +668,7 @@ export default function Grupos() {
                       <div style={{ display: "flex", gap: "10px", marginTop: "15px", flexWrap: "wrap" }}>
                         {puedeGestionar && (
                           <button
-                            onClick={() => handleOpenEditar(curso)}
+                            onClick={() => handleOpenGestionar(curso)}
                             className="tour-curso-gestionar"
                             onMouseEnter={() => setHoveredCursoId(curso.id)}
                             onMouseLeave={() => setHoveredCursoId(null)}
@@ -712,7 +676,7 @@ export default function Grupos() {
                               flex: 1, padding: "8px", background: hoveredCursoId === curso.id ? "#374151" : "#4b5563", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", color: "#ffffff", transition: "background-color 0.2s"
                             }}
                           >
-                            Editar
+                            Gestionar curso
                           </button>
                         )}
                         <button
@@ -723,76 +687,6 @@ export default function Grupos() {
                           Subir Material
                         </button>
                       </div>
-
-                      {/* Botón dinámico de QR: verde si está habilitado; azul sólido si está inactivo. */}
-                      {puedeGestionar && (() => {
-                        const qrActivo = obtenerQRActivoDeClase(curso.id);
-                        const fechaVencida = Boolean(
-                          curso.fecha_limite_matriculacion &&
-                          curso.fecha_limite_matriculacion < new Date().toISOString().slice(0, 10)
-                        );
-                        const matriculaInactiva = !curso.codigo || fechaVencida;
-                        const esQRActivo = !matriculaInactiva && qrActivo !== null;
-                        const bgColor = matriculaInactiva
-                          ? "var(--primary-color)"
-                          : "rgba(16, 185, 129, 0.1)";
-                        const borderColor = matriculaInactiva
-                          ? "var(--primary-color)"
-                          : "rgba(16, 185, 129, 0.4)";
-                        const textColor = matriculaInactiva ? "#ffffff" : "#10b981";
-                        const hoverBg = matriculaInactiva
-                          ? "var(--primary-color-dark, #1d4ed8)"
-                          : "#10b981";
-                        const textoQR = matriculaInactiva
-                          ? "Generar QR"
-                          : esQRActivo
-                            ? "Ver QR Activo"
-                            : "Generar QR";
-
-                        return (
-                          <button
-                            onClick={() => {
-                              setCursoParaQR(curso);
-                              setMostrarModalQR(true);
-                            }}
-                            className="tour-curso-qr"
-                            title={`${textoQR} para ${curso.nombre}`}
-                            style={{
-                              width: "100%",
-                              padding: "8px",
-                              marginTop: "10px",
-                              background: bgColor,
-                              border: matriculaInactiva ? "none" : `1px solid ${borderColor}`,
-                              borderRadius: "4px",
-                              cursor: "pointer",
-                              fontWeight: "bold",
-                              color: textColor,
-                              transition: "all 0.2s",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "8px",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = hoverBg;
-                              e.currentTarget.style.color = "#ffffff";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = bgColor;
-                              e.currentTarget.style.color = textColor;
-                            }}
-                          >
-                            {esQRActivo ? (
-                              <IconoQr indicador width="16" height="16" />
-                            ) : (
-                              <IconoQr width="16" height="16" />
-                            )}
-                            <span>
-                              {textoQR}
-                            </span>
-                          </button>
-                        );
-                      })() || null}
 
                       {puedeGestionar && (
                         <button
@@ -1106,77 +1000,6 @@ export default function Grupos() {
       )}
 
       {/* ========================================= */}
-      {/* VENTANA MODAL PARA EDITAR CURSO           */}
-      {/* ========================================= */}
-      {mostrarModalEditar && cursoAEditar && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }}>
-          <div style={{ background: "var(--bg-card)", padding: "30px", borderRadius: "10px", width: "400px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)", border: "1px solid var(--border-color)" }}>
-            <h2 style={{ marginTop: 0, color: "var(--primary-color)" }}>Gestionar Curso</h2>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "20px" }}>
-              Código de acceso (Sólo lectura): <strong>{cursoAEditar.codigo}</strong>
-            </p>
-
-            <form onSubmit={handleActualizarCurso}>
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>Nombre de la Materia:</label>
-                <input
-                  type="text"
-                  value={editarNombre}
-                  onChange={(e) => setEditarNombre(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "5px", border: "1px solid var(--border-color)", boxSizing: "border-box", background: "var(--bg-input)", color: "var(--text-main)" }}
-                  required
-                  autoFocus
-                />
-              </div>
-
-              <div style={{ marginBottom: "25px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "var(--text-main)" }}>Fecha Límite de Matriculación (Opcional):</label>
-                <DatePicker
-                  selected={fechaIsoADate(editarFechaLimite)}
-                  onChange={(fecha) => setEditarFechaLimite(dateAFechaIso(fecha))}
-                  dateFormat="dd/MM/yyyy"
-                  locale="es"
-                  placeholderText="dd/mm/aaaa"
-                  isClearable
-                  className="selector-fecha"
-                  wrapperClassName="selector-fecha-wrapper"
-                />
-              </div>
-
-              <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <input
-                  type="checkbox"
-                  id="resetear-codigo-chk"
-                  checked={resetearCodigo}
-                  onChange={(e) => setResetearCodigo(e.target.checked)}
-                  style={{ width: "18px", height: "18px", cursor: "pointer", accentColor: "var(--accent-color)" }}
-                />
-                <label htmlFor="resetear-codigo-chk" style={{ fontWeight: "bold", color: "var(--text-main)", cursor: "pointer", fontSize: "0.95rem", userSelect: "none" }}>
-                  Reasignar/Resetear Código
-                </label>
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMostrarModalEditar(false);
-                    setCursoAEditar(null);
-                  }}
-                  style={{ padding: "10px 15px", background: "var(--bg-main)", color: "var(--text-main)", border: "1px solid var(--border-color)", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" style={{ padding: "10px 20px", background: "var(--accent-color)", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}>
-                  Guardar Cambios
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================= */}
       {/* VENTANA MODAL PARA CONFIRMAR ELIMINACIÓN  */}
       {/* ========================================= */}
       {mostrarModalEliminar && cursoAEliminar && (
@@ -1264,15 +1087,15 @@ export default function Grupos() {
       )}
 
       {/* ========================================= */}
-      {/* 🆕 MODAL: GENERAR QR (DOCENTE / ADMIN)   */}
+      {/* CENTRO DE CONTROL DEL CURSO (DOCENTE / ADMIN) */}
       {/* ========================================= */}
-      {mostrarModalQR && cursoParaQR && (
-        <ModalQR
-          curso={cursoParaQR}
-          qrActivo={obtenerQRActivoDeClase(cursoParaQR.id)}
+      {mostrarCentroControl && cursoParaGestionar && (
+        <CentroControlCurso
+          curso={cursoParaGestionar}
+          qrActivo={obtenerQRActivoDeClase(cursoParaGestionar.id)}
           onClose={async () => {
-            setMostrarModalQR(false);
-            setCursoParaQR(null);
+            setMostrarCentroControl(false);
+            setCursoParaGestionar(null);
             // Recargar QRs activos al cerrar para sincronizar la UI
             await cargarQRsActivos();
           }}

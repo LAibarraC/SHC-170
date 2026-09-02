@@ -74,6 +74,24 @@ async def actualizar_clase_db(db: AsyncSession, datos: ActualizarClase, current_
         "codigo_acceso": clase.codigo_acceso
     }
 
+async def resetear_integrantes_clase_db(db: AsyncSession, clase_id: int, current_user: Usuario):
+    result = await db.execute(select(Clase).filter(Clase.id == clase_id))
+    clase = result.scalars().first()
+    if not clase:
+        return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
+
+    if current_user.rol != "Administrador" and clase.docente_id != current_user.id:
+        return JSONResponse(status_code=403, content={"error": "No tienes permisos para modificar esta clase"})
+
+    result = await db.execute(
+        select(func.count()).select_from(Inscripcion).filter(Inscripcion.clase_id == clase_id)
+    )
+    total = result.scalar() or 0
+    await db.execute(delete(Inscripcion).where(Inscripcion.clase_id == clase_id))
+    await db.commit()
+    return {"message": "Integrantes eliminados correctamente", "eliminados": total}
+
+
 async def unirse_clase_db(db: AsyncSession, datos: UnirseClase):
     result = await db.execute(select(Usuario).filter(Usuario.email == datos.estudiante_email))
     estudiante = result.scalars().first()
@@ -242,21 +260,27 @@ async def eliminar_clase_db(db: AsyncSession, clase_id: int, user_email: str):
             content={"error": "No tienes permisos para eliminar este curso. Solo el docente creador o un administrador pueden hacerlo."}
         )
         
-    await db.execute(delete(Inscripcion).filter(Inscripcion.clase_id == clase.id))
-    await db.execute(delete(Archivo).filter(Archivo.clase_id == clase.id))
-    await db.execute(delete(HistorialCalculo).filter(HistorialCalculo.clase_id == clase.id))
-    
-    target_folder = os.path.join("excels", "_cursos", str(clase.id))
-    if os.path.exists(target_folder):
-        try:
-            shutil.rmtree(target_folder)
-        except Exception as e:
-            print(f"Error al eliminar la carpeta física de la clase {clase.id}: {e}")
-            
-    await db.delete(clase)
-    await db.commit()
-    
-    return {"message": "Curso eliminado exitosamente"}
+    try:
+        await db.execute(delete(Inscripcion).filter(Inscripcion.clase_id == clase.id))
+        await db.execute(delete(Archivo).filter(Archivo.clase_id == clase.id))
+        await db.execute(delete(HistorialCalculo).filter(HistorialCalculo.clase_id == clase.id))
+        await db.execute(delete(ClaseQR).filter(ClaseQR.clase_id == clase.id))
+        
+        target_folder = os.path.join("excels", "_cursos", str(clase.id))
+        if os.path.exists(target_folder):
+            try:
+                shutil.rmtree(target_folder)
+            except Exception as e:
+                print(f"Error al eliminar la carpeta física de la clase {clase.id}: {e}")
+                
+        await db.delete(clase)
+        await db.commit()
+        
+        return {"message": "Curso eliminado exitosamente"}
+    except Exception as e:
+        await db.rollback()
+        print(f"Error al eliminar clase {clase_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Error interno al eliminar el curso: {str(e)}"})
 
 async def obtener_estudiantes_clase_db(db: AsyncSession, clase_id: int, user_email: str):
     result = await db.execute(select(Usuario).filter(Usuario.email == user_email))

@@ -104,7 +104,7 @@ export default function GenerarQR() {
       await navigator.clipboard.writeText(qr.url);
       alerta.success("Enlace copiado", "El enlace fue copiado al portapapeles.");
     } catch {
-      alerta.error("No se pudo copiar", "Copia manualmente el enlace mostrado en pantalla.");
+      alerta.error("No se pudo copiar el enlace", "Verifica los permisos del navegador e inténtalo nuevamente.");
     }
   };
 
@@ -128,7 +128,7 @@ export default function GenerarQR() {
       await navigator.clipboard.writeText(qr.url);
       alerta.success("Enlace copiado", "Tu navegador no soporta 'Compartir'. El enlace fue copiado al portapapeles.");
     } catch {
-      alerta.error("No se pudo compartir", "Copia manualmente el enlace mostrado en pantalla.");
+      alerta.error("No se pudo compartir el enlace", "Verifica los permisos del navegador e inténtalo nuevamente.");
     }
   };
 
