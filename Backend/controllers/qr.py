@@ -28,7 +28,7 @@ logger = logging.getLogger("qr")
 
 # DEFAULT_DURATION_MINUTES = 30
 # FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
-
+#errores
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 def _now_utc() -> datetime:
