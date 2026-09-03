@@ -25,3 +25,10 @@ class ActualizarClase(BaseModel):
     nombre: str
     fecha_limite_matriculacion: Optional[str] = None
     resetear_codigo: Optional[bool] = False
+
+class ActualizarFechaClase(BaseModel):
+    id: int
+    fecha_limite_matriculacion: str
+
+class ActualizarEstadoMatricula(BaseModel):
+    activa: bool

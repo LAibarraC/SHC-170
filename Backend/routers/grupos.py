@@ -5,7 +5,10 @@ from models import Usuario
 from middlewares.auth import get_current_user, require_role
 
 # Importamos los validadores y el controlador
-from validators.grupos import NuevaClase, UnirseClase, CambiarClase, AbandonarClase, ActualizarClase
+from validators.grupos import (
+    NuevaClase, UnirseClase, CambiarClase, AbandonarClase, ActualizarClase,
+    ActualizarFechaClase, ActualizarEstadoMatricula,
+)
 from controllers import grupos as grupos_controller
 
 router = APIRouter()
@@ -25,6 +28,26 @@ async def actualizar_clase(
     current_user: Usuario = Depends(require_role(["Docente", "Administrador"])),
 ):
     return await grupos_controller.actualizar_clase_db(db, datos, current_user)
+
+@router.put("/clases/{clase_id}/fecha-limite")
+async def actualizar_fecha_clase(
+    clase_id: int,
+    datos: ActualizarFechaClase,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(require_role(["Docente", "Administrador"])),
+):
+    if datos.id != clase_id:
+        datos.id = clase_id
+    return await grupos_controller.actualizar_fecha_clase_db(db, datos, current_user)
+
+@router.patch("/clases/{clase_id}/estado-matricula")
+async def actualizar_estado_matricula(
+    clase_id: int,
+    datos: ActualizarEstadoMatricula,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(require_role(["Docente", "Administrador"])),
+):
+    return await grupos_controller.actualizar_estado_matricula_db(db, clase_id, datos, current_user)
 
 @router.delete("/clases/{clase_id}/integrantes")
 async def resetear_integrantes_clase(

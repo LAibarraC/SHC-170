@@ -1,78 +1,198 @@
 import random
 import os
 import shutil
-from datetime import datetime
+import secrets
+from datetime import date, datetime, time
 import string
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, func
 from models import Clase, ClaseQR, Inscripcion, Usuario, Archivo, HistorialCalculo, Notificacion
-from validators.grupos import NuevaClase, UnirseClase, CambiarClase, ActualizarClase
+from validators.grupos import (
+    NuevaClase, UnirseClase, CambiarClase, ActualizarClase,
+    ActualizarFechaClase, ActualizarEstadoMatricula,
+)
+
+def _limite_fecha(fecha_limite):
+    if not fecha_limite:
+        return None
+    try:
+        return datetime.combine(
+            datetime.strptime(fecha_limite, "%Y-%m-%d").date(),
+            time.max,
+        )
+    except ValueError:
+        return None
 
 async def crear_clase_db(db: AsyncSession, datos: NuevaClase):
-    result = await db.execute(select(Usuario).filter(Usuario.email == datos.docente_email))
-    docente = result.scalars().first()
-    if not docente:
-        return JSONResponse(status_code=404, content={"error": "Docente no encontrado"})
+    try:
+        result = await db.execute(select(Usuario).filter(Usuario.email == datos.docente_email))
+        docente = result.scalars().first()
+        if not docente:
+            return JSONResponse(status_code=404, content={"error": "Docente no encontrado"})
 
-    prefijo = datos.nombre.replace(" ", "")[:3].upper()
-    prefijo = prefijo.ljust(3, 'X')
-    
-    codigo = f"{prefijo}-{random.randint(1000, 9999)}"
+        docente_id = docente.id
 
-    nueva_clase = Clase(
-        nombre=datos.nombre,
-        docente_id=docente.id,
-        codigo_acceso=codigo,
-        fecha_limite_matriculacion=datos.fecha_limite_matriculacion
-    )
-    db.add(nueva_clase)
-    await db.commit()
-    await db.refresh(nueva_clase)
-    return {"message": "Clase creada exitosamente", "codigo_acceso": codigo}
+        prefijo = datos.nombre.replace(" ", "")[:3].upper()
+        prefijo = prefijo.ljust(3, 'X')
+
+        codigo = f"{prefijo}-{random.randint(1000, 9999)}"
+
+        nueva_clase = Clase(
+            nombre=datos.nombre,
+            docente_id=docente_id,
+            codigo_acceso=codigo,
+            fecha_limite_matriculacion=datos.fecha_limite_matriculacion,
+            activa=True,
+        )
+        db.add(nueva_clase)
+        await db.flush()
+
+        # Generar y asociar automáticamente el código QR al crear la clase
+        token = secrets.token_urlsafe(32)
+        expiracion = _limite_fecha(datos.fecha_limite_matriculacion) or datetime.max
+        nuevo_qr = ClaseQR(
+            token=token,
+            clase_id=nueva_clase.id,
+            docente_id=docente_id,
+            fecha_expiracion=expiracion,
+            activo=True,
+        )
+        db.add(nuevo_qr)
+        await db.commit()
+        await db.refresh(nueva_clase)
+
+        return {
+            "message": "Clase creada exitosamente",
+            "id": nueva_clase.id,
+            "nombre": nueva_clase.nombre,
+            "codigo_acceso": codigo,
+            "activa": nueva_clase.activa,
+            "qr_token": token,
+        }
+    except Exception as e:
+        await db.rollback()
+        print(f"Error al crear clase: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Error al crear la clase: {str(e)}"})
 
 async def actualizar_clase_db(db: AsyncSession, datos: ActualizarClase, current_user: Usuario):
     if current_user.rol not in ("Docente", "Administrador"):
         return JSONResponse(status_code=403, content={"error": "No tienes autorización para actualizar clases"})
 
-    result = await db.execute(select(Clase).filter(Clase.id == datos.id))
-    clase = result.scalars().first()
+    try:
+        result = await db.execute(select(Clase).filter(Clase.id == datos.id))
+        clase = result.scalars().first()
+        if not clase:
+            return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
+        if current_user.rol != "Administrador" and clase.docente_id != current_user.id:
+            return JSONResponse(status_code=403, content={"error": "No tienes permisos sobre esta clase"})
+
+        clase_id = clase.id
+        docente_id = clase.docente_id
+
+        clase.nombre = datos.nombre
+        clase.fecha_limite_matriculacion = datos.fecha_limite_matriculacion
+
+        if datos.resetear_codigo:
+            caracteres_aleatorios = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            codigo_nuevo = f"MAT-{clase_id}-{caracteres_aleatorios}"
+
+            while True:
+                res = await db.execute(select(Clase).filter(Clase.codigo_acceso == codigo_nuevo))
+                if res.scalars().first() is None:
+                    break
+                caracteres_aleatorios = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+                codigo_nuevo = f"MAT-{clase_id}-{caracteres_aleatorios}"
+
+            clase.codigo_acceso = codigo_nuevo
+            # Un código nuevo invalida los enlaces QR anteriores de la misma clase.
+            qrs = (await db.execute(select(ClaseQR).filter(ClaseQR.clase_id == clase_id))).scalars().all()
+            for qr in qrs:
+                qr.activo = False
+
+            # Generar automáticamente nuevo QR activo para el código renovado
+            token_nuevo = secrets.token_urlsafe(32)
+            expiracion = _limite_fecha(clase.fecha_limite_matriculacion) or datetime.max
+            nuevo_qr = ClaseQR(
+                token=token_nuevo,
+                clase_id=clase_id,
+                docente_id=docente_id,
+                fecha_expiracion=expiracion,
+                activo=True,
+            )
+            db.add(nuevo_qr)
+
+        await db.commit()
+        await db.refresh(clase)
+
+        return {
+            "message": "Clase actualizada exitosamente",
+            "id": clase.id,
+            "nombre": clase.nombre,
+            "fecha_limite_matriculacion": clase.fecha_limite_matriculacion,
+            "codigo": clase.codigo_acceso,
+            "codigo_acceso": clase.codigo_acceso,
+            "activa": clase.activa,
+        }
+    except Exception as e:
+        await db.rollback()
+        print(f"Error al actualizar clase: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Error al actualizar la clase: {str(e)}"})
+
+async def actualizar_fecha_clase_db(db: AsyncSession, datos: ActualizarFechaClase, current_user: Usuario):
+    if current_user.rol not in ("Docente", "Administrador"):
+        return JSONResponse(status_code=403, content={"error": "No tienes autorización para actualizar la fecha"})
+    try:
+        fecha = datetime.strptime(datos.fecha_limite_matriculacion, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return JSONResponse(status_code=422, content={"error": "La fecha debe tener formato YYYY-MM-DD"})
+    if fecha < date.today():
+        return JSONResponse(status_code=400, content={"error": "La fecha límite no puede ser anterior a hoy"})
+
+    clase = (await db.execute(select(Clase).filter(Clase.id == datos.id))).scalars().first()
     if not clase:
         return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
     if current_user.rol != "Administrador" and clase.docente_id != current_user.id:
         return JSONResponse(status_code=403, content={"error": "No tienes permisos sobre esta clase"})
-    
-    clase.nombre = datos.nombre
     clase.fecha_limite_matriculacion = datos.fecha_limite_matriculacion
-    
-    if datos.resetear_codigo:
-        caracteres_aleatorios = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-        codigo_nuevo = f"MAT-{clase.id}-{caracteres_aleatorios}"
-        
-        while True:
-            res = await db.execute(select(Clase).filter(Clase.codigo_acceso == codigo_nuevo))
-            if res.scalars().first() is None:
-                break
-            caracteres_aleatorios = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-            codigo_nuevo = f"MAT-{clase.id}-{caracteres_aleatorios}"
-            
-        clase.codigo_acceso = codigo_nuevo
-        # Un código nuevo invalida los enlaces QR anteriores de la misma clase.
-        qrs = (await db.execute(select(ClaseQR).filter(ClaseQR.clase_id == clase.id))).scalars().all()
-        for qr in qrs:
-            qr.activo = False
-        
     await db.commit()
     await db.refresh(clase)
-    
     return {
-        "message": "Clase actualizada exitosamente",
+        "message": "Fecha límite actualizada exitosamente",
         "id": clase.id,
-        "nombre": clase.nombre,
         "fecha_limite_matriculacion": clase.fecha_limite_matriculacion,
-        "codigo_acceso": clase.codigo_acceso
+        "codigo": clase.codigo_acceso,
+        "codigo_acceso": clase.codigo_acceso,
+        "activa": clase.activa,
     }
+
+
+async def actualizar_estado_matricula_db(db: AsyncSession, clase_id: int, datos: ActualizarEstadoMatricula, current_user: Usuario):
+    if current_user.rol not in ("Docente", "Administrador"):
+        return JSONResponse(status_code=403, content={"error": "No tienes autorización para actualizar el estado"})
+    clase = (await db.execute(select(Clase).filter(Clase.id == clase_id))).scalars().first()
+    if not clase:
+        return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
+    if current_user.rol != "Administrador" and clase.docente_id != current_user.id:
+        return JSONResponse(status_code=403, content={"error": "No tienes permisos sobre esta clase"})
+    if datos.activa and clase.fecha_limite_matriculacion:
+        try:
+            if datetime.strptime(clase.fecha_limite_matriculacion, "%Y-%m-%d").date() < date.today():
+                return JSONResponse(status_code=400, content={"error": "No se puede abrir la matrícula con una fecha vencida"})
+        except ValueError:
+            return JSONResponse(status_code=422, content={"error": "La fecha límite almacenada no es válida"})
+    clase.activa = datos.activa
+    await db.commit()
+    await db.refresh(clase)
+    return {
+        "message": "Estado de matrícula actualizado",
+        "id": clase.id,
+        "codigo": clase.codigo_acceso,
+        "codigo_acceso": clase.codigo_acceso,
+        "activa": clase.activa,
+    }
+
 
 async def resetear_integrantes_clase_db(db: AsyncSession, clase_id: int, current_user: Usuario):
     result = await db.execute(select(Clase).filter(Clase.id == clase_id))
@@ -102,6 +222,8 @@ async def unirse_clase_db(db: AsyncSession, datos: UnirseClase):
     clase = result.scalars().first()
     if not clase:
         return JSONResponse(status_code=404, content={"error": "Código de clase inválido"})
+    if not clase.activa:
+        return JSONResponse(status_code=400, content={"error": "La matrícula de esta clase está cerrada"})
 
     if clase.fecha_limite_matriculacion:
         try:
@@ -113,13 +235,13 @@ async def unirse_clase_db(db: AsyncSession, datos: UnirseClase):
                 )
         except ValueError:
             pass
-        
+
     result = await db.execute(select(Inscripcion).filter(
         Inscripcion.clase_id == clase.id,
         Inscripcion.estudiante_id == estudiante.id
     ))
     inscrito = result.scalars().first()
-    
+
     if inscrito:
         return JSONResponse(status_code=409, content={"error": "Ya estás inscrito en esta clase"})
 
@@ -196,14 +318,14 @@ async def obtener_clases_docente_db(db: AsyncSession, email: str):
     result = await db.execute(select(Usuario).filter(Usuario.email == email))
     usuario = result.scalars().first()
     if not usuario: return []
-    
+
     if usuario.rol == "Administrador":
         result = await db.execute(select(Clase))
         clases = result.scalars().all()
     else:
         result = await db.execute(select(Clase).filter(Clase.docente_id == usuario.id))
         clases = result.scalars().all()
-        
+
     res_list = []
     for c in clases:
         res = await db.execute(select(Usuario).filter(Usuario.id == c.docente_id))
@@ -214,6 +336,8 @@ async def obtener_clases_docente_db(db: AsyncSession, email: str):
             "id": c.id,
             "nombre": c.nombre,
             "codigo": c.codigo_acceso,
+            "codigo_acceso": c.codigo_acceso,
+            "activa": c.activa,
             "alumnos": 0,
             "archivos": 0,
             "fecha_limite_matriculacion": c.fecha_limite_matriculacion,
@@ -226,10 +350,10 @@ async def obtener_clases_estudiante_db(db: AsyncSession, email: str):
     result = await db.execute(select(Usuario).filter(Usuario.email == email))
     estudiante = result.scalars().first()
     if not estudiante: return []
-    
+
     result = await db.execute(select(Inscripcion).filter(Inscripcion.estudiante_id == estudiante.id))
     inscripciones = result.scalars().all()
-    
+
     clases_inscritas = []
     for ins in inscripciones:
         res = await db.execute(select(Clase).filter(Clase.id == ins.clase_id))
@@ -239,6 +363,8 @@ async def obtener_clases_estudiante_db(db: AsyncSession, email: str):
                 "id": clase.id,
                 "nombre": clase.nombre,
                 "codigo": clase.codigo_acceso,
+                "codigo_acceso": clase.codigo_acceso,
+                "activa": clase.activa,
                 "fecha_limite_matriculacion": clase.fecha_limite_matriculacion
             })
     return clases_inscritas
@@ -248,34 +374,34 @@ async def eliminar_clase_db(db: AsyncSession, clase_id: int, user_email: str):
     usuario = result.scalars().first()
     if not usuario:
         return JSONResponse(status_code=404, content={"error": "Usuario no encontrado"})
-        
+
     result = await db.execute(select(Clase).filter(Clase.id == clase_id))
     clase = result.scalars().first()
     if not clase:
         return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
-        
+
     if usuario.rol != "Administrador" and clase.docente_id != usuario.id:
         return JSONResponse(
-            status_code=403, 
+            status_code=403,
             content={"error": "No tienes permisos para eliminar este curso. Solo el docente creador o un administrador pueden hacerlo."}
         )
-        
+
     try:
         await db.execute(delete(Inscripcion).filter(Inscripcion.clase_id == clase.id))
         await db.execute(delete(Archivo).filter(Archivo.clase_id == clase.id))
         await db.execute(delete(HistorialCalculo).filter(HistorialCalculo.clase_id == clase.id))
         await db.execute(delete(ClaseQR).filter(ClaseQR.clase_id == clase.id))
-        
+
         target_folder = os.path.join("excels", "_cursos", str(clase.id))
         if os.path.exists(target_folder):
             try:
                 shutil.rmtree(target_folder)
             except Exception as e:
                 print(f"Error al eliminar la carpeta física de la clase {clase.id}: {e}")
-                
+
         await db.delete(clase)
         await db.commit()
-        
+
         return {"message": "Curso eliminado exitosamente"}
     except Exception as e:
         await db.rollback()
@@ -287,18 +413,18 @@ async def obtener_estudiantes_clase_db(db: AsyncSession, clase_id: int, user_ema
     usuario = result.scalars().first()
     if not usuario:
         return JSONResponse(status_code=404, content={"error": "Usuario no encontrado"})
-        
+
     result = await db.execute(select(Clase).filter(Clase.id == clase_id))
     clase = result.scalars().first()
     if not clase:
         return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
-        
+
     if usuario.rol != "Administrador" and clase.docente_id != usuario.id:
         return JSONResponse(
-            status_code=403, 
+            status_code=403,
             content={"error": "No tienes permisos para ver los alumnos de esta clase"}
         )
-        
+
     result = await db.execute(select(Inscripcion).filter(Inscripcion.clase_id == clase_id))
     inscripciones = result.scalars().all()
     estudiantes_list = []
@@ -357,27 +483,27 @@ async def desmatricular_estudiante_db(db: AsyncSession, clase_id: int, estudiant
     usuario = result.scalars().first()
     if not usuario:
         return JSONResponse(status_code=404, content={"error": "Usuario no encontrado"})
-        
+
     result = await db.execute(select(Clase).filter(Clase.id == clase_id))
     clase = result.scalars().first()
     if not clase:
         return JSONResponse(status_code=404, content={"error": "Clase no encontrada"})
-        
+
     if usuario.rol != "Administrador" and clase.docente_id != usuario.id:
         return JSONResponse(
-            status_code=403, 
+            status_code=403,
             content={"error": "No tienes permisos para modificar esta clase"}
         )
-        
+
     result = await db.execute(select(Inscripcion).filter(
         Inscripcion.clase_id == clase_id,
         Inscripcion.estudiante_id == estudiante_id
     ))
     inscripcion = result.scalars().first()
-    
+
     if not inscripcion:
         return JSONResponse(status_code=404, content={"error": "Inscripción no encontrada"})
-        
+
     nombre_clase = clase.nombre
     await db.delete(inscripcion)
     db.add(Notificacion(
@@ -396,17 +522,17 @@ async def obtener_mis_clases_docente_db(db: AsyncSession, current_user: Usuario)
     else:
         result = await db.execute(select(Clase).filter(Clase.docente_id == current_user.id))
         clases = result.scalars().all()
-        
+
     res_list = []
     for c in clases:
         res = await db.execute(select(Usuario).filter(Usuario.id == c.docente_id))
         docente_creador = res.scalars().first()
         docente_nombre = docente_creador.nombre if docente_creador else "Desconocido"
         docente_email = docente_creador.email if docente_creador else ""
-        
+
         count_res = await db.execute(select(func.count()).select_from(Inscripcion).filter(Inscripcion.clase_id == c.id))
         alumnos_count = count_res.scalar()
-        
+
         res_list.append({
             "id": c.id,
             "nombre": c.nombre,
@@ -414,6 +540,7 @@ async def obtener_mis_clases_docente_db(db: AsyncSession, current_user: Usuario)
             "alumnos": alumnos_count,
             "archivos": 0,
             "fecha_limite_matriculacion": c.fecha_limite_matriculacion,
+            "activa": c.activa,
             "docente_nombre": docente_nombre,
             "docente_email": docente_email
         })
@@ -460,6 +587,7 @@ async def obtener_estadisticas_docente_db(db: AsyncSession, current_user: Usuari
                 "id": clases_filtradas[0].id,
                 "nombre": clases_filtradas[0].nombre,
                 "codigo": clases_filtradas[0].codigo_acceso,
+                "activa": clases_filtradas[0].activa,
                 "fecha_limite": clases_filtradas[0].fecha_limite_matriculacion
             }
         else:

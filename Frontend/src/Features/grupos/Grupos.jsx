@@ -211,6 +211,11 @@ export default function Grupos() {
         if (res.ok) {
           const data = await res.json();
           setMisCursos(data);
+          setCursoParaGestionar((prev) => {
+            if (!prev) return null;
+            const updated = data.find((c) => c.id === prev.id);
+            return updated ? { ...prev, ...updated } : prev;
+          });
         } else {
           console.error("Error loading docente classes:", res.status, res.statusText);
         }
@@ -235,9 +240,15 @@ export default function Grupos() {
       const listaQRs = await qrApi.listarMisQRs();
       const qrsPorClase = {};
       (listaQRs || []).forEach((qr) => {
-        // Conservar también QR vencidos/cerrados para que el docente pueda gestionarlos.
+        // Mostrar el QR activo de la clase; si no existe, conservar el más
+        // reciente para que el docente pueda gestionar el histórico.
         const anterior = qrsPorClase[qr.clase_id];
-        if (!anterior || new Date(qr.fecha_creacion) > new Date(anterior.fecha_creacion)) {
+        const debeReemplazar =
+          !anterior ||
+          (qr.activo && !anterior.activo) ||
+          (qr.activo === anterior.activo &&
+            new Date(qr.fecha_creacion) > new Date(anterior.fecha_creacion));
+        if (debeReemplazar) {
           qrsPorClase[qr.clase_id] = qr;
         }
       });
@@ -341,7 +352,8 @@ export default function Grupos() {
         setNuevoNombre("");
         setFechaLimiteMatriculacion("");
         setMostrarModal(false);
-        cargarCursos(); // Recargamos la lista desde la BD
+        await cargarCursos(); // Recargamos la lista desde la BD
+        await cargarQRsActivos(); // Recargamos los QRs activos inmediatamente
       } else {
         alerta.error("Error", data.error || "No se pudo crear la clase.");
       }
@@ -637,7 +649,14 @@ export default function Grupos() {
                 {currentCursos.map((curso) => {
                   const puedeGestionar = esAdmin || curso.docente_email === correoUsuario;
                   const qrDeCurso = obtenerQRActivoDeClase(curso.id);
-                  const qrHabilitado = Boolean(curso.codigo && qrDeCurso?.activo !== false && qrDeCurso);
+                  const fechaVencida = Boolean(
+                    curso.fecha_limite_matriculacion &&
+                    curso.fecha_limite_matriculacion < new Date().toISOString().slice(0, 10)
+                  );
+                  const matriculaCerrada = curso.activa === false || fechaVencida;
+                  const qrHabilitado = !matriculaCerrada && Boolean(
+                    (curso.codigo || curso.codigo_acceso) && qrDeCurso && qrDeCurso.activo !== false
+                  );
                   return (
                     <div key={curso.id} style={{ background: "var(--bg-card, white)", padding: "20px", borderRadius: "8px", border: "1px solid var(--border-color, #eee)", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "10px" }}>
@@ -653,7 +672,16 @@ export default function Grupos() {
                         )}
                       </div>
                       <p style={{ margin: "0 0 5px 0", color: "var(--text-muted, #666)" }}>
-                        <strong>Código de Matriculación:</strong> <span className="tour-curso-codigo" style={{ color: "var(--accent-color)", fontWeight: "bold" }}>{curso.codigo}</span>
+                        <strong>Código de Matriculación:</strong>{" "}
+                        <span
+                          className="tour-curso-codigo"
+                          style={{
+                            color: matriculaCerrada ? "#dc2626" : "var(--accent-color)",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {curso.codigo || curso.codigo_acceso || "Sin código"}
+                        </span>
                       </p>
                       {curso.fecha_limite_matriculacion && (
                         <p style={{ margin: "5px 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
@@ -1100,7 +1128,12 @@ export default function Grupos() {
             await cargarQRsActivos();
           }}
           onDesactivar={handleQRDesactivado}
-          onCursoActualizado={() => cargarCursos()}
+          onCursoActualizado={(actualizado) => {
+            if (actualizado) {
+              setCursoParaGestionar((prev) => (prev ? { ...prev, ...actualizado } : actualizado));
+            }
+            cargarCursos();
+          }}
         />
       )}
     </div>

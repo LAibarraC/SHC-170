@@ -40,7 +40,7 @@ origins = [
     "https://simulador-empresarial-swart.vercel.app", #por las dudas
     "http://10.250.54.12:5173",
     "http://10.250.50.52:5173",
-    "http://10.250.55.72:5173",
+    "http://10.250.48.29:5173",
 ]
 
 app.add_middleware(

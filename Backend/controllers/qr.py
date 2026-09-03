@@ -29,7 +29,7 @@ logger = logging.getLogger("qr")
 # DEFAULT_DURATION_MINUTES = 30
 # FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://10.250.55.72:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://10.250.48.29:5173")
 
 def _now_utc() -> datetime:
     """Devuelve el momento actual en UTC, naive para MySQL DateTime."""
@@ -52,7 +52,7 @@ def _limite_clase(fecha_limite: Optional[str]) -> Optional[datetime]:
 def _matricula_cerrada(clase: Clase, ahora: datetime) -> bool:
     """La matrícula se cierra sin depender de la tabla histórica de QR."""
     limite = _limite_clase(clase.fecha_limite_matriculacion)
-    return clase.codigo_acceso is None or (limite is not None and limite <= ahora)
+    return not clase.activa or clase.codigo_acceso is None or (limite is not None and limite <= ahora)
 
 
 def _build_url(token: str) -> str:
@@ -223,7 +223,7 @@ async def info_qr_db(db: AsyncSession, token: str):
     limite = _limite_clase(clase.fecha_limite_matriculacion)
     fecha_expiracion = _format_dt(limite)
 
-    if not qr.activo or clase.codigo_acceso is None:
+    if not qr.activo or not clase.activa or clase.codigo_acceso is None:
         return {
             "estado": "desactivado",
             "mensaje": "La matrícula fue cerrada por el docente.",
@@ -297,7 +297,7 @@ async def matricular_por_qr_db(
     if not qr.activo:
         return JSONResponse(
             status_code=400,
-            content={"error": "El código QR fue desactivado por el docente."},
+            content={"error": "Código de clase inválido"},
         )
     clase = (
         await db.execute(select(Clase).filter(Clase.id == qr.clase_id))
@@ -318,7 +318,7 @@ async def matricular_por_qr_db(
         return JSONResponse(
             status_code=400,
             content={
-                "error": f"El periodo de matriculación para este curso ha finalizado (Fecha límite: {fecha_limite or 'no definida'})."
+                "error": f"La matrícula de esta clase está cerrada"
             },
         )
 
@@ -423,9 +423,8 @@ async def cerrar_matricula_db(db: AsyncSession, clase_id: int, current_user: Usu
         return JSONResponse(status_code=404, content={"error": "Clase no encontrada."})
     if current_user.rol != "Administrador" and clase.docente_id != current_user.id:
         return JSONResponse(status_code=403, content={"error": "No tienes permisos sobre esta clase."})
-    clase.codigo_acceso = None
-    # El estado persistente de la matrícula es la ausencia del código de acceso.
-    # Los QRs históricos se conservan para poder gestionarlos al reabrirla.
+    clase.activa = False
+    # El código y los QRs son persistentes; solo se bloquea la matrícula.
     try:
         await db.commit()
         await db.refresh(clase)
@@ -437,8 +436,10 @@ async def cerrar_matricula_db(db: AsyncSession, clase_id: int, current_user: Usu
     return {
         "message": "Matrícula cerrada correctamente.",
         "id": clase.id,
+        "codigo": clase.codigo_acceso,
         "codigo_acceso": clase.codigo_acceso,
-        "cerrada": clase.codigo_acceso is None,
+        "activa": clase.activa,
+        "cerrada": not clase.activa,
     }
 
 
@@ -472,7 +473,7 @@ async def listar_qrs_docente_db(db: AsyncSession, current_user: Usuario):
                 "url": _build_url(qr.token),
                 "fecha_creacion": _format_dt(qr.fecha_creacion),
                 "fecha_expiracion": _format_dt(_limite_clase(clase.fecha_limite_matriculacion)),
-                "activo": qr.activo and clase.codigo_acceso is not None,
+                "activo": qr.activo,
                 "alumnos_inscritos": alumnos,
             }
         )

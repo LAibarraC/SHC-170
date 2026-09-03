@@ -47,13 +47,15 @@ export default function CentroControlCurso({
   const [desactivando, setDesactivando] = useState(false);
   const [nombreCurso, setNombreCurso] = useState(curso?.nombre || "");
   const [fechaLimite, setFechaLimite] = useState(curso?.fecha_limite_matriculacion || "");
-  const [codigoAcceso, setCodigoAcceso] = useState(curso?.codigo || null);
+  const [codigoAcceso, setCodigoAcceso] = useState(
+    curso?.codigo_acceso || curso?.codigo || null
+  );
   const [guardandoCurso, setGuardandoCurso] = useState(false);
   const [seccionActiva, setSeccionActiva] = useState("general");
   const [reseteandoCurso, setReseteandoCurso] = useState(false);
   const [actualizandoFecha, setActualizandoFecha] = useState(false);
   const [matriculaCerrada, setMatriculaCerrada] = useState(
-    !curso?.codigo || qrActivoProp?.activo === false
+    curso?.activa === false
   );
 
   // Datos del QR generado (o mostrado si viene en props)
@@ -75,21 +77,31 @@ export default function CentroControlCurso({
   const fechaVencida = Boolean(
     fechaLimite && fechaLimite < new Date().toISOString().slice(0, 10)
   );
+  const accesoCerrado = matriculaCerrada || fechaVencida;
 
   // ────────────── Efectos ──────────────
 
-  // Sincronizar estado cuando cambian las props
+  // Sincronizar los datos del curso cuando cambian las props.
+  // El QR se sincroniza por separado para no sobrescribir el QR recién
+  // regenerado con una prop antigua cuando el curso se actualiza.
   useEffect(() => {
-    if (curso) {
-      setNombreCurso(curso.nombre || "");
-      setFechaLimite(curso.fecha_limite_matriculacion || "");
-      setCodigoAcceso(curso.codigo || null);
-      setMatriculaCerrada(!curso.codigo || qrActivoProp?.activo === false);
+    if (!curso) return;
+    setNombreCurso(curso.nombre || "");
+    setFechaLimite(curso.fecha_limite_matriculacion || "");
+    const cod = curso.codigo_acceso || curso.codigo;
+    if (cod) {
+      setCodigoAcceso(cod);
     }
+    if (curso.activa !== undefined) {
+      setMatriculaCerrada(!curso.activa);
+    }
+  }, [curso]);
+
+  useEffect(() => {
     if (qrActivoProp !== undefined) {
       setQr(qrActivoProp);
     }
-  }, [curso, qrActivoProp]);
+  }, [qrActivoProp]);
 
   // Cerrar con tecla Escape
   useEffect(() => {
@@ -140,8 +152,9 @@ export default function CentroControlCurso({
         fechaLimite,
         false
       );
-      setCodigoAcceso(actualizado.codigo_acceso ?? codigoAcceso);
-      onCursoActualizado?.(actualizado);
+      const cod = actualizado.codigo_acceso || actualizado.codigo || codigoAcceso;
+      setCodigoAcceso(cod);
+      onCursoActualizado?.({ ...curso, ...actualizado, activa: !matriculaCerrada, codigo: cod, codigo_acceso: cod });
       alerta.success("Curso actualizado", "La información del curso se guardó correctamente.");
     } catch (e) {
       alerta.error("No se pudo guardar el curso", e.message || "Intenta nuevamente.");
@@ -174,16 +187,21 @@ export default function CentroControlCurso({
         alerta.error("Fecha requerida", "Selecciona una fecha límite para habilitar la matrícula.");
         return;
       }
+      if (fechaLimite < new Date().toISOString().slice(0, 10)) {
+        alerta.error(
+          "Fecha límite vencida",
+          "La fecha límite actual ya venció. Por favor actualiza la 'Fecha Límite de Matriculación' a una fecha futura antes de habilitar la matrícula."
+        );
+        return;
+      }
       setDesactivando(true);
       try {
-        // PUT persistente: genera un código de acceso nuevo y reabre la clase.
-        const actualizado = await api.actualizarClase(curso.id, curso.nombre, fechaLimite, true);
-        const nuevoQr = await qrApi.generarQR(curso.id);
-        setCodigoAcceso(actualizado.codigo_acceso ?? null);
-        setQr(nuevoQr);
+        const actualizado = await qrApi.actualizarEstadoMatricula(curso.id, true);
+        const cod = actualizado.codigo_acceso || actualizado.codigo || codigoAcceso;
+        setCodigoAcceso(cod);
         setMatriculaCerrada(false);
-        onCursoActualizado?.(actualizado);
-        onDesactivar?.();
+        setQr((qrActual) => (qrActual ? { ...qrActual, activo: true } : qrActual));
+        onCursoActualizado?.({ ...curso, ...actualizado, activa: true, codigo: cod, codigo_acceso: cod });
         alerta.success("Matrícula habilitada", "La matrícula volvió a estar disponible.");
       } catch (e) {
         alerta.error("No se pudo habilitar la matrícula", e.message || "Intenta nuevamente.");
@@ -206,12 +224,12 @@ export default function CentroControlCurso({
     if (!confirmado) return;
     setDesactivando(true);
     try {
-      const actualizado = await qrApi.cerrarMatricula(curso.id);
-      setCodigoAcceso(actualizado.codigo_acceso ?? null);
+      const actualizado = await qrApi.actualizarEstadoMatricula(curso.id, false);
+      const cod = actualizado.codigo_acceso || actualizado.codigo || codigoAcceso;
+      setCodigoAcceso(cod);
       setMatriculaCerrada(true);
-      // Reflejar también el estado del QR mostrado
-      setQr((qrActual) => (qrActual ? { ...qrActual, activo: false } : qrActual));
-      onCursoActualizado?.(actualizado);
+      // El QR permanece visible y reutilizable al reabrir; la clase bloquea el acceso.
+      onCursoActualizado?.({ ...curso, ...actualizado, activa: false, codigo: cod, codigo_acceso: cod });
       onDesactivar?.();
       alerta.success("Matrícula cerrada", "El estado se guardó correctamente en el servidor.");
     } catch (e) {
@@ -264,6 +282,10 @@ export default function CentroControlCurso({
   };
 
   const handleCopiarEnlace = async () => {
+    if (accesoCerrado) {
+      alerta.warning("Matrícula cerrada", "Este enlace QR ya no permite nuevas matrículas.");
+      return;
+    }
     const enlace = qr?.url;
     if (!enlace) {
       alerta.error("No se pudo copiar", "El enlace del código QR no está disponible.");
@@ -291,6 +313,10 @@ export default function CentroControlCurso({
   };
 
   const handleDescargar = () => {
+    if (accesoCerrado) {
+      alerta.warning("Matrícula cerrada", "El QR actual está deshabilitado. Abre la matrícula para generar uno nuevo.");
+      return;
+    }
     if (!qrContainerRef.current) return;
     const svg = qrContainerRef.current.querySelector("svg");
     if (!svg) {
@@ -344,11 +370,23 @@ export default function CentroControlCurso({
     setDesactivando(true);
     try {
       const actualizado = await api.actualizarClase(curso.id, curso.nombre, fechaLimite, true);
-      const nuevoQr = await qrApi.generarQR(curso.id);
-      setCodigoAcceso(actualizado.codigo_acceso ?? null);
+      const qrs = await qrApi.listarMisQRs();
+      const nuevoQr = qrs.find((item) => item.clase_id === curso.id && item.activo);
+      if (!nuevoQr) throw new Error("No se pudo generar el nuevo código QR.");
+      const cod = actualizado.codigo_acceso || actualizado.codigo;
+      setCodigoAcceso(cod);
       setQr(nuevoQr);
-      setMatriculaCerrada(false);
-      onCursoActualizado?.(actualizado);
+      // El backend activa la clase al regenerar el código. Mantener ambos
+      // estados alineados evita que el QR aparezca habilitado solo visualmente.
+      const claseActiva = actualizado.activa !== false;
+      setMatriculaCerrada(!claseActiva);
+      onCursoActualizado?.({
+        ...curso,
+        ...actualizado,
+        activa: claseActiva,
+        codigo: cod,
+        codigo_acceso: cod,
+      });
       alerta.success("Código actualizado", "El código anterior quedó inválido.");
     } catch (e) {
       alerta.error("No se pudo generar el código", e.message || "Intenta nuevamente.");
@@ -364,23 +402,16 @@ export default function CentroControlCurso({
     }
     setActualizandoFecha(true);
     try {
-      const actualizado = await api.actualizarClase(
-        curso.id,
-        curso.nombre,
-        fechaLimite,
-        matriculaCerrada
-      );
-      let qrActualizado = qr;
-      if (!qrActualizado) {
-        qrActualizado = await qrApi.generarQR(curso.id);
+      if (fechaLimite < new Date().toISOString().slice(0, 10)) {
+        alerta.error("Fecha inválida", "La fecha límite no puede ser anterior a hoy.");
+        return;
       }
-      setQr({ ...qrActualizado, activo: true, fecha_expiracion: `${fechaLimite} 23:59:59` });
-      setMatriculaCerrada(false);
-      onCursoActualizado?.(actualizado);
-      alerta.success(
-        "Fecha actualizada",
-        "La misma fecha límite se actualizó para el curso y el QR."
-      );
+      const actualizado = await api.actualizarFechaClase(curso.id, fechaLimite);
+      // Guardar la fecha no modifica ni el estado ni el QR existente.
+      const cod = actualizado.codigo_acceso || actualizado.codigo || codigoAcceso;
+      setCodigoAcceso(cod);
+      onCursoActualizado?.({ ...curso, ...actualizado, activa: !matriculaCerrada, codigo: cod, codigo_acceso: cod });
+      alerta.success("Fecha actualizada", "La fecha límite se guardó correctamente.");
     } catch (e) {
       alerta.error("No se pudo actualizar la fecha", e.message || "Intenta nuevamente.");
     } finally {
@@ -641,6 +672,7 @@ export default function CentroControlCurso({
                       onChange={(fecha) => setFechaLimite(dateAFechaIso(fecha))}
                       dateFormat="dd/MM/yyyy"
                       locale="es"
+                      minDate={new Date()}
                       placeholderText="dd/mm/aaaa"
                       isClearable
                       className="selector-fecha"
@@ -698,12 +730,12 @@ export default function CentroControlCurso({
                         style={{
                           padding: "4px 10px",
                           background: "var(--bg-card)",
-                          border: "1px solid var(--border-color)",
+                          border: `1px solid ${accesoCerrado ? "#dc2626" : "var(--border-color)"}`,
                           borderRadius: "4px",
                           fontFamily: "monospace",
                           fontSize: "1rem",
                           fontWeight: "bold",
-                          color: "var(--primary-color)",
+                          color: accesoCerrado ? "#dc2626" : "var(--primary-color)",
                           letterSpacing: "1px",
                         }}
                       >
@@ -905,118 +937,138 @@ export default function CentroControlCurso({
                ════════════════════════════════════════════════════════════════ */
             <section aria-labelledby="seccion-qr">
               {!qr ? (
-                <div style={{ textAlign: "center" }}>
-                  {/* 1. Encabezado de Acceso */}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      background: "var(--bg-input, #f9fafb)",
-                      borderRadius: "8px",
-                      border: "1px solid var(--border-color, #eee)",
-                      marginBottom: "16px",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                      textAlign: "left",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span
-                        style={{
-                          fontSize: "0.9rem",
-                          fontWeight: "600",
-                          color: "var(--text-muted)",
-                        }}
-                      >
-                        Código de acceso:
-                      </span>
-                      {codigoAcceso ? (
-                        <code
-                          style={{
-                            padding: "3px 8px",
-                            background: "var(--bg-card)",
-                            border: "1px solid var(--border-color)",
-                            borderRadius: "4px",
-                            fontFamily: "monospace",
-                            fontSize: "1rem",
-                            fontWeight: "bold",
-                            color: "var(--primary-color)",
-                            letterSpacing: "1px",
-                          }}
-                        >
-                          {codigoAcceso}
-                        </code>
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: "0.85rem",
-                            color: "var(--text-muted)",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          Sin código asignado
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleCopiarCodigo}
-                      disabled={!codigoAcceso}
+                generando ? (
+                  <div style={{ textAlign: "center", padding: "48px 20px" }}>
+                    <div
                       style={{
-                        padding: "7px 14px",
-                        background: "var(--bg-card)",
-                        color: "var(--text-main)",
-                        border: "1px solid var(--border-color)",
-                        borderRadius: "6px",
-                        cursor: !codigoAcceso ? "not-allowed" : "pointer",
-                        fontWeight: "bold",
-                        fontSize: "0.85rem",
-                        display: "inline-flex",
+                        display: "inline-block",
+                        width: "36px",
+                        height: "36px",
+                        border: "3px solid rgba(156, 163, 175, 0.3)",
+                        borderTopColor: "var(--accent-color)",
+                        borderRadius: "50%",
+                        animation: "spin 0.8s linear infinite",
+                        marginBottom: "14px",
+                      }}
+                    />
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", margin: 0, fontWeight: "500" }}>
+                      Generando código QR automáticamente…
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center" }}>
+                    {/* 1. Encabezado de Acceso */}
+                    <div
+                      style={{
+                        display: "flex",
                         alignItems: "center",
-                        gap: "6px",
+                        justifyContent: "space-between",
+                        padding: "12px 16px",
+                        background: "var(--bg-input, #f9fafb)",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border-color, #eee)",
+                        marginBottom: "16px",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                        textAlign: "left",
                       }}
                     >
-                      <Copiar width="15" height="15" /> Copiar código
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span
+                          style={{
+                            fontSize: "0.9rem",
+                            fontWeight: "600",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          Código de acceso:
+                        </span>
+                        {codigoAcceso ? (
+                          <code
+                            style={{
+                              padding: "3px 8px",
+                              background: "var(--bg-card)",
+                              border: `1px solid ${accesoCerrado ? "#dc2626" : "var(--border-color)"}`,
+                              borderRadius: "4px",
+                              fontFamily: "monospace",
+                              fontSize: "1rem",
+                              fontWeight: "bold",
+                              color: accesoCerrado ? "#dc2626" : "var(--primary-color)",
+                              letterSpacing: "1px",
+                            }}
+                          >
+                            {codigoAcceso}
+                          </code>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: "0.85rem",
+                              color: "var(--text-muted)",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            Sin código asignado
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleCopiarCodigo}
+                        disabled={!codigoAcceso}
+                        style={{
+                          padding: "7px 14px",
+                          background: "var(--bg-card)",
+                          color: "var(--text-main)",
+                          border: "1px solid var(--border-color)",
+                          borderRadius: "6px",
+                          cursor: !codigoAcceso ? "not-allowed" : "pointer",
+                          fontWeight: "bold",
+                          fontSize: "0.85rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <Copiar width="15" height="15" /> Copiar código
+                      </button>
+                    </div>
+
+                    <p style={{ color: "var(--text-muted)", marginTop: "20px" }}>
+                      El QR utilizará la fecha límite de matrícula del curso.
+                    </p>
+                    <p style={{ color: "var(--text-main)", fontWeight: "bold" }}>
+                      Válido hasta: {formatearFecha(fechaLimite)}
+                    </p>
+                    <button
+                      onClick={
+                        matriculaCerrada || fechaVencida ? handleCambiarEstado : handleGenerar
+                      }
+                      disabled={generando || desactivando}
+                      style={{
+                        width: "100%",
+                        padding: "12px 18px",
+                        background:
+                          generando || desactivando ? "#9ca3af" : "var(--accent-color)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: generando || desactivando ? "not-allowed" : "pointer",
+                        fontWeight: "bold",
+                        fontSize: "1rem",
+                        marginTop: "12px",
+                      }}
+                    >
+                      {generando
+                        ? "Generando…"
+                        : desactivando
+                          ? "Habilitando…"
+                          : matriculaCerrada || fechaVencida
+                            ? "Habilitar matrícula"
+                            : "Generar Código QR"}
                     </button>
                   </div>
-
-                  <p style={{ color: "var(--text-muted)", marginTop: "20px" }}>
-                    El QR utilizará la fecha límite de matrícula del curso.
-                  </p>
-                  <p style={{ color: "var(--text-main)", fontWeight: "bold" }}>
-                    Válido hasta: {formatearFecha(fechaLimite)}
-                  </p>
-                  <button
-                    onClick={
-                      matriculaCerrada || fechaVencida ? handleCambiarEstado : handleGenerar
-                    }
-                    disabled={generando || desactivando}
-                    style={{
-                      width: "100%",
-                      padding: "12px 18px",
-                      background:
-                        generando || desactivando ? "#9ca3af" : "var(--accent-color)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      cursor: generando || desactivando ? "not-allowed" : "pointer",
-                      fontWeight: "bold",
-                      fontSize: "1rem",
-                      marginTop: "12px",
-                    }}
-                  >
-                    {generando
-                      ? "Generando…"
-                      : desactivando
-                        ? "Habilitando…"
-                        : matriculaCerrada || fechaVencida
-                          ? "Habilitar matrícula"
-                          : "Generar Código QR"}
-                  </button>
-                </div>
+                )
               ) : (
                 /* ── ESTADO: POST-GENERACIÓN CON QR ACTIVO ── */
                 <div style={{ textAlign: "center" }}>
@@ -1051,12 +1103,12 @@ export default function CentroControlCurso({
                           style={{
                             padding: "3px 8px",
                             background: "var(--bg-card)",
-                            border: "1px solid var(--border-color)",
+                            border: `1px solid ${accesoCerrado ? "#dc2626" : "var(--border-color)"}`,
                             borderRadius: "4px",
                             fontFamily: "monospace",
                             fontSize: "1rem",
                             fontWeight: "bold",
-                            color: "var(--primary-color)",
+                            color: accesoCerrado ? "#dc2626" : "var(--primary-color)",
                             letterSpacing: "1px",
                           }}
                         >
@@ -1138,9 +1190,12 @@ export default function CentroControlCurso({
                       border: "1px solid var(--border-color)",
                       borderRadius: "8px",
                       margin: "6px auto",
+                      opacity: accesoCerrado ? 0.55 : 1,
+                      filter: accesoCerrado ? "grayscale(1)" : "none",
+                      pointerEvents: accesoCerrado ? "none" : "auto",
                     }}
                   >
-                    <QRCodeSVG value={qr.url} size={240} level="H" includeMargin={true} />
+                    <QRCodeSVG value={qr.url} size={320} level="M" includeMargin={true} />
                   </div>
 
                   {/* 4. Badge de Estado */}

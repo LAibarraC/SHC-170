@@ -51,6 +51,15 @@ export const qrApi = {
     return handle(res);
   },
 
+  actualizarEstadoMatricula: async (claseId, activa) => {
+    const res = await fetch(`${BASE_URL}/clases/${claseId}/estado-matricula`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...tokenHeader() },
+      body: JSON.stringify({ activa }),
+    });
+    return handle(res);
+  },
+
   cerrarMatricula: async (claseId) => {
     const res = await fetch(`${BASE_URL}/api/qr/cerrar-matricula/${claseId}`, {
       method: "PATCH",

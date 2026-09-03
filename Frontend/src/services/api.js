@@ -35,6 +35,20 @@ export const api = {
     return await res.json();
   },
 
+  actualizarFechaClase: async (id, fechaLimite) => {
+    const res = await fetch(`${BASE_URL}/clases/${id}/fecha-limite`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(localStorage.getItem("token") ? { Authorization: `Bearer ${localStorage.getItem("token")}` } : {}),
+      },
+      body: JSON.stringify({ id, fecha_limite_matriculacion: fechaLimite }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.detail || "No se pudo actualizar la fecha");
+    return data;
+  },
+
   actualizarClase: async (id, nombre, fechaLimite, resetearCodigo = false) => {
     const res = await fetch(`${BASE_URL}/actualizar_clase`, {
       method: "PUT",

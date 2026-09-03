@@ -270,7 +270,7 @@ export default function GenerarQR() {
                 margin: "10px auto",
               }}
             >
-              <QRCodeSVG value={qr.url} size={260} level="H" includeMargin={true} />
+              <QRCodeSVG value={qr.url} size={320} level="M" includeMargin={true} />
             </div>
 
             <div style={{ marginTop: "15px" }}>
