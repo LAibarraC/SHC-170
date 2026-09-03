@@ -386,6 +386,7 @@ async def eliminar_cuenta_logic(datos: UsuarioLogin, db: AsyncSession):
     await db.execute(delete(models.Inscripcion).filter(models.Inscripcion.estudiante_id == usuario.id))
     await db.execute(delete(models.HistorialCalculo).filter(models.HistorialCalculo.usuario_id == usuario.id))
     await db.execute(delete(models.Archivo).filter(models.Archivo.usuario_id == usuario.id))
+    await db.execute(delete(models.ClaseQR).filter(models.ClaseQR.docente_id == usuario.id))
     
     result = await db.execute(select(models.Clase).filter(models.Clase.docente_id == usuario.id))
     clases_docente = result.scalars().all()
@@ -393,6 +394,7 @@ async def eliminar_cuenta_logic(datos: UsuarioLogin, db: AsyncSession):
         await db.execute(delete(models.Inscripcion).filter(models.Inscripcion.clase_id == clase.id))
         await db.execute(delete(models.Archivo).filter(models.Archivo.clase_id == clase.id))
         await db.execute(delete(models.HistorialCalculo).filter(models.HistorialCalculo.clase_id == clase.id))
+        await db.execute(delete(models.ClaseQR).filter(models.ClaseQR.clase_id == clase.id))
         await db.delete(clase)
         
     await db.delete(usuario)
@@ -464,6 +466,7 @@ async def admin_eliminar_usuario_logic(email: str, db: AsyncSession, current_use
     await db.execute(delete(models.HistorialCalculo).filter(models.HistorialCalculo.usuario_id == usuario.id))
     await db.execute(delete(models.Archivo).filter(models.Archivo.usuario_id == usuario.id))
     await db.execute(delete(models.Notificacion).filter(models.Notificacion.usuario_id == usuario.id))
+    await db.execute(delete(models.ClaseQR).filter(models.ClaseQR.docente_id == usuario.id))
     
     result = await db.execute(select(models.Clase).filter(models.Clase.docente_id == usuario.id))
     clases_docente = result.scalars().all()
@@ -471,6 +474,7 @@ async def admin_eliminar_usuario_logic(email: str, db: AsyncSession, current_use
         await db.execute(delete(models.Inscripcion).filter(models.Inscripcion.clase_id == clase.id))
         await db.execute(delete(models.Archivo).filter(models.Archivo.clase_id == clase.id))
         await db.execute(delete(models.HistorialCalculo).filter(models.HistorialCalculo.clase_id == clase.id))
+        await db.execute(delete(models.ClaseQR).filter(models.ClaseQR.clase_id == clase.id))
         await db.delete(clase)
         
     await db.delete(usuario)

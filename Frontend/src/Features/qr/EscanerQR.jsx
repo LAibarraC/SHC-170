@@ -151,12 +151,14 @@ export default function EscanerQR({
       container.id = elementId;
       Object.assign(container.style, {
         position: "fixed",
-        width: "1px",
-        height: "1px",
+        width: "640px",
+        height: "640px",
         left: "-10000px",
         top: "-10000px",
         overflow: "hidden",
-        opacity: "0",
+        // Mantener dimensiones reales: html5-qrcode necesita un canvas con
+        // tamaño suficiente para detectar QRs pequeños o descargados.
+        opacity: "0.01",
         pointerEvents: "none",
       });
       document.body.appendChild(container);

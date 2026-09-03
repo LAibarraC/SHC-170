@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useData } from "../../components/Gestion_Datos/DataContext";
 import { alerta } from "../../utils/Notificaciones";
 import qrApi from "../../services/qrApi";
-import { CierreX, Regenerar, Desactivar, Graduacion } from "../../ui/iconos";
+import { CierreX, Regenerar, Graduacion } from "../../ui/iconos";
 
 /**
  * Pantalla a la que llega el estudiante tras escanear el QR del docente.
@@ -70,6 +70,14 @@ export default function Matricular() {
     };
     cargar();
   }, [token]);
+
+  // Un QR desactivado se informa mediante el toast estándar de la aplicación,
+  // incluso cuando el enlace se abrió desde la cámara nativa del dispositivo.
+  useEffect(() => {
+    if (info?.estado === "desactivado") {
+      alerta.warning("Matrícula cerrada", "La matrícula de esta clase está cerrada");
+    }
+  }, [info]);
 
   // 2. Si no hay sesión y el QR es válido, redirigir a Login preservando la URL.
   useEffect(() => {
@@ -175,24 +183,9 @@ export default function Matricular() {
   }
 
   if (info.estado === "desactivado") {
-    return (
-      <PantallaContenedor>
-        <EstadoMensaje
-          icono={<Desactivar width="40" height="40" style={{ color: "#6b7280" }} />}
-          titulo="QR desactivado"
-          mensaje="Este código QR fue desactivado por el docente y ya no permite nuevas matrículas."
-          color="#6b7280"
-          navigate={navigate}
-          datosAdicionales={
-            info.clase_nombre && (
-              <p style={{ margin: "5px 0", fontSize: "0.9rem" }}>
-                <strong>Asignatura:</strong> {info.clase_nombre}
-              </p>
-            )
-          }
-        />
-      </PantallaContenedor>
-    );
+    // El mensaje ya fue mostrado con alerta.warning; no renderizar el modal
+    // anterior ni duplicar la información en una tarjeta de estado.
+    return <PantallaContenedor />;
   }
 
   // info.estado === "valido"

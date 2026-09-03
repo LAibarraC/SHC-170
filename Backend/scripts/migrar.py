@@ -1,4 +1,9 @@
+import os
 import sys
+
+# Permite ejecutar el script desde cualquier directorio.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config.database import engine
 from sqlalchemy import text
 
@@ -13,7 +18,15 @@ try:
         else:
             print("La columna 'fecha_limite_matriculacion' ya existe en 'clases'.")
         
-        # 2. fecha_creacion en usuarios
+        # 2. estado persistente de la matrícula (no reutilizar codigo_acceso)
+        res = con.execute(text("SHOW COLUMNS FROM clases LIKE 'activa'"))
+        if not res.fetchone():
+            con.execute(text("ALTER TABLE clases ADD COLUMN activa TINYINT(1) NOT NULL DEFAULT 1;"))
+            print("Columna 'activa' agregada a 'clases'.")
+        else:
+            print("La columna 'activa' ya existe en 'clases'.")
+
+        # 3. fecha_creacion en usuarios
         res = con.execute(text("SHOW COLUMNS FROM usuarios LIKE 'fecha_creacion'"))
         if not res.fetchone():
             con.execute(text("ALTER TABLE usuarios ADD COLUMN fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP;"))
