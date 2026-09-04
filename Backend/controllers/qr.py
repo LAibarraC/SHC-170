@@ -30,7 +30,7 @@ logger = logging.getLogger("qr")
 
 #FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://10.250.55.72:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://simulador-empresarial-swart.vercel.app")
 
 def _now_utc() -> datetime:
     """Devuelve el momento actual en UTC, naive para MySQL DateTime."""

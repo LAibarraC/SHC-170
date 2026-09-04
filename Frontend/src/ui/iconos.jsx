@@ -278,8 +278,18 @@ export const IconoQr = ({ width = "20", height = "20", style, indicador = false 
         <rect x="3" y="14" width="7" height="7" />
         <line x1="14" y1="14" x2="14" y2="17" />
         <line x1="14" y1="20" x2="17" y2="20" />
-        <line x1="20" y1="14" x2="20" y2="17" />
         <line x1="20" y1="20" x2="21" y2="20" />
         {indicador && <circle cx="20" cy="5" r="3" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />}
+    </svg>
+);
+
+export const IconoDado = ({ width = "20", height = "20", style }) => (
+    <svg width={width} height={height} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <circle cx="8" cy="8" r="1.5"></circle>
+        <circle cx="16" cy="16" r="1.5"></circle>
+        <circle cx="16" cy="8" r="1.5"></circle>
+        <circle cx="8" cy="16" r="1.5"></circle>
+        <circle cx="12" cy="12" r="1.5"></circle>
     </svg>
 );

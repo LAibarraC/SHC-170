@@ -1,7 +1,7 @@
 import React from 'react';
 import { FONT, FS, RADIUS } from '../../Principal/Constantes';
 
-export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
+export default function ArbolProbabilidad({ resultado, ramas, causasBayes }) {
     if (!resultado || !ramas || ramas.length === 0) return null;
 
     const height = Math.max(400, ramas.length * 140);
@@ -25,6 +25,7 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
     });
 
     const width = Math.max(850, nodeBX + 150);
+    const hasBayesSelected = causasBayes && causasBayes.length > 0;
 
     return (
         <div style={{ width: '100%', height: '100%', padding: '0px' }}>
@@ -56,8 +57,8 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
                     const midX3 = (nodeAX + nodeBX - 70) / 2;
                     const midY3 = (nodeAY + nodeAY + 35) / 2;
 
-                    const isBayesTarget = causaBayes && rama.nombre === causaBayes;
-                    const isOtherBayes = causaBayes && rama.nombre !== causaBayes;
+                    const isBayesTarget = hasBayesSelected && causasBayes.includes(rama.nombre);
+                    const isOtherBayes = hasBayesSelected && !causasBayes.includes(rama.nombre);
 
                     // En lugar de usar un gris claro estático (veryDimColor) que falla en modo oscuro,
                     // usamos el color original pero bajamos la opacidad (transparencia) para un difuminado natural.
@@ -143,8 +144,8 @@ export default function ArbolProbabilidad({ resultado, ramas, causaBayes }) {
                         <text x={width / 2} y={legendY} textAnchor="middle" fontSize="12" fill="var(--text-muted)">
                             <tspan fill={defaultHighlightColor} fontWeight="bold">■ </tspan>
                             Rutas ponderadas que conforman la Probabilidad Total
-                            {causaBayes && (
-                                <tspan fill={bayesHighlightColor} fontWeight="bold"> | ■ Ruta evaluada con el Teorema de Bayes</tspan>
+                            {hasBayesSelected && (
+                                <tspan fill={bayesHighlightColor} fontWeight="bold"> | ■ Rutas evaluadas con el Teorema de Bayes</tspan>
                             )}
                         </text>
                     );

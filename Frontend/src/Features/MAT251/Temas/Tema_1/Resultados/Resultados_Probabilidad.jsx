@@ -2,17 +2,46 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FONT, FS, RADIUS, cardStyle, labelStyle } from '../../../Principal/Constantes';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import { IconoCalculadora, EditarDatos, ModificarSeleccion, IconoAlerta } from '../../../../../ui/iconos';
+import { IconoCalculadora, EditarDatos, ModificarSeleccion, IconoAlerta, IconoDado } from '../../../../../ui/iconos';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from "@dnd-kit/sortable";
+import MarcoWidgetMAT251 from '../../../ui/MarcoWidgetMAT251';
 
 export default function ResultadosProbabilidad({
     statsDatos, abrirEditor, valoresUnicos, statsEventos, setModalEvento,
     eventoFavorable, setEventoFavorable, ejecutar, resProbabilidad, setResProbabilidad, formulaProbRef, inputDatos,
     tipo = 'clasica',
     eventoCondicion = [], setModalCondicion = () => { },
-    colProbClasica, setColProbClasica, varSeleccionada
+    colProbClasica, setColProbClasica, varSeleccionada,
+    inputMode, setInputMode
 }) {
     const [isDropdownColOpen, setIsDropdownColOpen] = useState(false);
     const dropdownColRef = useRef(null);
+
+    // Estados para el Simulador Frecuentista
+    const [iteracionesN, setIteracionesN] = useState(1000);
+    const [simulacionActiva, setSimulacionActiva] = useState(false);
+    const [datosSimulacion, setDatosSimulacion] = useState([]);
+    const [resultadoFrecuentista, setResultadoFrecuentista] = useState(null);
+
+    const [ordenWidgets, setOrdenWidgets] = useState(['w-frecuentista']);
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (!over) return;
+        if (active.id !== over.id) {
+            setOrdenWidgets((items) => {
+                const oldIndex = items.indexOf(active.id);
+                const newIndex = items.indexOf(over.id);
+                return arrayMove(items, oldIndex, newIndex);
+            });
+        }
+    };
 
     useEffect(() => {
         const handler = (e) => {
@@ -57,7 +86,6 @@ export default function ResultadosProbabilidad({
 
     const labels = getLabels();
 
-    const [inputMode, setInputMode] = useState('matriz'); // 'matriz' | 'manual'
     const [manualN, setManualN] = useState('');
     const [manualF, setManualF] = useState('');
 
@@ -98,36 +126,102 @@ export default function ResultadosProbabilidad({
         return resProbabilidad;
     })();
 
-    // Renderizar KaTeX localmente para modo manual y modo matriz
-    useEffect(() => {
-        if (formulaProbRef.current && activeRes) {
-            let latex = '';
-            if (inputMode === 'manual') {
-                if (isCond) {
-                    latex = `P(A|B)=\\dfrac{P(AB)}{P(B)}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
-                } else if (isFrec) {
-                    latex = `P(E)=\\dfrac{f}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
-                } else {
-                    latex = `P(E)=\\dfrac{k}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
-                }
-            } else {
-                if (isFrec) {
-                    latex = `P(E)=\\dfrac{f}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
-                } else if (isCond) {
-                    latex = `P(A|B)=\\dfrac{P(AB)}{P(B)}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
-                } else if (tipo === 'total') {
-                    latex = `P(A) = \\sum_{i} P(A|B_i)P(B_i) = ${activeRes.probabilidadDecimal}`;
-                } else {
-                    latex = `P(E)=\\dfrac{k}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
-                }
-            }
-            try {
-                katex.render(latex, formulaProbRef.current, { throwOnError: false, displayMode: true });
-            } catch (e) {
-                console.error("Error al renderizar KaTeX:", e);
+    const handleEjecutarSimulacion = () => {
+        if (eventoFavorable.length === 0) {
+            alert("Selecciona un evento de interés primero.");
+            return;
+        }
+        if (!inputDatos) {
+            alert("No hay datos en el espacio muestral.");
+            return;
+        }
+
+        let arr = inputDatos.split(',').map(d => d.trim()).filter(Boolean);
+        if (varSeleccionada?.nombresColumnas?.length > 1 && colProbClasica) {
+            const colIdx = varSeleccionada.nombresColumnas.indexOf(colProbClasica);
+            if (colIdx !== -1) {
+                arr = arr.map(row => {
+                    const partes = row.split(' | ').map(p => p.trim());
+                    return partes[colIdx];
+                }).filter(Boolean);
             }
         }
-    }, [activeRes, inputMode, tipo, formulaProbRef, isFrec, isCond]);
+
+        const totalIteraciones = parseInt(iteracionesN) || 1000;
+        const favorablesTeoricos = arr.filter(v => eventoFavorable.includes(v)).length;
+        const probTeorica = arr.length > 0 ? favorablesTeoricos / arr.length : 0;
+
+        let contadorFavorables = 0;
+        const history = [];
+        const step = Math.max(1, Math.floor(totalIteraciones / 100));
+
+        for (let i = 1; i <= totalIteraciones; i++) {
+            const randomIndex = Math.floor(Math.random() * arr.length);
+            if (eventoFavorable.includes(arr[randomIndex])) {
+                contadorFavorables++;
+            }
+            if (i === totalIteraciones || i % step === 0) {
+                history.push({
+                    iteracion: i,
+                    empirica: contadorFavorables / i,
+                    teorica: probTeorica
+                });
+            }
+        }
+
+        setResultadoFrecuentista({
+            f: contadorFavorables,
+            N: totalIteraciones,
+            probDecimal: (contadorFavorables / totalIteraciones).toFixed(4),
+            probPorcentaje: ((contadorFavorables / totalIteraciones) * 100).toFixed(2),
+            evento: eventoFavorable.join(', ')
+        });
+        setDatosSimulacion(history);
+        setSimulacionActiva(true);
+    };
+
+    // Renderizar KaTeX localmente para modo manual y modo matriz
+    useEffect(() => {
+        if (formulaProbRef.current) {
+            if (isFrec && resultadoFrecuentista && inputMode === 'simulacion') {
+                const latex = `P(E)=\\dfrac{f}{N}=\\dfrac{${resultadoFrecuentista.f}}{${resultadoFrecuentista.N}}=${resultadoFrecuentista.probDecimal}`;
+                try {
+                    katex.render(latex, formulaProbRef.current, { throwOnError: false, displayMode: true });
+                } catch (e) {
+                    console.error("Error al renderizar KaTeX:", e);
+                }
+                return;
+            }
+
+            if (activeRes) {
+                let latex = '';
+                if (inputMode === 'manual') {
+                    if (isCond) {
+                        latex = `P(A|B)=\\dfrac{P(AB)}{P(B)}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
+                    } else if (isFrec) {
+                        latex = `P(E)=\\dfrac{f}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
+                    } else {
+                        latex = `P(E)=\\dfrac{k}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
+                    }
+                } else {
+                    if (isFrec) {
+                        latex = `P(E)=\\dfrac{f}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
+                    } else if (isCond) {
+                        latex = `P(A|B)=\\dfrac{P(AB)}{P(B)}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
+                    } else if (tipo === 'total') {
+                        latex = `P(A) = \\sum_{i} P(A|B_i)P(B_i) = ${activeRes.probabilidadDecimal}`;
+                    } else {
+                        latex = `P(E)=\\dfrac{k}{n}=\\dfrac{${activeRes.casosFavorables}}{${activeRes.casosTotales}}=${activeRes.probabilidadDecimal}`;
+                    }
+                }
+                try {
+                    katex.render(latex, formulaProbRef.current, { throwOnError: false, displayMode: true });
+                } catch (e) {
+                    console.error("Error al renderizar KaTeX:", e);
+                }
+            }
+        }
+    }, [activeRes, inputMode, tipo, formulaProbRef, isFrec, isCond, resultadoFrecuentista]);
 
     return (
         <div style={{ marginTop: '15px', display: 'flex', flexDirection: 'column' }}>
@@ -152,6 +246,26 @@ export default function ResultadosProbabilidad({
                     >
                         Análisis de Matriz
                     </button>
+                    {isFrec && (
+                        <button
+                            type="button"
+                            className={`btn-tema1-borde ${inputMode === 'simulacion' ? 'active' : ''}`}
+                            onClick={() => setInputMode('simulacion')}
+                            style={{
+                                padding: '6px 16px',
+                                borderRadius: '6px',
+                                fontSize: FS.sm,
+                                fontWeight: 600,
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: inputMode === 'simulacion' ? 'var(--primary-color)' : 'transparent',
+                                color: inputMode === 'simulacion' ? '#fff' : 'var(--text-muted)',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Simulación
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={`btn-tema1-borde ${inputMode === 'manual' ? 'active' : ''}`}
@@ -175,7 +289,7 @@ export default function ResultadosProbabilidad({
 
             <div style={{ marginBottom: '12px' }}>
                 {inputMode === 'manual' ? (
-                    /* INTERFAZ PARA MODO MANUAL */ 
+                    /* INTERFAZ PARA MODO MANUAL */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '15px' }}>
                         <h4 style={{ marginBottom: '5px', fontSize: FS.sm, fontWeight: 700, color: 'var(--primary-color)' }}>Datos del Ejercicio</h4>
                         <div className="panel-inputs" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px', marginTop: 0, marginBottom: '15px', background: 'var(--bg-input)', padding: '20px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
@@ -273,7 +387,7 @@ export default function ResultadosProbabilidad({
                                 Editar Datos
                             </button>
                         </div>
-                        
+
                         {/* Selector de Columna (Solo si hay múltiples columnas y no es condicional) */}
                         {!isCond && varSeleccionada?.nombresColumnas && varSeleccionada.nombresColumnas.length > 1 && (
                             <div style={{ marginBottom: '15px' }}>
@@ -471,9 +585,33 @@ export default function ResultadosProbabilidad({
                             </div>
                         </div>
 
+                        {isFrec && inputMode === 'simulacion' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                                <label style={{ fontSize: FS.xs, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Número de Iteraciones (N)</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={iteracionesN}
+                                    onChange={(e) => setIteracionesN(e.target.value)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: RADIUS,
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-input)',
+                                        color: 'var(--text-color)',
+                                        fontSize: FS.sm,
+                                        outline: 'none',
+                                        width: '150px',
+                                        textAlign: 'center',
+                                        fontWeight: 600
+                                    }}
+                                />
+                            </div>
+                        )}
+
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', alignItems: 'center', justifyContent: 'center', display: 'flex' }}>
                             <button
-                                onClick={ejecutar}
+                                onClick={isFrec && inputMode === 'simulacion' ? handleEjecutarSimulacion : ejecutar}
                                 className="button_calcular btn-icon"
                                 style={{
                                     width: 'fit-content',
@@ -487,32 +625,97 @@ export default function ResultadosProbabilidad({
                                     gap: '10px'
                                 }}
                             >
-                                <IconoCalculadora />
-                                CALCULAR
+                                {isFrec && inputMode === 'simulacion' ? (
+                                    <>
+                                        <IconoDado />
+                                        EJECUTAR SIMULACIÓN
+                                    </>
+                                ) : (
+                                    <>
+                                        <IconoCalculadora />
+                                        CALCULAR
+                                    </>
+                                )}
                             </button>
                         </div>
                     </>
                 )}
 
                 {/* Resultado Math*/}
-                {activeRes && (
-                    <div style={{ marginTop: '20px' }}>
+                {(activeRes || (isFrec && resultadoFrecuentista && inputMode === 'simulacion')) && (
+                    <>
                         <div ref={formulaProbRef} style={{ overflowX: 'auto' }} />
                         <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' }}>
-                            {[
-                                ...(inputMode !== 'manual' ? [{ label: <>{(isCond || isFrec) ? 'Evento' : 'Eventos'} <InlineMath math={(isCond || isFrec) ? "A" : "E"} /></>, val: eventoFavorable.join(', ') }] : []),
-                                { label: <>{labels.tarjetaNumerador.text} <InlineMath math={labels.tarjetaNumerador.math} /></>, val: activeRes.casosFavorables },
-                                { label: <>{labels.tarjetaDenominador.text} <InlineMath math={labels.tarjetaDenominador.math} /></>, val: activeRes.casosTotales },
-                                ...(tipo === 'clasica' ? [] : [{ label: 'Decimal', val: activeRes.probabilidadDecimal }]),
-                                { label: 'Porcentaje', val: `${activeRes.probabilidadPorcentaje}%` },
-                            ].map(({ label, val }, i) => (
-                                <div key={i} style={{ padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
-                                    <p style={{ margin: 0, fontSize: FS.xs, color: 'var(--text-muted)' }}>{label}</p>
-                                    <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--primary-color)', fontSize: FS.md }}>{val}</p>
-                                </div>
-                            ))}
+                            {isFrec && resultadoFrecuentista && inputMode === 'simulacion' ? (
+                                <>
+                                    <div style={{ padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: FS.xs, color: 'var(--text-muted)' }}>Evento A</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--primary-color)', fontSize: FS.md }}>{resultadoFrecuentista.evento}</p>
+                                    </div>
+                                    <div style={{ padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: FS.xs, color: 'var(--text-muted)' }}>Frecuencia Empírica f</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--primary-color)', fontSize: FS.md }}>{resultadoFrecuentista.f}</p>
+                                    </div>
+                                    <div style={{ padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: FS.xs, color: 'var(--text-muted)' }}>Simulaciones N</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--primary-color)', fontSize: FS.md }}>{resultadoFrecuentista.N}</p>
+                                    </div>
+                                    <div style={{ padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: FS.xs, color: 'var(--text-muted)' }}>Porcentaje Empírico</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--primary-color)', fontSize: FS.md }}>{resultadoFrecuentista.probPorcentaje}%</p>
+                                    </div>
+                                </>
+                            ) : (
+                                [
+                                    ...(inputMode !== 'manual' ? [{ label: <>{(isCond || isFrec) ? 'Evento' : 'Eventos'} <InlineMath math={(isCond || isFrec) ? "A" : "E"} /></>, val: eventoFavorable.join(', ') }] : []),
+                                    { label: <>{labels.tarjetaNumerador.text} <InlineMath math={labels.tarjetaNumerador.math} /></>, val: activeRes?.casosFavorables },
+                                    { label: <>{labels.tarjetaDenominador.text} <InlineMath math={labels.tarjetaDenominador.math} /></>, val: activeRes?.casosTotales },
+                                    ...(tipo === 'clasica' ? [] : [{ label: 'Decimal', val: activeRes?.probabilidadDecimal }]),
+                                    { label: 'Porcentaje', val: `${activeRes?.probabilidadPorcentaje}%` },
+                                ].map(({ label, val }, i) => (
+                                    <div key={i} style={{ padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
+                                        <p style={{ margin: 0, fontSize: FS.xs, color: 'var(--text-muted)' }}>{label}</p>
+                                        <p style={{ margin: '4px 0 0', fontWeight: 700, color: 'var(--primary-color)', fontSize: FS.md }}>{val}</p>
+                                    </div>
+                                ))
+                            )}
                         </div>
-                    </div>
+
+                        {isFrec && simulacionActiva && datosSimulacion.length > 0 && inputMode === 'simulacion' && (
+                            <div style={{ marginTop: '20px' }}>
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                    <SortableContext items={ordenWidgets} strategy={rectSortingStrategy}>
+                                        {ordenWidgets.map((widgetId) => {
+                                            if (widgetId === 'w-frecuentista') {
+                                                return (
+                                                    <MarcoWidgetMAT251 key={widgetId} id={widgetId} titulo="Convergencia de la Probabilidad Empírica" anchoCompleto={true} alto="400px">
+                                                        <div style={{ width: '100%', height: '100%', minWidth: 0, padding: '15px' }}>
+                                                            <ResponsiveContainer>
+                                                                <LineChart data={datosSimulacion} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                                                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                                                                    <XAxis dataKey="iteracion" stroke="var(--text-muted)" fontSize={12} />
+                                                                    <YAxis domain={[0, 1]} stroke="var(--text-muted)" fontSize={12} />
+                                                                    <Tooltip
+                                                                        contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: '8px', color: 'var(--text-color)' }}
+                                                                        itemStyle={{ color: 'var(--primary-color)' }}
+                                                                        formatter={(value) => value.toFixed(4)}
+                                                                    />
+                                                                    <Legend wrapperStyle={{ fontSize: '12px', color: 'var(--text-color)' }} />
+                                                                    <ReferenceLine y={datosSimulacion[0]?.teorica} stroke="#10b981" strokeDasharray="5 5" label={{ position: 'top', value: 'Prob. Teórica', fill: '#10b981', fontSize: 12 }} />
+                                                                    <Line type="monotone" dataKey="empirica" name="Prob. Empírica" stroke="var(--primary-color)" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                                                                </LineChart>
+                                                            </ResponsiveContainer>
+                                                        </div>
+                                                    </MarcoWidgetMAT251>
+                                                );
+                                            }
+                                            return null;
+                                        })}
+                                    </SortableContext>
+                                </DndContext>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

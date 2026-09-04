@@ -47,26 +47,39 @@ export default function ResultadosReglaAdicion({
     const [manualPAndB, setManualPAndB] = useState('');
 
     // Extraer valores únicos para A y B
+    const pseudoVar = useMemo(() => {
+        if (varSeleccionada && varSeleccionada.nombresColumnas && varSeleccionada.nombresColumnas.length > 0) {
+            return varSeleccionada;
+        }
+        if (statsDatos?.total > 0) {
+            return {
+                nombre: 'Datos Manuales',
+                nombresColumnas: ['Valores']
+            };
+        }
+        return null;
+    }, [varSeleccionada, statsDatos]);
+
     const valoresUnicosA = useMemo(() => {
-        if (!varSeleccionada || !colA) return [];
-        const colIndex = varSeleccionada.nombresColumnas?.indexOf(colA);
+        if (!pseudoVar || !colA) return [];
+        const colIndex = pseudoVar.nombresColumnas?.indexOf(colA);
         if (colIndex === -1 || colIndex === undefined) return [];
         const vals = filas.map(f => f.valor.split(' | ').map(p => p.trim())[colIndex]).filter(Boolean);
         return [...new Set(vals)].sort();
-    }, [varSeleccionada, colA, filas]);
+    }, [pseudoVar, colA, filas]);
 
     const valoresUnicosB = useMemo(() => {
-        if (!varSeleccionada || !colB) return [];
-        const colIndex = varSeleccionada.nombresColumnas?.indexOf(colB);
+        if (!pseudoVar || !colB) return [];
+        const colIndex = pseudoVar.nombresColumnas?.indexOf(colB);
         if (colIndex === -1 || colIndex === undefined) return [];
         const vals = filas.map(f => f.valor.split(' | ').map(p => p.trim())[colIndex]).filter(Boolean);
         return [...new Set(vals)].sort();
-    }, [varSeleccionada, colB, filas]);
+    }, [pseudoVar, colB, filas]);
 
     const calcular = () => {
         if (inputMode === 'matriz') {
-            if (!varSeleccionada) {
-                setError("Importa una Matriz de Excel primero.");
+            if (!pseudoVar) {
+                setError("Importa una Matriz o agrega datos en el editor primero.");
                 setResultado(null);
                 return;
             }
@@ -76,7 +89,7 @@ export default function ResultadosReglaAdicion({
                 return;
             }
 
-            const res = calcularReglaAdicion(filas, varSeleccionada.nombresColumnas, colA, valA, colB, valB);
+            const res = calcularReglaAdicion(filas, pseudoVar.nombresColumnas, colA, valA, colB, valB);
             if (res.error) {
                 setError(res.error);
                 setResultado(null);
@@ -136,7 +149,7 @@ export default function ResultadosReglaAdicion({
             setError('');
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [colA, valA, colB, valB, varSeleccionada, filas, inputMode]);
+    }, [colA, valA, colB, valB, pseudoVar, filas, inputMode]);
 
     // Limpiar resultado al cambiar valores manuales (opcional pero buena UX)
     useEffect(() => {
@@ -238,7 +251,7 @@ export default function ResultadosReglaAdicion({
                             Definición de Eventos:
                         </h4>
 
-                        {varSeleccionada && varSeleccionada.nombresColumnas && varSeleccionada.nombresColumnas.length > 0 ? (
+                        {pseudoVar && pseudoVar.nombresColumnas && pseudoVar.nombresColumnas.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end', background: 'var(--bg-input)', padding: '15px', borderRadius: RADIUS, border: '1px solid var(--border-color)' }}>
                                 {/* EVENTO A */}
                                 <div style={{ flex: 1, minWidth: '200px' }}>
@@ -252,7 +265,7 @@ export default function ResultadosReglaAdicion({
                                         style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)', marginBottom: '8px' }}
                                     >
                                         <option value="">-- Seleccionar Variable --</option>
-                                        {varSeleccionada.nombresColumnas.filter(col => col !== colB).map(col => <option key={col} value={col}>{col}</option>)}
+                                        {pseudoVar.nombresColumnas.map(col => <option key={col} value={col}>{col}</option>)}
                                     </select>
 
                                     {colA && valoresUnicosA.length > 0 && (
@@ -283,7 +296,7 @@ export default function ResultadosReglaAdicion({
                                         style={{ width: '100%', borderRadius: RADIUS, padding: '8px', fontSize: FS.sm, border: '1px solid var(--border-color)', marginBottom: '8px' }}
                                     >
                                         <option value="">-- Seleccionar Variable --</option>
-                                        {varSeleccionada.nombresColumnas.filter(col => col !== colA).map(col => <option key={col} value={col}>{col}</option>)}
+                                        {pseudoVar.nombresColumnas.map(col => <option key={col} value={col}>{col}</option>)}
                                     </select>
 
                                     {colB && valoresUnicosB.length > 0 && (
@@ -307,20 +320,16 @@ export default function ResultadosReglaAdicion({
                                         onClick={calcular}
                                         className="button_calcular btn-icon"
                                         style={{ padding: '8px 25px', borderRadius: RADIUS, fontSize: FS.sm, fontWeight: 700, height: '36px', background: 'var(--primary-color)', color: 'white', border: 'none', cursor: 'pointer', width: 'fit-content' }}
-                                        disabled={!varSeleccionada || !colA || !valA || !colB || !valB}
+                                        disabled={!pseudoVar || !colA || !valA || !colB || !valB}
                                     >
                                         <IconoCalculadora />
                                         CALCULAR
                                     </button>
                                 </div>
                             </div>
-                        ) : varSeleccionada ? (
-                            <div style={{ padding: '10px', background: '#fee2e2', color: '#b91c1c', borderRadius: RADIUS, fontSize: FS.sm, marginBottom: '15px' }}>
-                                Para usar esta función, debes importar una "Matriz" que contenga columnas.
-                            </div>
                         ) : (
                             <p style={{ color: 'var(--text-muted)', fontSize: FS.sm }}>
-                                Importa una matriz en el panel izquierdo para comenzar.
+                                Importa una matriz o agrega datos en el panel superior para comenzar.
                             </p>
                         )}
                     </>
@@ -524,7 +533,7 @@ export default function ResultadosReglaAdicion({
                                 <span dangerouslySetInnerHTML={{ __html: katex.renderToString(`P(A \\cup B) = ${resultado.pAorB.toFixed(4)}`) }} />
                             </div>
                             <div style={{ fontSize: FS.sm, color: 'var(--text-main)', marginTop: '4px' }}>
-                                ({(resultado.pAorB * 100).toFixed(2)}% probabilidad conjunta)
+                                ({(resultado.pAorB * 100).toFixed(2)}% probabilidad de A o B)
                             </div>
                         </div>
                     </div>

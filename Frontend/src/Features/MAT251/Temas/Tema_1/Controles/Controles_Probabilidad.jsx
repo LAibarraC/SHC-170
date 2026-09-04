@@ -1,5 +1,5 @@
 import React from 'react';
-import {FONT, FS, RADIUS, labelStyle } from '../../../Principal/Constantes';
+import { FONT, FS, RADIUS, labelStyle } from '../../../Principal/Constantes';
 
 export default function ControlesProbabilidad({ variables, varSeleccionada, setVarSeleccionada, cargarVariable, deseleccionarVariable }) {
 
@@ -35,7 +35,7 @@ export default function ControlesProbabilidad({ variables, varSeleccionada, setV
                     background: #ff6e00 !important;
                 }
             `}</style>
-            
+
             <div style={{ border: '1px solid var(--border-color)', borderRadius: RADIUS, padding: '10px', background: 'var(--bg-card)', marginBottom: '15px' }}>
                 <h4 style={{ margin: '0 0 10px', fontSize: FS.sm, fontWeight: 600 }}>Selecciona una Variable:</h4>
                 {variables && variables.filter(v => v.datos && v.datos.length > 0).length > 0 ? (
@@ -44,10 +44,10 @@ export default function ControlesProbabilidad({ variables, varSeleccionada, setV
                             const isSelected = varSeleccionada && varSeleccionada.nombre === v.nombre;
                             return (
                                 <div key={i} onClick={() => handleSeleccionar(v)}
-                                    style={{ 
-                                        padding: '8px 12px', borderRadius: RADIUS, cursor: 'pointer', 
-                                        border: isSelected ? '2px solid var(--primary-color)' : '1px solid var(--border-color)', 
-                                        background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-body)', 
+                                    style={{
+                                        padding: '8px 12px', borderRadius: RADIUS, cursor: 'pointer',
+                                        border: isSelected ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
+                                        background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-body)',
                                         transition: 'all 0.2s',
                                         display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end'
                                     }}

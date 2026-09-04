@@ -165,7 +165,7 @@ export const calcularProbabilidadTotalParticion = (arr, nombresColumnas, columna
     if (!arr || arr.length === 0) return null;
     if (!nombresColumnas) return { error: 'La variable de estratificación/partición requiere una matriz con columnas.' };
     if (!columnaParticion) return { error: 'Selecciona una variable (columna) de partición B_i' };
-    
+
     const eventosFav = Array.isArray(eventoFavorable) ? eventoFavorable : [];
     if (eventosFav.length === 0) {
         return { error: 'Selecciona al menos un Evento de Interés (A)' };
@@ -221,7 +221,7 @@ export const calcularReglaAdicion = (filas, nombresColumnas, colA, valA, colB, v
     }
     const idxA = nombresColumnas.indexOf(colA);
     const idxB = nombresColumnas.indexOf(colB);
-    
+
     if (idxA === -1 || idxB === -1) {
         return { error: "Columnas no encontradas en la matriz." };
     }
@@ -255,14 +255,14 @@ export const calcularReglaAdicion = (filas, nombresColumnas, colA, valA, colB, v
 
     return {
         resultado: {
-            total, 
-            countA, 
-            countB, 
-            countAandB, 
+            total,
+            countA,
+            countB,
+            countAandB,
             countAorB: countA + countB - countAandB,
-            pA, 
-            pB, 
-            pAandB, 
+            pA,
+            pB,
+            pAandB,
             pAorB,
             nameA: valA,
             nameB: valB
@@ -276,7 +276,7 @@ export const calcularReglaMultiplicacion = (filas, nombresColumnas, colA, valA, 
     }
     const idxA = nombresColumnas.indexOf(colA);
     const idxB = nombresColumnas.indexOf(colB);
-    
+
     if (idxA === -1 || idxB === -1) {
         return { error: "Columnas no encontradas en la matriz." };
     }
@@ -302,7 +302,7 @@ export const calcularReglaMultiplicacion = (filas, nombresColumnas, colA, valA, 
     });
 
     const pA = countA / totalA;
-    
+
     let totalB = totalA;
     let countB = countB_inicial;
 
@@ -321,12 +321,12 @@ export const calcularReglaMultiplicacion = (filas, nombresColumnas, colA, valA, 
 
     return {
         resultado: {
-            totalA, 
+            totalA,
             totalB,
-            countA, 
+            countA,
             countB,
-            pA, 
-            pB, 
+            pA,
+            pB,
             pAandB,
             nameA: valA,
             nameB: valB
@@ -416,13 +416,13 @@ export const calcularMuestreo = (filas, nombresColumnas, metodoMuestreo, tamanoM
         const countPob = {};
         const countMue = {};
         const hasCols = nombresColumnas && nombresColumnas.length > 0;
-        
+
         let colIdxChart = 0;
         if (hasCols && varEstratificacion) {
             const idx = nombresColumnas.indexOf(varEstratificacion);
             if (idx !== -1) colIdxChart = idx;
         }
-        
+
         filas.forEach(f => {
             const valorDinamico = hasCols ? f.valor.split(' | ')[colIdxChart].trim() : f.valor.trim();
             if (valorDinamico) countPob[valorDinamico] = (countPob[valorDinamico] || 0) + 1;
@@ -442,7 +442,7 @@ export const calcularMuestreo = (filas, nombresColumnas, metodoMuestreo, tamanoM
 
     } else if (metodoMuestreo === 'estratificado') {
         const selectedVariable = varEstratificacion; // Renombrado para la lógica dinámica
-        
+
         if (!selectedVariable) {
             return { error: "Selecciona una variable para estratificar." };
         }
@@ -511,7 +511,7 @@ export const calcularMuestreo = (filas, nombresColumnas, metodoMuestreo, tamanoM
             return { error: `La muestra (n=${n}) es demasiado grande para la población (N=${N}). Ajusta el tamaño de la muestra.` };
         }
         r = Math.floor(Math.random() * k) + 1;
-        
+
         for (let i = 0; i < n; i++) {
             const index = (r - 1) + (i * k);
             if (index < N) {
@@ -522,13 +522,13 @@ export const calcularMuestreo = (filas, nombresColumnas, metodoMuestreo, tamanoM
         const countPob = {};
         const countMue = {};
         const hasCols = nombresColumnas && nombresColumnas.length > 0;
-        
+
         let colIdxChart = 0;
         if (hasCols && varEstratificacion) {
             const idx = nombresColumnas.indexOf(varEstratificacion);
             if (idx !== -1) colIdxChart = idx;
         }
-        
+
         filas.forEach(f => {
             const valorDinamico = hasCols ? f.valor.split(' | ')[colIdxChart].trim() : f.valor.trim();
             if (valorDinamico) countPob[valorDinamico] = (countPob[valorDinamico] || 0) + 1;
@@ -602,14 +602,14 @@ export const calcularDistribucionUniforme = (minVal, maxVal, inputMin, inputMax)
 
 export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo, parametroCalculo = 'media') => {
     if (!poblacionStr || poblacionStr.trim() === '') return { error: 'Ingresa la población.' };
-    
+
     const rawItems = poblacionStr.split(',').map(v => v.trim()).filter(v => v !== '');
     const poblacion = [];
-    
+
     for (const item of rawItems) {
         let label = '';
         let numStr = item;
-        
+
         if (item.includes('=')) {
             const parts = item.split('=');
             label = parts[0].trim();
@@ -653,15 +653,15 @@ export const calcularDistribucionMuestral = (poblacionStr, nStr, conReemplazo, p
                 numStr = parts[0];
             }
         }
-        
+
         const valor = parseFloat(numStr);
         if (!isNaN(valor)) {
             poblacion.push({ id: label || valor.toString(), valor: valor });
         }
     }
-    
+
     if (poblacion.length === 0) return { error: 'La población ingresada no tiene números válidos.' };
-    
+
     const n = parseInt(nStr);
     if (isNaN(n) || n <= 0) return { error: 'El tamaño de muestra (n) debe ser un número entero positivo.' };
     if (!conReemplazo && n > poblacion.length) return { error: 'El tamaño de muestra (n) no puede ser mayor a la población sin reemplazo.' };

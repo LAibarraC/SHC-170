@@ -57,25 +57,42 @@ const FormulaMatematica = ({ resultado }) => {
     );
 };
 
-const FormulaBayes = ({ resultado, ramaSeleccionada }) => {
+const FormulaBayes = ({ resultado, ramasSeleccionadas }) => {
     const formulaRef = useRef(null);
 
     useEffect(() => {
-        if (formulaRef.current && resultado && ramaSeleccionada) {
+        if (formulaRef.current && resultado && ramasSeleccionadas && ramasSeleccionadas.length > 0) {
             let formulaLatex = `\\displaystyle \\begin{aligned}\n`;
-            // Fórmula principal
-            formulaLatex += `P(\\text{${ramaSeleccionada.nombre}} | A) &= \\frac{P(\\text{${ramaSeleccionada.nombre}}) \\cdot P(A|\\text{${ramaSeleccionada.nombre}})}{P(A)} \\\\\n`;
             
-            // Cálculos más pequeños
-            formulaLatex += `\\footnotesize P(\\text{${ramaSeleccionada.nombre}} | A) &\\footnotesize = \\frac{${ramaSeleccionada.pA.toFixed(4)} \\cdot ${ramaSeleccionada.pB_A.toFixed(4)}}{${resultado.probB.toFixed(4)}} \\\\\n`;
-            formulaLatex += `\\footnotesize P(\\text{${ramaSeleccionada.nombre}} | A) &\\footnotesize = \\frac{${ramaSeleccionada.mult.toFixed(4)}}{${resultado.probB.toFixed(4)}} \\\\\n`;
-            const bayesVal = resultado.probB > 0 ? (ramaSeleccionada.mult / resultado.probB) : 0;
-            formulaLatex += `\\footnotesize P(\\text{${ramaSeleccionada.nombre}} | A) &\\footnotesize = \\mathbf{${bayesVal.toFixed(4)}}\n`;
+            const numRamas = ramasSeleccionadas.length;
+            const names = ramasSeleccionadas.map(r => `\\text{${r.nombre}}`);
+            const unionNames = names.join(' \\cup ');
+            
+            if (numRamas === 1) {
+                const r = ramasSeleccionadas[0];
+                formulaLatex += `P(${unionNames} | A) &= \\frac{P(${names[0]}) \\cdot P(A|${names[0]})}{P(A)} \\\\\n`;
+                formulaLatex += `\\footnotesize P(${unionNames} | A) &\\footnotesize = \\frac{${r.pA.toFixed(4)} \\cdot ${r.pB_A.toFixed(4)}}{${resultado.probB.toFixed(4)}} \\\\\n`;
+                formulaLatex += `\\footnotesize P(${unionNames} | A) &\\footnotesize = \\frac{${r.mult.toFixed(4)}}{${resultado.probB.toFixed(4)}} \\\\\n`;
+            } else {
+                formulaLatex += `P((${unionNames}) | A) &= \\frac{${names.map(n => `P(${n})P(A|${n})`).join(' + ')}}{P(A)} \\\\\n`;
+                const calcs = ramasSeleccionadas.map(r => `(${r.pA.toFixed(4)} \\cdot ${r.pB_A.toFixed(4)})`).join(' + ');
+                formulaLatex += `\\footnotesize P((${unionNames}) | A) &\\footnotesize = \\frac{${calcs}}{${resultado.probB.toFixed(4)}} \\\\\n`;
+                const mults = ramasSeleccionadas.map(r => r.mult.toFixed(4)).join(' + ');
+                formulaLatex += `\\footnotesize P((${unionNames}) | A) &\\footnotesize = \\frac{${mults}}{${resultado.probB.toFixed(4)}} \\\\\n`;
+                const sumMults = ramasSeleccionadas.reduce((sum, r) => sum + r.mult, 0);
+                formulaLatex += `\\footnotesize P((${unionNames}) | A) &\\footnotesize = \\frac{${sumMults.toFixed(4)}}{${resultado.probB.toFixed(4)}} \\\\\n`;
+            }
+            
+            const sumMults = ramasSeleccionadas.reduce((sum, r) => sum + r.mult, 0);
+            const bayesVal = resultado.probB > 0 ? (sumMults / resultado.probB) : 0;
+            const formatUnion = numRamas === 1 ? unionNames : `(${unionNames})`;
+            formulaLatex += `\\footnotesize P(${formatUnion} | A) &\\footnotesize = \\mathbf{${bayesVal.toFixed(4)}}\n`;
+            
             formulaLatex += `\\end{aligned}`;
 
             katex.render(formulaLatex, formulaRef.current, { throwOnError: false, displayMode: false });
         }
-    }, [resultado, ramaSeleccionada]);
+    }, [resultado, ramasSeleccionadas]);
 
     return (
         <div style={{ overflowX: 'auto', background: 'var(--bg-input)', border: '1px solid var(--border-color)', padding: '15px', borderRadius: RADIUS, textAlign: 'left' }}>
@@ -84,8 +101,8 @@ const FormulaBayes = ({ resultado, ramaSeleccionada }) => {
     );
 };
 
-// COMPONENTE SELECTOR PERSONALIZADO (Mismo estilo que en la Probabilidad)
-const CustomSelect = ({ value, onChange, options, placeholder, accentColor = 'var(--primary-color)' }) => {
+// COMPONENTE SELECTOR PERSONALIZADO (Adaptado para selección múltiple opcional)
+const CustomSelect = ({ value, onChange, options, placeholder, accentColor = 'var(--primary-color)', multiple = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef(null);
 
@@ -96,6 +113,41 @@ const CustomSelect = ({ value, onChange, options, placeholder, accentColor = 'va
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // Helper to format the displayed text when multiple
+    const getDisplayText = () => {
+        if (!multiple) return value || placeholder;
+        if (!value || value.length === 0) return placeholder;
+        if (value.length === 1) return value[0];
+        if (value.length === options.length && options.length > 0) return 'Todas las causas';
+        return value.join(' + ');
+    };
+
+    const handleOptionClick = (optValue, e) => {
+        if (!multiple) {
+            onChange(optValue);
+            setIsOpen(false);
+        } else {
+            // Lógica múltiple
+            e.stopPropagation();
+            if (optValue === '') { // Clear all
+                onChange([]);
+                return;
+            }
+            if (optValue === 'ALL') { // Select all
+                onChange(options.filter(o => o.value !== '' && o.value !== 'ALL').map(o => o.value));
+                return;
+            }
+            
+            let newValue = [...(value || [])];
+            if (newValue.includes(optValue)) {
+                newValue = newValue.filter(v => v !== optValue);
+            } else {
+                newValue.push(optValue);
+            }
+            onChange(newValue);
+        }
+    };
 
     return (
         <div ref={ref} style={{ position: 'relative', width: '100%', fontFamily: FONT }}>
@@ -115,10 +167,10 @@ const CustomSelect = ({ value, onChange, options, placeholder, accentColor = 'va
                     minHeight: '38px'
                 }}
             >
-                <span style={{ fontWeight: 500, color: value ? 'var(--text-color)' : 'var(--text-muted)' }}>
-                    {value || placeholder}
+                <span style={{ fontWeight: 500, color: (!multiple && value) || (multiple && value?.length > 0) ? 'var(--text-color)' : 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%' }}>
+                    {getDisplayText()}
                 </span>
-                <svg style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
 
             {isOpen && (
@@ -140,33 +192,43 @@ const CustomSelect = ({ value, onChange, options, placeholder, accentColor = 'va
                         </div>
                     )}
                     {options.map((opt, idx) => {
-                        const isSelected = value === opt.value;
+                        const isSelected = multiple ? (value || []).includes(opt.value) : value === opt.value;
+                        const isSpecial = opt.value === '' || opt.value === 'ALL';
+                        
                         return (
                             <div
                                 key={idx}
-                                onClick={() => {
-                                    onChange(opt.value);
-                                    setIsOpen(false);
-                                }}
+                                onClick={(e) => handleOptionClick(opt.value, e)}
                                 style={{
                                     padding: '10px 12px',
                                     cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
                                     background: 'transparent',
                                     borderBottom: idx < options.length - 1 ? '1px solid var(--border-color)' : 'none',
-                                    color: isSelected ? accentColor : 'var(--text-color)',
+                                    color: isSelected && !isSpecial ? accentColor : (isSpecial ? 'var(--text-muted)' : 'var(--text-color)'),
                                     fontSize: FS.sm,
-                                    fontWeight: isSelected ? 600 : 400
+                                    fontWeight: isSelected && !isSpecial ? 600 : 400
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!isSelected) e.currentTarget.style.background = 'var(--bg-body)';
+                                    if (!isSelected || isSpecial) e.currentTarget.style.background = 'var(--bg-body)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                    if (!isSelected || isSpecial) e.currentTarget.style.background = 'transparent';
                                 }}
                             >
-                                {opt.label}
-                                {isSelected && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    {multiple && !isSpecial && (
+                                        <div style={{
+                                            width: '16px', height: '16px', borderRadius: '4px', border: `1px solid ${isSelected ? accentColor : 'var(--text-muted)'}`,
+                                            background: isSelected ? accentColor : 'transparent',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                        }}>
+                                            {isSelected && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                        </div>
+                                    )}
+                                    <span style={{ fontStyle: isSpecial ? 'italic' : 'normal' }}>{opt.label}</span>
+                                </div>
+                                {!multiple && isSelected && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="20 6 9 17 4 12"></polyline></svg>}
                             </div>
                         );
                     })}
@@ -193,7 +255,7 @@ export default function ResultadosSimuladorTotal({
     ]);
 
     const [ordenWidgets, setOrdenWidgets] = useState(['w-arbol']);
-    const [causaBayes, setCausaBayes] = useState('');
+    const [causasBayes, setCausasBayes] = useState([]);
 
     // Mapear ramas manuales al formato del motor existente
     const { mappedRamas, mappedResultado } = useMemo(() => {
@@ -233,8 +295,8 @@ export default function ResultadosSimuladorTotal({
         const filtradas = manualBranches.filter(b => b.id !== id);
         setManualBranches(filtradas);
         const eliminada = manualBranches.find(b => b.id === id);
-        if (eliminada && causaBayes === eliminada.name) {
-            setCausaBayes('');
+        if (eliminada && causasBayes.includes(eliminada.name)) {
+            setCausasBayes(causasBayes.filter(c => c !== eliminada.name));
         }
     };
 
@@ -305,14 +367,14 @@ export default function ResultadosSimuladorTotal({
             setRamas(res.resultado.desglose);
             setResultadoSimulador(res.resultado);
             setErrorSimulador('');
-            setCausaBayes(''); // Reset Bayes when calculating again
+            setCausasBayes([]); // Reset Bayes when calculating again
         }
     };
 
     // Limpiar el resultado al cambiar parámetros para forzar uso del botón Calcular
     useEffect(() => {
         setResultadoSimulador(null);
-        setCausaBayes('');
+        setCausasBayes([]);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filas, colCausa, colEvento, valExito, varSeleccionada]);
 
@@ -699,31 +761,41 @@ export default function ResultadosSimuladorTotal({
                             </label>
                             <div style={{ maxWidth: '400px' }}>
                                 <CustomSelect
-                                    value={causaBayes}
-                                    onChange={(val) => setCausaBayes(val)}
+                                    value={causasBayes}
+                                    onChange={(val) => setCausasBayes(val)}
                                     options={[
-                                        { value: '', label: '-- Seleccionar Causa / Limpiar --' },
+                                        { value: 'ALL', label: 'Seleccionar Todas' },
+                                        { value: '', label: 'Limpiar Selección' },
                                         ...activeRamas.map(r => ({ value: r.nombre, label: r.nombre }))
                                     ]}
-                                    placeholder="-- Seleccionar Causa --"
+                                    placeholder="-- Seleccionar Causa(s) --"
+                                    multiple={true}
                                 />
                             </div>
                         </div>
 
-                        {causaBayes && (
+                        {causasBayes && causasBayes.length > 0 && (
                             <>
                                 <h4 style={{ color: 'var(--primary-color)', fontSize: FS.sm, margin: '15px 0 10px 0' }}>Desarrollo Matemático: Teorema de Bayes</h4>
-                                <FormulaBayes resultado={activeResultado} ramaSeleccionada={activeRamas.find(r => r.nombre === causaBayes)} />
+                                <FormulaBayes 
+                                    resultado={activeResultado} 
+                                    ramasSeleccionadas={activeRamas.filter(r => causasBayes.includes(r.nombre))} 
+                                />
 
                                 {(() => {
-                                    const rama = activeRamas.find(r => r.nombre === causaBayes);
-                                    if (!rama) return null;
-                                    const bayesResult = activeResultado.probB > 0 ? rama.mult / activeResultado.probB : 0;
+                                    const ramas = activeRamas.filter(r => causasBayes.includes(r.nombre));
+                                    if (ramas.length === 0) return null;
+                                    const sumMult = ramas.reduce((sum, r) => sum + r.mult, 0);
+                                    const bayesResult = activeResultado.probB > 0 ? sumMult / activeResultado.probB : 0;
+                                    
+                                    const names = ramas.map(r => `\\text{${r.nombre}}`).join(' \\cup ');
+                                    const formatUnion = ramas.length === 1 ? names : `(${names})`;
+                                    
                                     return (
                                         <div style={{ marginTop: '15px', padding: '15px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: RADIUS, textAlign: 'center' }}>
                                             <div 
                                                 style={{ fontSize: FS.lg, fontWeight: 'bold', color: 'var(--primary-color)' }}
-                                                dangerouslySetInnerHTML={{ __html: katex.renderToString(`P(\\text{${rama.nombre}} | A) = ${bayesResult.toFixed(4)}`) }}
+                                                dangerouslySetInnerHTML={{ __html: katex.renderToString(`P(${formatUnion} | A) = ${bayesResult.toFixed(4)}`) }}
                                             />
                                             <div style={{ fontSize: FS.sm, color: 'var(--text-main)', marginTop: '4px' }}>
                                                 ({(bayesResult * 100).toFixed(2)}% probabilidad)
@@ -735,7 +807,6 @@ export default function ResultadosSimuladorTotal({
                         )}
                     </div>
 
-
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={ordenWidgets} strategy={rectSortingStrategy}>
                             <div style={{ width: '100%', minWidth: 0 }}>
@@ -744,7 +815,7 @@ export default function ResultadosSimuladorTotal({
                                         return (
                                             <MarcoWidgetMAT251 key={id} id={id} titulo="Árbol de Probabilidad" anchoCompleto={true} alto={`${Math.max(400, activeRamas.length * 140) + 120}px`}>
                                                 <div style={{ width: '100%', height: '100%', minWidth: 0 }}>
-                                                    <ArbolProbabilidad resultado={activeResultado} ramas={activeRamas} causaBayes={causaBayes} />
+                                                    <ArbolProbabilidad resultado={activeResultado} ramas={activeRamas} causasBayes={causasBayes} />
                                                 </div>
                                             </MarcoWidgetMAT251>
                                         );

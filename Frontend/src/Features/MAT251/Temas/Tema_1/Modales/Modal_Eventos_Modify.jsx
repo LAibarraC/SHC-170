@@ -1,7 +1,7 @@
 import React from 'react';
 import { overlayStyle, modalBoxStyle, FS, RADIUS } from '../../../Principal/Constantes';
 
-export default function ModalEventosModify({ modalEvento, setModalEvento, statsEventos, statsEventosPorColumna, eventoFavorable, setEventoFavorable, setResProbabilidad, titulo }) {
+export default function ModalEventosModify({ modalEvento, setModalEvento, statsEventos, statsEventosPorColumna, eventoFavorable, setEventoFavorable, setResProbabilidad, titulo, mostrarFrecuencia = true }) {
     const [filtro, setFiltro] = React.useState('');
 
     if (!modalEvento) return null;
@@ -67,9 +67,11 @@ export default function ModalEventosModify({ modalEvento, setModalEvento, statsE
                     <div style={{ fontWeight: isSelected ? 700 : 500, fontSize: FS.sm, color: isSelected ? 'var(--primary-color)' : 'var(--text-main)' }}>
                         {valor}
                     </div>
-                    <div style={{ fontSize: FS.xs, color: 'var(--text-muted)', marginTop: '1px' }}>
-                        Aparece <strong>{count}</strong> {count === 1 ? 'vez' : 'veces'}
-                    </div>
+                    {mostrarFrecuencia && (
+                        <div style={{ fontSize: FS.xs, color: 'var(--text-muted)', marginTop: '1px' }}>
+                            Aparece <strong>{count}</strong> {count === 1 ? 'vez' : 'veces'}
+                        </div>
+                    )}
                 </div>
             </label>
         );

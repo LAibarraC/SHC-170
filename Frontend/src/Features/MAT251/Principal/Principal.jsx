@@ -62,8 +62,8 @@ import Controles_DistribucionDiscreta from '../Temas/Tema_2/Controles/Controles_
 import Resultados_DistribucionDiscreta from '../Temas/Tema_2/Resultados/Resultados_DistribucionDiscreta';
 //import Controles_Bivariante from '../Temas/Tema_2/Controles/Controles_Bivariante';
 //import Resultados_Bivariante from '../Temas/Tema_2/Resultados/Resultados_Bivariante';
-import Controles_ContinuaPlantilla from '../Temas/Tema_2/Controles/Controles_ContinuaPlantilla';
-import Resultados_ContinuaPlantilla from '../Temas/Tema_2/Resultados/Resultados_ContinuaPlantilla';
+import Controles_DistribucionContinua from '../Temas/Tema_2/Controles/Controles_DistribucionContinua';
+import Resultados_DistribucionContinua from '../Temas/Tema_2/Resultados/Resultados_DistribucionContinua';
 // import ControlDistribucionContinua from '../Temas/Tema_2/Controles/ControlDistribucionContinua';
 // import ControlDistribucionContinua_v2 from '../Temas/Tema_2/Controles/ControlDistribucionContinua_v2';
 // import ResultadoDistribucionContinua from '../Temas/Tema_2/Resultados/ResultadoDistribucionContinua';
@@ -87,8 +87,8 @@ const OpcionesHerramienta = [
     { id: 'dif_medias_desc', label: 'Distribución de la Diferencia de Medias Muestrales con Varianzas Desconocidas' },
     { id: 'razon_varianzas', label: 'Distribución de la Razón de dos Varianzas Muestrales' },
     { id: 'dif_proporciones', label: 'Distribución de la Diferencia entre dos Proporciones' }
-]; 
-         ///no jodas ia de mierdaa       
+];
+///no jodas ia de mierdaa       
 function CustomSelectHerramienta({ value, onChange }) {
     const [isOpen, setIsOpen] = useState(false);
     const selectRef = useRef(null);
@@ -230,6 +230,7 @@ export default function Principal() {
     const [modalEvento, setModalEvento] = useState(false);
     const [modalCondicion, setModalCondicion] = useState(false);
     const [filasTemp, setFilasTemp] = useState([]);   // copia editable en el modal
+    const [inputModeProb, setInputModeProb] = useState('matriz');
     const formulaProbRef = useRef(null);
 
     // ── Simulador Probabilidad Total ─────────────────────────────────────────────
@@ -621,6 +622,18 @@ export default function Principal() {
         return statsEventosPorColumna.filter(col => !columnasUsadasEnB.includes(col.nombre));
     }, [statsEventosPorColumna, eventoCondicion]);
 
+    // Filtrar la columna usada en el evento de interés (A) para que no aparezca en la condición (B)
+    const statsEventosPorColumnaParaB = useMemo(() => {
+        if (!statsEventosPorColumna) return null;
+        if (eventoFavorable.length === 0) return statsEventosPorColumna;
+
+        const columnasUsadasEnA = statsEventosPorColumna.filter(col =>
+            col.eventos.some(e => eventoFavorable.includes(e.valor))
+        ).map(col => col.nombre);
+
+        return statsEventosPorColumna.filter(col => !columnasUsadasEnA.includes(col.nombre));
+    }, [statsEventosPorColumna, eventoFavorable]);
+
     return (
         <div className={`calculadora-layout ${panelAbierto ? '' : 'colapsado'}`} style={{ position: 'relative', fontFamily: FONT }}>
             {/* Estilos locales para el grid y modal */}
@@ -727,11 +740,11 @@ export default function Principal() {
                             />
                         )}
                         {(operacion === 'probabilidad' || operacion === 'simulador_total' || operacion === 'regla_adicion' || operacion === 'regla_multiplicacion' || operacion === 'muestreo' || (operacion === 'distribuciones_muestrales' && modoMuestral === 'empirica') || operacion === 'tamanio_muestra' || operacion === 'dist_uniforme' || operacion === 'dist_continua' || operacion === 'esperanza_varianza' || operacion === 'momentos_asimetria' || operacion === 'modelos_discretos' || operacion === 'modelos_continuos' || operacion === 'dist_discreta') && (
-                            <ControlesProbabilidad 
-                                setModalVars={setModalVars} 
-                                varSeleccionada={varSeleccionada} 
-                                variables={variables} 
-                                cargarVariable={cargarVariable} 
+                            <ControlesProbabilidad
+                                setModalVars={setModalVars}
+                                varSeleccionada={varSeleccionada}
+                                variables={variables}
+                                cargarVariable={cargarVariable}
                                 setVarSeleccionada={setVarSeleccionada}
                                 deseleccionarVariable={deseleccionarVariable}
                             />
@@ -821,25 +834,25 @@ export default function Principal() {
                             />
                             <Resultados_DistribucionDiscreta resultados={datosDiscretos} />
                         </div>
-                    ) : operacion === 'dist_continua' ? (
+                    ) : operacion === 'dist_continua' || operacion === 'dist_continua_v2' ? (
                         <div className="tema2-container">
-                            {/* <ControlDistribucionContinua onCalcular={setDatosContinuos} />
-                            <ResultadoDistribucionContinua resultados={datosContinuos} /> */}
-                            <p style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Módulo en construcción...</p>
-                        </div>
-                    ) : operacion === 'dist_continua_v2' ? (
-                        <div className="tema2-container">
-                            <Controles_ContinuaPlantilla 
-                                onCalcular={(datos) => {
-                                    if (!datos) {
-                                        setDatosContinuosV2(null);
-                                        return;
-                                    }
-                                    const calculos = calcularContinuaPlantilla(datos.tipoFuncion, datos.a, datos.b, datos.n, datos.c);
-                                    setDatosContinuosV2(calculos);
-                                }}
-                            />
-                            <Resultados_ContinuaPlantilla resultados={datosContinuosV2} />
+                            <div style={{ padding: '0 20px 20px 20px' }}>
+                                <Controles_DistribucionContinua
+                                    onCalcular={(datos) => {
+                                        if (datos) {
+                                            setDatosContinuosV2(datos);
+                                        } else {
+                                            setDatosContinuosV2(null);
+                                        }
+                                    }}
+                                />
+
+                                {datosContinuosV2 && (
+                                    <div style={{ marginTop: '20px' }}>
+                                        <Resultados_DistribucionContinua resultados={datosContinuosV2} />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     ) : operacion === 'modelos_discretos' ? (
                         <div className="tema3-container">
@@ -958,97 +971,97 @@ export default function Principal() {
                                 <>
                                     <CustomSelectHerramienta value={distribucionActiva} onChange={setDistribucionActiva} />
                                     {distribucionActiva === 'normal' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_ProbabilidadMuestral onCalcular={setDatosProbMuestral} />
-                                        <div>
-                                            <GraficoProbabilidadMuestral resultados={datosProbMuestral} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_ProbabilidadMuestral resultados={datosProbMuestral} />
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_ProbabilidadMuestral onCalcular={setDatosProbMuestral} />
+                                            <div>
+                                                <GraficoProbabilidadMuestral resultados={datosProbMuestral} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_ProbabilidadMuestral resultados={datosProbMuestral} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'proporcion' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_Proporcion onCalcular={setDatosProporcion} />
-                                        <div>
-                                            <GraficoProporcion resultados={datosProporcion} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_Proporcion resultados={datosProporcion} />
+                                    ) : distribucionActiva === 'proporcion' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_Proporcion onCalcular={setDatosProporcion} />
+                                            <div>
+                                                <GraficoProporcion resultados={datosProporcion} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_Proporcion resultados={datosProporcion} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'dif_medias' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_DiferenciaMedias onCalcular={setDatosDiferenciaMedias} />
-                                        <div>
-                                            <GraficoDiferenciaMedias resultados={datosDiferenciaMedias} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_DiferenciaMedias resultados={datosDiferenciaMedias} />
+                                    ) : distribucionActiva === 'dif_medias' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_DiferenciaMedias onCalcular={setDatosDiferenciaMedias} />
+                                            <div>
+                                                <GraficoDiferenciaMedias resultados={datosDiferenciaMedias} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_DiferenciaMedias resultados={datosDiferenciaMedias} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'student' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_Student onCalcular={setDatosStudent} />
-                                        <div>
-                                            <GraficoStudent resultados={datosStudent} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_Student resultados={datosStudent} />
+                                    ) : distribucionActiva === 'student' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_Student onCalcular={setDatosStudent} />
+                                            <div>
+                                                <GraficoStudent resultados={datosStudent} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_Student resultados={datosStudent} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'chi' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_ChiCuadrada onCalcular={setDatosChiCuadrada} />
-                                        <div>
-                                            <GraficoChiCuadrada resultados={datosChiCuadrada} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_ChiCuadrada resultados={datosChiCuadrada} />
+                                    ) : distribucionActiva === 'chi' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_ChiCuadrada onCalcular={setDatosChiCuadrada} />
+                                            <div>
+                                                <GraficoChiCuadrada resultados={datosChiCuadrada} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_ChiCuadrada resultados={datosChiCuadrada} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'dif_medias_desc' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_DiferenciaMediasDesconocidas onCalcular={setDatosDifMediasDesc} />
-                                        <div>
-                                            {datosDifMediasDesc && (
-                                                datosDifMediasDesc.escenario === 'grandes' ? (
-                                                    <GraficoDiferenciaMedias resultados={datosDifMediasDesc} />
-                                                ) : (
-                                                    <GraficoStudent resultados={datosDifMediasDesc} />
-                                                )
-                                            )}
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_DiferenciaMediasDesconocidas resultados={datosDifMediasDesc} />
+                                    ) : distribucionActiva === 'dif_medias_desc' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_DiferenciaMediasDesconocidas onCalcular={setDatosDifMediasDesc} />
+                                            <div>
+                                                {datosDifMediasDesc && (
+                                                    datosDifMediasDesc.escenario === 'grandes' ? (
+                                                        <GraficoDiferenciaMedias resultados={datosDifMediasDesc} />
+                                                    ) : (
+                                                        <GraficoStudent resultados={datosDifMediasDesc} />
+                                                    )
+                                                )}
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_DiferenciaMediasDesconocidas resultados={datosDifMediasDesc} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'razon_varianzas' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_RazonVarianzas onCalcular={setDatosRazonVarianzas} />
-                                        <div>
-                                            <GraficoFisher resultados={datosRazonVarianzas} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_RazonVarianzas resultados={datosRazonVarianzas} />
+                                    ) : distribucionActiva === 'razon_varianzas' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_RazonVarianzas onCalcular={setDatosRazonVarianzas} />
+                                            <div>
+                                                <GraficoFisher resultados={datosRazonVarianzas} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_RazonVarianzas resultados={datosRazonVarianzas} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : distribucionActiva === 'dif_proporciones' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
-                                        <Controles_DiferenciaProporciones onCalcular={setDatosDiferenciaProporciones} />
-                                        <div>
-                                            <GraficoDiferenciaProporciones resultados={datosDiferenciaProporciones} />
-                                            <div style={{ marginTop: '20px' }}>
-                                                <Resultados_DiferenciaProporciones resultados={datosDiferenciaProporciones} />
+                                    ) : distribucionActiva === 'dif_proporciones' ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'stretch' }}>
+                                            <Controles_DiferenciaProporciones onCalcular={setDatosDiferenciaProporciones} />
+                                            <div>
+                                                <GraficoDiferenciaProporciones resultados={datosDiferenciaProporciones} />
+                                                <div style={{ marginTop: '20px' }}>
+                                                    <Resultados_DiferenciaProporciones resultados={datosDiferenciaProporciones} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: RADIUS, border: '1px solid var(--border-color)', margin: '20px' }}>
-                                        <h3 style={{ color: 'var(--primary-color)', fontSize: FS.lg, marginBottom: '10px' }}>Distribución</h3>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: FS.md }}>Calculadora en construcción...</p>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--bg-card)', borderRadius: RADIUS, border: '1px solid var(--border-color)', margin: '20px' }}>
+                                            <h3 style={{ color: 'var(--primary-color)', fontSize: FS.lg, marginBottom: '10px' }}>Distribución</h3>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: FS.md }}>Calculadora en construcción...</p>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -1098,6 +1111,7 @@ export default function Principal() {
                             columnaParticion={columnaParticion} setColumnaParticion={setColumnaParticion}
                             varSeleccionada={varSeleccionada}
                             colProbClasica={colProbClasica} setColProbClasica={setColProbClasica}
+                            inputMode={inputModeProb} setInputMode={setInputModeProb}
                         />
                     )}
                 </div>
@@ -1105,8 +1119,8 @@ export default function Principal() {
 
             {/* MODALES*/}
             <ModalEditor modalEditor={modalEditor} setModalEditor={setModalEditor} filasTemp={filasTemp} setFilasTemp={setFilasTemp} columns={columns} guardarEditor={guardarEditor} hayCambiosEditor={hayCambiosEditor} titulo={subTipoProbabilidad === 'frecuentista' ? 'Editor de Datos Históricos' : 'Editor de Espacio Muestral'} />
-            <ModalEventos modalEvento={modalEvento} setModalEvento={setModalEvento} statsEventos={statsEventos} statsEventosPorColumna={(subTipoProbabilidad === 'clasica' || subTipoProbabilidad === 'frecuentista') ? null : statsEventosPorColumnaParaA} eventoFavorable={eventoFavorable} setEventoFavorable={setEventoFavorable} setResProbabilidad={setResProbabilidad} titulo={subTipoProbabilidad === 'frecuentista' ? 'Seleccionar Evento de Interés' : 'Seleccionar Eventos Favorables'} />
-            <ModalEventos modalEvento={modalCondicion} setModalEvento={setModalCondicion} statsEventos={statsEventos} statsEventosPorColumna={statsEventosPorColumna} eventoFavorable={eventoCondicion} setEventoFavorable={setEventoCondicion} setResProbabilidad={setResProbabilidad} titulo="Seleccionar Eventos para Condición (B)" />
+            <ModalEventos modalEvento={modalEvento} setModalEvento={setModalEvento} statsEventos={statsEventos} statsEventosPorColumna={(subTipoProbabilidad === 'clasica' || subTipoProbabilidad === 'frecuentista') ? null : statsEventosPorColumnaParaA} eventoFavorable={eventoFavorable} setEventoFavorable={setEventoFavorable} setResProbabilidad={setResProbabilidad} titulo={subTipoProbabilidad === 'frecuentista' ? 'Seleccionar Evento de Interés' : 'Seleccionar Eventos Favorables'} mostrarFrecuencia={subTipoProbabilidad === 'condicional' || (subTipoProbabilidad === 'frecuentista' && inputModeProb === 'matriz')} />
+            <ModalEventos modalEvento={modalCondicion} setModalEvento={setModalCondicion} statsEventos={statsEventos} statsEventosPorColumna={statsEventosPorColumnaParaB} eventoFavorable={eventoCondicion} setEventoFavorable={setEventoCondicion} setResProbabilidad={setResProbabilidad} titulo="Seleccionar Eventos para Condición (B)" mostrarFrecuencia={subTipoProbabilidad === 'condicional'} />
             <ModalVariables modalVars={modalVars} setModalVars={setModalVars} variables={variables} cargarVariable={cargarVariable} />
 
             {/* Modales Tema 3 */}
